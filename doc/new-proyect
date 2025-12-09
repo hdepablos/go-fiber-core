@@ -1,7 +1,7 @@
 Steps:
 
 1. Crear la base de datos
-2. Ejecutar los scripts de extensiones y users
+2. Ejecutar los scripts de plugins y users
 3. Remplazar con la nueva ruta del proyecto
 4. Ejecutar make install-all-pkg
 5. Ejecutar make migrate-up
