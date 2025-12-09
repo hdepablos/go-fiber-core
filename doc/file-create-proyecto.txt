@@ -1,0 +1,19 @@
+
+Para crear el proyecto desde cero y a la vez posiblemente crear plantillas
+
+# main.go
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Listo... !!!")
+}
+
+# go.mod
+module github/hdepablos/nombre-aplicación
+go 1.23.1
+
+# go.sum
+nombre-service = nombre-aplicación
+docker compose run --rm nombre-service go mod init github/hdepablos/nombre-service

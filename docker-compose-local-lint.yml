@@ -1,0 +1,10 @@
+services:
+  lint:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.lint
+    volumes:
+      - .:/app
+    environment:
+      - GOTOOLCHAIN=local

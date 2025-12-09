@@ -1,0 +1,82 @@
+Modificar el Dockerfile para permitir instalar paquetes:
+    # Crear un usuario no root para seguridad, sin intentar crear el grupo si ya existe
+    RUN getent group appuser || groupadd -r appuser
+    RUN useradd -r -g appuser appuser
+
+    # **Permitir el acceso como root para instalación**
+    USER root
+
+
+brew install mkcert
+mkcert -install
+
+Ahora ejecutas
+    mkdir -p certs
+
+    mkcert -cert-file certs/cert.pem -key-file certs/key.pem "*.localhost" localhost 127.0.0.1 ::1
+
+Esto crea:
+
+certs/cert.pem → certificado
+
+certs/key.pem → llave privada
+
+¡Perfectos para localhost!
+
+Verificar los alias de de contenedores
+docker inspect -f '{{json .NetworkSettings.Networks}}' postgres | jq
+
+Leer el certificado para garantizar que es correcto:
+    openssl x509 -in /var/www/go-fiber-core/certs/local.bankfilegen.test.pem -text -noout
+
+
+Probar https:
+    curl -v https://local.bankfilegen.test
+
+Probar sin validar el certificado:
+    curl -v -k https://local.bankfilegen.test
+
+
+
+El comando:
+openssl s_client -connect localhost:443 -servername local.bankfilegen.test
+
+
+Responde:
+Connecting to ::1
+CONNECTED(00000005)
+80CC7C0402000000:error:0A000458:SSL routines:ssl3_read_bytes:tlsv1 unrecognized name:ssl/record/rec_layer_s3.c:861:SSL alert number 112
+---
+no peer certificate available
+---
+No client certificate CA names sent
+---
+SSL handshake has read 7 bytes and written 330 bytes
+Verification: OK
+---
+New, (NONE), Cipher is (NONE)
+This TLS version forbids renegotiation.
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 0 (ok)
+---
+
+Perfecto, muy buen dato.
+
+Tu respuesta de openssl confirma 100% que el problema es Traefik y no tu app ni los certificados.
+
+
+
+
+
+Correr después de ejecutar el script para las certificaciones:
+
+linux:
+    sudo cp certs/ca/ca.crt.pem /usr/local/share/ca-certificates/mi-local-ca.crt
+    sudo update-ca-certificates
+
+MacOS:
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certs/ca/ca.crt.pem
+

@@ -1,0 +1,27 @@
+¿Cómo saber si necesito aumentar PoolSize?
+Puedes ver el uso del pool con client.PoolStats(). Si Timeouts es alto, necesitas aumentar PoolSize.
+
+stats := client.PoolStats()
+fmt.Println("Total Conexiones:", stats.TotalConns)
+fmt.Println("Conexiones Idle:", stats.IdleConns)
+fmt.Println("Conexiones Estancadas:", stats.StaleConns)
+fmt.Println("Timeouts:", stats.Timeouts)  // Si este número crece, aumenta PoolSize
+
+
+2. ¿Cómo se recomienda usar PoolSize en Redis?
+PoolSize define el número máximo de conexiones simultáneas en el pool de Redis.
+
+Valores recomendados:
+Por defecto: Si no lo defines, go-redis usa 10 * runtime.NumCPU(), es decir, 10 conexiones por CPU.
+Carga baja (API REST pequeña o uso esporádico): PoolSize = 5 - 20
+Carga media (muchas lecturas, algunas escrituras): PoolSize = 50 - 100
+Carga alta (servicio de alta concurrencia o mensajería con Redis): PoolSize = 100 - 500
+Ejemplo de uso recomendado
+go
+Copiar
+Editar
+client := redis.NewClient(&redis.Options{
+	Addr:     "localhost:6379",
+	PoolSize: 50,  // Permite hasta 50 conexiones simultáneas
+})
+Si Redis recibe más conexiones de las permitidas, estas esperarán en cola hasta que alguna quede libre.

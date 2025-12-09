@@ -1,0 +1,26 @@
+meta {
+  name: crear product
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}api/v1/products
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "ol",
+    "price": 10
+  }
+}

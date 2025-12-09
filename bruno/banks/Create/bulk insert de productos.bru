@@ -1,0 +1,30 @@
+meta {
+  name: bulk insert de productos
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}api/v1/products/bulk
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "user_id": 1,
+    "products": [
+      { "name": "Silla Ergonómica azul", "price": 500.00 },
+      { "name": "Teclado Mecánico rojo", "price": 220.00 },
+      { "name": "Mouse Inalámbrico verde", "price": 95.00 }
+    ]
+  }
+}

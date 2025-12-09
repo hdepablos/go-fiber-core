@@ -1,0 +1,40 @@
+package factories
+
+import (
+	"fmt"
+	"go-fiber-core/internal/database/models"
+	"math/rand"
+	"time"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+func CreateBulkProcessDetails(db *gorm.DB, bulkProcessID uint, count int) ([]models.BulkProcessDetail, error) {
+	var details []models.BulkProcessDetail
+	customerId := rand.Intn(1000)
+	for i := 0; i < count; i++ {
+		infoJSON := datatypes.JSON([]byte(`{"example": "data"}`))
+		detail := models.BulkProcessDetail{
+			BulkProcessID:    bulkProcessID,
+			UniqueIdentifier: generateUniqueIdentifier(),
+			CustomerID:       &customerId,
+			Info:             infoJSON,
+			StatusCode:       rand.Intn(5) + 1,
+			CreatedAt:        time.Now(),
+			UpdatedAt:        time.Now(),
+		}
+		details = append(details, detail)
+	}
+
+	if err := db.Create(&details).Error; err != nil {
+		return nil, err
+	}
+
+	return details, nil
+}
+
+func generateUniqueIdentifier() string {
+	// Generar un string con la fecha actual + un número aleatorio de 2 dígitos
+	return time.Now().Format("20060102150") + fmt.Sprintf("%02d", rand.Intn(100))
+}

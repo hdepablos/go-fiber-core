@@ -1,0 +1,22 @@
+Steps:
+
+1. Crear la base de datos
+2. Ejecutar los scripts de extensiones y users
+3. Remplazar con la nueva ruta del proyecto
+4. Ejecutar make install-all-pkg
+5. Ejecutar make migrate-up
+6. Ejecutar make run-cli c="seed"
+
+
+Nota:
+Para crear el Makefile para crear proyecto puntos a contemplar:
+1. El punto 3 es para remplazar la ruta del proyecto
+2. Modificar archivo:
+	a. bruno/bruno.json
+		"name": ${APP_NAME}
+	b. bruno/environments/local.bru
+		urlBase: http://127.0.0.1:9009/
+		por
+		urlBase: http://127.0.0.1:${PORT}/
+
+

@@ -1,0 +1,16 @@
+services:
+  go-fiber-core-cmd:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.cmd.prod
+    env_file:
+      - .env
+    entrypoint: ["/app/bin/cli"]
+    command: ["${CMD_ARGS}"]
+    networks:
+      - nginx-proxy
+    stdin_open: true
+    tty: true
+    restart: "no"
+    labels:
+      - "auto.remove=true"

@@ -1,0 +1,50 @@
+Como un verdadero experto programador en golang he creado un proyecto con go-bluePrint con fiber
+con postgres en su últimas versiones en el cual quiero aplicar las mejores prácticas modernas en go, implementando
+
+Como un verdadero programador experto en goalng, quiero aplicar las mejores prácticas modernas en Go,
+especialmente bajo la filosofía de go-blueprint, clean architecture y legibilidad / testabilidad
+
+
+Como un verdadero experto DevOps
+
+Como un verdadero programador experto en goalng, quiero aplicar las mejores prácticas modernas en Go,
+especialmente bajo la filosofía de go-blueprint, al crear comandos con cobra
+y si la aplicación está compilada para producción como ejecuto los comandos de cobra dockerizada?
+
+
+
+Como un verdadero programador experto en goalng, quiero aplicar las mejores prácticas modernas en Go,
+especialmente bajo la filosofía de go-blueprint al implementar un entorno completo y moderno para desarrollar y 
+probar localmente una API REST que use Lambda + SQS, todo con LocalStack, AWS SAM CLI, Docker Compose,
+incluyendo un Makefile productivo.
+
+Con un ejercicio sencillo que reciba un json:
+
+{
+    "header": true,
+    "refCode": 3001,
+    "lastId": 0,
+    "details": [
+        {
+            "text": "Id",
+            "value": "id",
+            "showColumn": true
+        },
+        {
+            "text": "Nombre",
+            "value": "customer.first_name",
+            "sortable": false,
+            "showColumn": true
+        },
+        {
+            "text": "CUIL",
+            "value": "unique_identifier",
+            "showColumn": true
+        }
+    ]
+}
+
+y que la función sqs reciba y recorra details
+
+
+

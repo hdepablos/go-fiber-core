@@ -1,0 +1,30 @@
+meta {
+  name: paginated base filter frontend
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{urlBase}}api/v1/banks/paginated
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": ["banks.id"],
+      "filterValues": [[1,35,40]],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

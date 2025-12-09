@@ -1,0 +1,88 @@
+app:
+  app_name: ${APP_NAME}
+  app_env: ${APP_ENV}
+
+server:
+  server_header: server_header
+  server_port: ${SERVER_PORT} # Corregido para no usar DB_PORT aquí
+
+jwt:
+  jwt_access_secret: ${JWT_ACCESS_SECRET}
+  jwt_refresh_secret: ${JWT_REFRESH_SECRET}
+  jwt_access_ttl_minutes: ${JWT_ACCESS_TTL_MINUTES}
+  jwt_refresh_ttl_days: ${JWT_REFRESH_TTL_DAYS}
+
+access_external:
+  client_api_token: ${CLIENT_API_TOKEN}
+
+# ==========================================================
+# CAMBIO: SE REESTRUCTURA LA SECCIÓN DE BASE DE DATOS
+# ==========================================================
+database:
+  # Configuraciones para las conexiones gestionadas por GORM
+  gorm:
+    write: # Conexión de escritura principal
+      driver: ${GORM_WRITE_DRIVER}
+      host: ${GORM_WRITE_HOST}
+      port: ${GORM_WRITE_PORT}
+      username: ${GORM_WRITE_USER}
+      password: ${GORM_WRITE_PASSWORD}
+      database: ${GORM_WRITE_DBNAME}
+      schema: ${GORM_WRITE_SCHEMA}
+      max_open_conns: ${GORM_WRITE_MAX_OPEN_CONNS}
+      max_idle_conns: ${GORM_WRITE_MAX_IDLE_CONNS}
+      max_conn_life_time_in_seconds: ${GORM_WRITE_CONN_MAX_LIFETIME_SECONDS}
+
+    read: # Conexión de lectura a la réplica
+      driver: ${GORM_READ_DRIVER}
+      host: ${GORM_READ_HOST}
+      port: ${GORM_READ_PORT}
+      username: ${GORM_READ_USER}
+      password: ${GORM_READ_PASSWORD}
+      database: ${GORM_READ_DBNAME}
+      schema: ${GORM_READ_SCHEMA}
+      max_open_conns: ${GORM_READ_MAX_OPEN_CONNS}
+      max_idle_conns: ${GORM_READ_MAX_IDLE_CONNS}
+      max_conn_life_time_in_seconds: ${GORM_READ_CONN_MAX_LIFETIME_SECONDS}
+
+  # Configuraciones para las conexiones gestionadas por PGX
+  pgx:
+    write: # Conexión de escritura principal
+      host: ${PGX_WRITE_HOST}
+      port: ${PGX_WRITE_PORT}
+      username: ${PGX_WRITE_USER}
+      password: ${PGX_WRITE_PASSWORD}
+      database: ${PGX_WRITE_DBNAME}
+      max_conns: ${PGX_WRITE_MAX_CONNS}
+
+    read: # Conexión de lectura a la réplica
+      host: ${PGX_READ_HOST}
+      port: ${PGX_READ_PORT}
+      username: ${PGX_READ_USER}
+      password: ${PGX_READ_PASSWORD}
+      database: ${PGX_READ_DBNAME}
+      max_conns: ${PGX_READ_MAX_CONNS}
+
+# Las siguientes secciones no cambian
+redis:
+  redis_host: ${REDIS_HOST}
+  redis_port: ${REDIS_PORT}
+  redis_password: ${REDIS_PASSWORD}
+  redis_database: ${REDIS_DATABASE}
+  redis_expires_in_seconds: ${REDIS_EXPIRES_IN_SECONDS}
+  redis_pool_size: ${POOL_SIZE}
+
+email_config:
+  smtp_host: ${SMTP_HOST}
+  smtp_port: ${SMTP_PORT}
+  smtp_username: ${SMTP_USERNAME}
+  smtp_password: ${SMTP_PASSWORD}
+  smtp_from: ${SMTP_FROM}
+
+apis:
+  discord:
+    url: ${NOTIFICATION_API_URL}
+    token: ${NOTIFICATION_API_TOKEN}
+  backoffice:
+    url: ${BACKOFFICE_URL}
+    token: ${BACKOFFICE_TOKEN}

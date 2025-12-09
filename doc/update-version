@@ -1,0 +1,9 @@
+En pocas palabras, el flujo de trabajo es:
+
+Editar: go mod edit -go=1.25
+
+Ordenar: go mod tidy
+
+"Vender": go mod vendor (si aplica)
+
+Probar: make test y make build

@@ -1,0 +1,27 @@
+meta {
+  name: agg roles to menus
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}api/v1/menus/roles/bulk
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "menu_ids": [15, 13],
+    "role_ids": [1, 3]
+  }
+  
+}

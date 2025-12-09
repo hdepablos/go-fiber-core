@@ -1,0 +1,34 @@
+## Flujo Completo de una Petición
+Para unir todo, una petición típica sigue este flujo:
+
+Llega la Petición: Un cliente envía POST /products con un JSON.
+
+Router: El router de la aplicación (ej: Fiber) dirige la petición al Controller/Handler correspondiente.
+
+Controller/Handler:
+
+Valida que el JSON del cuerpo de la petición sea correcto.
+
+Llama al método productService.CreateProduct(...) pasándole los datos ya validados.
+
+Service:
+
+Recibe los datos.
+
+Ejecuta las reglas de negocio (ej: "el precio no puede ser negativo", "el código del producto debe ser único").
+
+Llama a productRepository.Create(...) para guardar el nuevo producto en la base de datos.
+
+Controller/Handler (de nuevo):
+
+Recibe el producto recién creado del servicio.
+
+Lo convierte a JSON.
+
+Envía una respuesta HTTP 201 Created con el JSON en el cuerpo.
+
+## Resumen en una Tabla
+Capa (Layer)	Responsabilidad Principal	Analogía
+Handler / Controller	Gestionar la comunicación HTTP (validar, parsear, serializar).	El Recepcionista
+Service	Orquestar la lógica y las reglas de negocio.	El Departamento Experto
+Repository	Acceder y persistir los datos (hablar con la BD).	El Archivista / Almacén

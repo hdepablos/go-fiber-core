@@ -1,0 +1,6 @@
+networks:
+  nginx-proxy:
+    external: true
+
+volumes:
+  data:

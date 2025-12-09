@@ -1,0 +1,161 @@
+// internal/services/user/user_deactivation_service.go
+package user
+
+import (
+	"context"
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/dtos/requests"
+	"go-fiber-core/internal/models"
+	userRepo "go-fiber-core/internal/repositories/user"
+	"go-fiber-core/internal/services"
+
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+type DeactivationService interface {
+	CreateWithProductsAndRoles(ctx context.Context, user *models.User, roleIDs []uint64) error
+	CreateWithExistingProductsAndRoles(ctx context.Context, user *models.User, productIDs []uint64, roleIDs []uint64) error
+	CreateUserWithNewProductsAndRolesIfNotExist(ctx context.Context, user *models.User, productRequests []requests.ProductRequest, roleRequests []requests.RoleNewRequest) error
+}
+
+type deactivationService struct {
+	services.TransactionManager
+	userWriter userRepo.UserWriter
+	userReader userRepo.UserReader
+}
+
+func NewDeactivationService(
+	conn *connect.ConnectDTO,
+	writer userRepo.UserWriter,
+	reader userRepo.UserReader,
+) DeactivationService {
+	return &deactivationService{
+		TransactionManager: services.NewTransactionManager(conn),
+		userWriter:         writer,
+		userReader:         reader,
+	}
+}
+
+func (s *deactivationService) CreateWithProductsAndRoles(ctx context.Context, user *models.User, roleIDs []uint64) error {
+	return s.TransactionManager.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		user.Password = string(hashedPassword)
+		user.IsActive = true
+
+		if err := s.userWriter.Create(ctx, tx, user); err != nil {
+			return err
+		}
+
+		if len(roleIDs) > 0 {
+			var roles []models.Role
+			if err := tx.Find(&roles, roleIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(user).Association("Roles").Replace(roles); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// func (s *deactivationService) CreateWithExistingProductsAndRoles(ctx context.Context, user *models.User, productIDs []uint64, roleIDs []uint64) error {
+// 	return s.TransactionManager.ExecuteTx(ctx, func(tx *gorm.DB) error {
+// 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		user.Password = string(hashedPassword)
+// 		user.IsActive = true
+
+// 		if err := s.userWriter.Create(ctx, tx, user); err != nil {
+// 			return err
+// 		}
+
+// 		if len(productIDs) > 0 {
+// 			var products []models.Product
+// 			if err := tx.Find(&products, productIDs).Error; err != nil {
+// 				return err
+// 			}
+// 			if err := tx.Model(user).Association("Products").Replace(products); err != nil {
+// 				return err
+// 			}
+// 		}
+
+// 		if len(roleIDs) > 0 {
+// 			var roles []models.Role
+// 			if err := tx.Find(&roles, roleIDs).Error; err != nil {
+// 				return err
+// 			}
+// 			if err := tx.Model(user).Association("Roles").Replace(roles); err != nil {
+// 				return err
+// 			}
+// 		}
+
+// 		return nil
+// 	})
+// }
+
+// func (s *deactivationService) CreateUserWithNewProductsAndRolesIfNotExist(ctx context.Context, user *models.User, productRequests []requests.ProductRequest, roleRequests []requests.RoleNewRequest) error {
+// 	return s.TransactionManager.ExecuteTx(ctx, func(tx *gorm.DB) error {
+// 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		user.Password = string(hashedPassword)
+// 		user.IsActive = true
+
+// 		// Validar existencia de productos
+// 		for _, p := range productRequests {
+// 			var existing models.Product
+// 			if err := tx.Where("name = ?", p.Name).First(&existing).Error; err == nil {
+// 				return fmt.Errorf("el producto '%s' ya existe", p.Name)
+// 			} else if err != gorm.ErrRecordNotFound {
+// 				return err
+// 			}
+// 		}
+
+// 		// Validar existencia de roles
+// 		for _, r := range roleRequests {
+// 			var existing models.Role
+// 			if err := tx.Where("name = ?", r.Name).First(&existing).Error; err == nil {
+// 				return fmt.Errorf("el rol '%s' ya existe", r.Name)
+// 			} else if err != gorm.ErrRecordNotFound {
+// 				return err
+// 			}
+// 		}
+
+// 		// Convertir ProductRequest a models.Product
+// 		for _, p := range productRequests {
+// 			user.Products = append(user.Products, models.Product{
+// 				Name:  p.Name,
+// 				Price: p.Price,
+// 			})
+// 		}
+
+// 		if err := s.userWriter.Create(ctx, tx, user); err != nil {
+// 			return err
+// 		}
+
+// 		var roles []models.Role
+// 		for _, r := range roleRequests {
+// 			roles = append(roles, models.Role{Name: r.Name})
+// 		}
+
+// 		if len(roles) > 0 {
+// 			if err := tx.Create(&roles).Error; err != nil {
+// 				return err
+// 			}
+// 			if err := tx.Model(user).Association("Roles").Replace(roles); err != nil {
+// 				return err
+// 			}
+// 		}
+
+// 		return nil
+// 	})
+// }

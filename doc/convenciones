@@ -1,0 +1,17 @@
+Resumen de convenciones
+
+Paquete lo dice todo: service, repository, interfaces, no hace falta repetir "interface" o "impl".
+exepto algunos casos que la carpeta esta dentro de otra carpeta al final de la carpeta
+se le coloca _service/_interface/_struct etc...
+
+Todos
+    Elemento	                Estilo sugerido	    Ejemplo
+    Nombre de archivo/carpeta	snake_case          config_punitive, service_config.go, config_punitive_service
+    Nombre del interno  	    CamelCase          NewPunitiveService, Struct/Interface
+
+Comandos
+    Elemento	            Estilo sugerido	    Ejemplo
+    Nombre CLI	            kebab-case          service-config, service-config-punitive
+    Nombre de archivo	    snake_case          service_config.go, service_config_punitive.go
+    Nombre de comando Go	PascalCase          serviceConfigCmd, serviceConfigPunitiveCmd
+

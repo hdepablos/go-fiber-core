@@ -1,0 +1,36 @@
+-- go local para poder correr el make watch
+    GOPATH=$HOME/go  PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+
+Run proyecto
+    clear && docker compose up --remove-orphans --force-recreate
+    clear && docker compose up --remove-orphans --force-recreate -d
+
+-- instrucción install librería
+    docker compose run --rm go-padron go get librería
+    docker compose run --rm go-padron go get github.com/redis/go-redis/v9
+
+-- validator
+    go get gopkg.in/go-playground/validator.v10
+
+-- instrucción remove librería
+    docker compose run --rm go-padron go get -u librería
+    docker compose run --rm go-padron go mod tidy
+
+    docker compose run --rm go-padron go get gopkg.in/go-playground/validator.v10
+
+
+install librerias
+    --  mensajes con color
+        docker compose run --rm go-padron go get github.com/TwiN/go-color
+
+    -- logger cutoms
+        docker compose run --rm go-fiber-core go get github.com/charmbracelet/log@latest
+
+    -- install fiberv2
+        docker-compose run --rm go-padron go get github.com/gofiber/fiber/v2
+
+
+verificar que este instalada correctamente
+ls -l /usr/local/bin/cobra
+
+docker compose run --rm go-fiber-core ls -l /usr/local/bin/cobra

@@ -1,0 +1,267 @@
+package user
+
+import (
+	"context"
+	"errors"
+	"go-fiber-core/internal/dtos"
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/models"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+// --- MOCKS ---
+
+// MockUserRepository es una implementación falsa de la interfaz UserRepository.
+type MockUserRepository struct {
+	mock.Mock
+}
+
+// createGormConnection es un helper interno para no duplicar la lógica de conexión.
+func (m *MockUserRepository) Create(ctx context.Context, db *gorm.DB, user *models.User) error {
+	args := m.Mock.Called(ctx, db, user)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) Update(ctx context.Context, db *gorm.DB, user *models.User) error {
+	args := m.Mock.Called(ctx, db, user)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) SoftDelete(ctx context.Context, db *gorm.DB, id uint64) error {
+	args := m.Mock.Called(ctx, db, id)
+	return args.Error(0)
+}
+
+// Implementación a prueba de balas para GetByID para evitar panics.
+func (m *MockUserRepository) GetByID(ctx context.Context, db *gorm.DB, id uint64) (*models.User, error) {
+	args := m.Mock.Called(ctx, db, id)
+	if user, ok := args.Get(0).(*models.User); ok {
+		return user, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) GetByEmail(ctx context.Context, db *gorm.DB, email string) (*models.User, error) {
+	args := m.Mock.Called(ctx, db, email)
+	if user, ok := args.Get(0).(*models.User); ok {
+		return user, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepository) GetAll(ctx context.Context, db *gorm.DB) ([]models.User, error) {
+	args := m.Mock.Called(ctx, db)
+	if users, ok := args.Get(0).([]models.User); ok {
+		return users, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// MockUserPaginationRepository es una implementación falsa para el repositorio de paginación.
+type MockUserPaginationRepository struct {
+	mock.Mock
+}
+
+func (m *MockUserPaginationRepository) GetAllPaginated(ctx context.Context, db *gorm.DB, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.User], error) {
+	args := m.Mock.Called(ctx, db, req)
+	if resp, ok := args.Get(0).(*dtos.PaginationResponse[models.User]); ok {
+		return resp, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// --- TESTS ---
+
+func TestUserWriterService_Create_Success(t *testing.T) {
+	// Arrange
+	mockRepo := new(MockUserRepository)
+	service := NewUserWriterService(mockRepo, connect.ConnectDTO{})
+	plainPassword := "password123"
+	userToCreate := &models.User{
+		Name:     "Test User",
+		Email:    "test@test.com",
+		Password: plainPassword,
+	}
+
+	mockRepo.Mock.On("Create", mock.Anything, mock.Anything, mock.MatchedBy(func(user *models.User) bool {
+		// Assert business logic
+		err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(plainPassword))
+		return err == nil && user.IsActive
+	})).Return(nil)
+
+	// Act
+	err := service.Create(context.Background(), userToCreate)
+
+	// Assert
+	assert.NoError(t, err)
+	mockRepo.Mock.AssertExpectations(t)
+}
+
+func TestUserWriterService_Create_RepositoryError(t *testing.T) {
+	// Arrange
+	mockRepo := new(MockUserRepository)
+	service := NewUserWriterService(mockRepo, connect.ConnectDTO{})
+	userToCreate := &models.User{Password: "password123"}
+	expectedError := errors.New("database error simulated")
+
+	mockRepo.Mock.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(expectedError)
+
+	// Act
+	err := service.Create(context.Background(), userToCreate)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, expectedError, err)
+	mockRepo.Mock.AssertExpectations(t)
+}
+
+func TestUserWriterService_Update_WithPasswordChange(t *testing.T) {
+	// Arrange
+	mockRepo := new(MockUserRepository)
+	service := NewUserWriterService(mockRepo, connect.ConnectDTO{})
+	newPlainPassword := "newPassword456"
+	userToUpdate := &models.User{
+		ID:       1,
+		Name:     "Updated Name",
+		Email:    "test@test.com",
+		Password: newPlainPassword,
+	}
+
+	mockRepo.Mock.On("Update", mock.Anything, mock.Anything, mock.MatchedBy(func(user *models.User) bool {
+		err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(newPlainPassword))
+		return err == nil
+	})).Return(nil)
+
+	// Act
+	err := service.Update(context.Background(), userToUpdate)
+
+	// Assert
+	assert.NoError(t, err)
+	mockRepo.Mock.AssertExpectations(t)
+}
+
+func TestUserReaderService_GetByID_Success(t *testing.T) {
+	// Arrange
+	mockUserRepo := new(MockUserRepository)
+	mockPaginationRepo := new(MockUserPaginationRepository)
+	service := NewUserReaderService(mockUserRepo, mockPaginationRepo, connect.ConnectDTO{})
+
+	userID := uint64(123)
+	expectedUser := &models.User{
+		ID:    userID,
+		Name:  "Found User",
+		Email: "found@test.com",
+	}
+
+	mockUserRepo.Mock.On("GetByID", mock.Anything, mock.Anything, userID).Return(expectedUser, nil)
+
+	// Act
+	foundUser, err := service.GetByID(context.Background(), userID)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, foundUser)
+	assert.Equal(t, expectedUser, foundUser)
+	mockUserRepo.Mock.AssertExpectations(t)
+}
+
+func TestUserReaderService_GetByID_NotFound(t *testing.T) {
+	// Arrange
+	mockUserRepo := new(MockUserRepository)
+	mockPaginationRepo := new(MockUserPaginationRepository)
+	service := NewUserReaderService(mockUserRepo, mockPaginationRepo, connect.ConnectDTO{})
+	nonExistentUserID := uint64(999)
+
+	mockUserRepo.Mock.On("GetByID", mock.Anything, mock.Anything, nonExistentUserID).Return(nil, gorm.ErrRecordNotFound)
+
+	// Act
+	foundUser, err := service.GetByID(context.Background(), nonExistentUserID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, foundUser)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	mockUserRepo.Mock.AssertExpectations(t)
+}
+
+func TestUserReaderService_GetAllPaginated_Success(t *testing.T) {
+	// --- Arrange (Preparación) ---
+	mockUserRepo := new(MockUserRepository)
+	mockPaginationRepo := new(MockUserPaginationRepository)
+	mockConnectDTO := connect.ConnectDTO{}
+
+	service := NewUserReaderService(mockUserRepo, mockPaginationRepo, mockConnectDTO)
+
+	paginationRequest := dtos.PaginationRequest{
+		Page:        1,
+		RowsPerPage: 10,
+	}
+
+	// CAMBIO: Usamos el nombre de campo correcto (ej. 'Total') al definir la respuesta esperada.
+	expectedResponse := &dtos.PaginationResponse[models.User]{
+		TotalRows:  1, // <-- CAMBIO DE 'TotalRecords' A 'Total'
+		TotalPages: 1,
+		Page:       1,
+		Data: []models.User{
+			{ID: 1, Name: "Paginated User", Email: "pagination@test.com"},
+		},
+	}
+
+	mockPaginationRepo.Mock.On("GetAllPaginated", mock.Anything, mock.Anything, paginationRequest).Return(expectedResponse, nil)
+
+	// --- Act (Ejecución) ---
+	actualResponse, err := service.GetAllPaginated(context.Background(), paginationRequest)
+
+	// --- Assert (Verificación) ---
+	assert.NoError(t, err)
+	assert.NotNil(t, actualResponse)
+	assert.Equal(t, expectedResponse, actualResponse)
+	assert.Len(t, actualResponse.Data, 1)
+	assert.Equal(t, "Paginated User", actualResponse.Data[0].Name)
+
+	mockPaginationRepo.Mock.AssertExpectations(t)
+	mockUserRepo.Mock.AssertNotCalled(t, "GetByID")
+}
+
+func TestUserReaderService_GetAllPaginated_RepositoryError(t *testing.T) {
+	// --- Arrange (Preparación) ---
+	mockUserRepo := new(MockUserRepository)
+	mockPaginationRepo := new(MockUserPaginationRepository)
+	mockConnectDTO := connect.ConnectDTO{}
+
+	service := NewUserReaderService(mockUserRepo, mockPaginationRepo, mockConnectDTO)
+
+	paginationRequest := dtos.PaginationRequest{
+		Page:        1,
+		RowsPerPage: 10,
+	}
+
+	// Creamos un error de ejemplo que nuestro mock devolverá.
+	expectedError := errors.New("error simulado del repositorio de paginación")
+
+	// Configuramos la expectativa del Mock de PAGINACIÓN.
+	// Le decimos que cuando lo llamen, devuelva una respuesta nula y nuestro error.
+	mockPaginationRepo.Mock.On("GetAllPaginated", mock.Anything, mock.Anything, paginationRequest).Return(nil, expectedError)
+
+	// --- Act (Ejecución) ---
+	actualResponse, err := service.GetAllPaginated(context.Background(), paginationRequest)
+
+	// --- Assert (Verificación) ---
+
+	// 1. Verificamos que SÍ recibimos un error.
+	assert.Error(t, err)
+
+	// 2. Verificamos que el error es el que esperábamos.
+	assert.Equal(t, expectedError, err)
+
+	// 3. Verificamos que la respuesta es nula, ya que hubo un error.
+	assert.Nil(t, actualResponse)
+
+	// 4. Verificamos que el mock fue llamado como esperábamos.
+	mockPaginationRepo.Mock.AssertExpectations(t)
+}

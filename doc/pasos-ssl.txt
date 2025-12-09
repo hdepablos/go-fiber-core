@@ -1,0 +1,2 @@
+Pasos:
+    chmod +x scripts/generate-local-cert.sh

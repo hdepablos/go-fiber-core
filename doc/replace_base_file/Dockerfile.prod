@@ -1,0 +1,51 @@
+# Etapa 1: Descargar dependencias
+FROM golang:1.24-bookworm AS deps
+
+WORKDIR /app
+
+# Copiar los archivos del módulo y descargar las dependencias
+COPY go.mod go.sum /app/
+RUN go mod download
+
+# Etapa 2: Construcción de la aplicación
+FROM golang:1.24-bookworm AS builder
+
+WORKDIR /app/cmd/api
+
+# Copiar las dependencias descargadas desde la etapa deps
+COPY --from=deps /go/pkg /go/pkg
+
+# Copiar el código fuente de la aplicación
+COPY . /app
+
+# Crear la carpeta bin
+RUN mkdir -p /app/bin
+
+# Construir el binario en la carpeta bin
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app/bin/app
+
+# Etapa final: Imagen de producción
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Crear un usuario no root para seguridad
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Crear la carpeta bin antes de copiar
+RUN mkdir -p /app/bin
+
+# Copiar la carpeta bin desde la etapa de construcción
+COPY --from=builder /app/bin /app/bin
+
+# Asignar permisos al usuario no root
+RUN chown -R appuser:appuser /app/bin
+
+# Cambiar a usuario no root
+USER appuser
+
+# Exponer el puerto si es necesario (descomentar si es aplicable)
+# EXPOSE 8080
+
+# Ejecutar la aplicación
+CMD ["/app/bin/app"]

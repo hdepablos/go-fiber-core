@@ -1,0 +1,54 @@
+mostrar las dependencias con la version especifica
+    docker compose run --rm go-fiber-core cat go.mod | grep redis
+
+entrar a la maquina docker
+    docker compose run --rm go-padron sh
+
+
+docker-compose down --rmi all --volumes --remove-orphans
+docker-compose build --no-cache
+docker-compose up
+
+docker compose run --rm go-padron go get github.com/spf13/viper
+
+para ver los log de la construcción
+
+docker compose up --build --remove-orphans --force-recreate > build_logs.txt
+
+docker compose up --remove-orphans --force-recreate
+
+Para probar el dockerfile
+    docker build -f tools/Dockerfile.production -t myapp:test .
+
+Correr con replicas
+    docker compose up --build --remove-orphans --force-recreate --scale app=3 -d
+
+
+
+Para jsonb
+gorm.io/datatypes
+
+
+
+Para ejecutar un bash desde Makefile
+    run_traefik:
+        @bash -c "docker-compose -f docker-compose-base.yml -p traefik -f docker-compose-traefik.yml up -d"
+
+
+para comprobar el rate limit
+    bash -c 'for i in {1..15}; do curl -H "X-Client-Code: unique-code-123" http://127.0.0.1:9009/; done'
+
+
+saber si esta activo el Swarm
+docker info | grep Swarm
+
+
+Ejecutar comandos con parámetros
+    make run_cmd_cli CMD_ARGS='mycmd --env=prod --force'
+
+
+sudo apt install tree
+brew install tree
+
+find . -maxdepth 3
+

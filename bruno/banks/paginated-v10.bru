@@ -1,0 +1,26 @@
+meta {
+  name: paginated-v10
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{urlBase}}api/v1/banks/paginated
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["banks.id"],
+      "sortDesc": [true],
+      "filterBy": ["banks.name:fuzzy"],
+      "filterValues": ["provincia buenos"],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

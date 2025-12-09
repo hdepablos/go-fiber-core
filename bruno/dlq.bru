@@ -1,0 +1,17 @@
+meta {
+  name: dlq
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://127.0.0.1:9009/dlq?origen=sns&proyecto=sqsv4&ambiente=prod
+  body: none
+  auth: none
+}
+
+params:query {
+  origen: sns
+  proyecto: sqsv4
+  ambiente: prod
+}

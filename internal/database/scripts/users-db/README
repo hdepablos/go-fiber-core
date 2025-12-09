@@ -1,0 +1,18 @@
+-- *********************************************************
+-- Readme antes de ejecutar este script:
+-- 1. Asegúrate de tener permisos de superusuario o los permisos necesarios para
+--    crear roles y asignar privilegios en la base de datos.
+-- *********************************************************
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+
+
+-- ==========================================================
+-- (opcional): Confirmar que no existan dependencias
+-- ==========================================================
+
+SELECT *
+FROM pg_shdepend d
+JOIN pg_roles r ON d.refobjid = r.oid
+WHERE r.rolname = 'gorm_writer';

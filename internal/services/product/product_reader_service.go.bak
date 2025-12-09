@@ -1,0 +1,37 @@
+package product
+
+import (
+	"context"
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/models"
+	productRepo "go-fiber-core/internal/repositories/product"
+)
+
+type ProductReaderService interface {
+	GetByID(ctx context.Context, id uint) (*models.Product, error)
+	GetAll(ctx context.Context) ([]models.Product, error)
+}
+
+type productReaderService struct {
+	conn          *connect.ConnectDTO
+	productReader productRepo.ProductReader
+}
+
+func NewProductReaderService(
+	conn *connect.ConnectDTO,
+	reader productRepo.ProductReader,
+	paginator productRepo.ProductPagination,
+) ProductReaderService {
+	return &productReaderService{
+		conn:          conn,
+		productReader: reader,
+	}
+}
+
+func (s *productReaderService) GetByID(ctx context.Context, id uint) (*models.Product, error) {
+	return s.productReader.GetByID(ctx, s.conn.ConnectGormRead, id)
+}
+
+func (s *productReaderService) GetAll(ctx context.Context) ([]models.Product, error) {
+	return s.productReader.GetAll(ctx, s.conn.ConnectGormRead)
+}

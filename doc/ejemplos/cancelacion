@@ -1,0 +1,100 @@
+
+// Obtenemos los elementos del DOM
+const startButton = document.getElementById('startButton');
+const cancelButton = document.getElementById('cancelButton');
+const statusDiv = document.getElementById('status');
+
+// Declaramos el controlador en un scope accesible por ambas funciones
+let abortController;
+
+// Función para iniciar la petición
+const startRequest = async () => {
+    // 1. Creamos un nuevo controlador para cada petición
+    abortController = new AbortController();
+    const signal = abortController.signal;
+
+    // Actualizamos la UI para indicar que el proceso comenzó
+    statusDiv.textContent = 'Petición en curso...';
+    startButton.disabled = true;
+    cancelButton.disabled = false;
+
+    try {
+        // 2. Hacemos la petición y pasamos el 'signal' en el objeto de configuración
+        const response = await axios.get('https://jsonplaceholder.typicode.com/users', {
+            signal: signal
+        });
+        
+        statusDiv.textContent = `Éxito: Se encontraron ${response.data.length} usuarios.`;
+        console.log(response.data);
+
+    } catch (error) {
+        // 4. Axios tiene un helper para saber si el error fue por cancelación
+        if (axios.isCancel(error)) {
+            statusDiv.textContent = 'La petición fue cancelada por el usuario.';
+            console.log('Error de cancelación:', error.message);
+        } else {
+            // Manejo de otros errores (de red, etc.)
+            statusDiv.textContent = 'Ocurrió un error en la petición.';
+            console.error('Error de Axios:', error);
+        }
+    } finally {
+        // Se ejecuta siempre, ya sea por éxito, cancelación u otro error
+        startButton.disabled = false;
+        cancelButton.disabled = true;
+    }
+};
+
+// Función para cancelar la petición
+const cancelRequest = () => {
+    if (abortController) {
+        // 3. Llamamos a .abort() para cancelar
+        abortController.abort();
+    }
+};
+
+// Asignamos las funciones a los eventos de los botones
+startButton.addEventListener('click', startRequest);
+cancelButton.addEventListener('click', cancelRequest);
+
+
+
+package main
+
+import(
+    "log"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+func devolucionesHandler(c * fiber.Ctx) error {
+    log.Println("✅ Petición recibida...")
+
+    // Aquí está el "receptor" de la señal de cancelación del cliente.
+    // Fiber nos da acceso al context.Context estándar de Go.
+    ctx:= c.UserContext()
+
+	select {
+	case < -time.After(10 * time.Second):
+        // Este bloque se ejecuta si la tarea termina antes de que el cliente cancele.
+        log.Println("👍 Tarea completada.")
+        return c.SendString("Proceso completado.")
+
+	// ESTA ES LA PARTE CLAVE:
+	case < -ctx.Done():
+        // Esta línea se activa CUANDO el cliente cierra la conexión (por el AbortController).
+        // El canal `ctx.Done()` se cierra, lo que desbloquea este 'case'.
+        log.Println("🚫 Conexión cerrada por el cliente. Cancelando tarea.")
+
+        // Detenemos el trabajo y retornamos.
+        return nil
+    }
+}
+
+func main() {
+    app:= fiber.New()
+    app.Get("/devoluciones", devolucionesHandler)
+
+    log.Println("🚀 Servidor Fiber escuchando en http://localhost:8080")
+    log.Fatal(app.Listen(":8080"))
+}

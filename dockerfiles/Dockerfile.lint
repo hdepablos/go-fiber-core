@@ -1,0 +1,24 @@
+# 1. Empezamos con la imagen oficial de Go en la versión exacta que necesita tu proyecto.
+FROM golang:1.25-alpine
+
+# 2. Establecemos el directorio de trabajo.
+WORKDIR /app
+
+# 3. Instalamos 'curl' para poder descargar el linter.
+RUN apk add --no-cache curl
+
+# 4. Usamos el script oficial para instalar la última versión estable de golangci-lint.
+#    Cambiamos v1.59.1 por la versión que necesites en el futuro.
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.59.1
+
+# 5. Copiamos el código de tu proyecto al contenedor.
+COPY . .
+
+# 6. Mantenemos tu configuración para que Go use el toolchain local del contenedor (que ahora es 1.25).
+ENV GOTOOLCHAIN=local
+
+# 7. Establecemos el punto de entrada al binario del linter que acabamos de instalar.
+ENTRYPOINT ["/go/bin/golangci-lint"]
+
+# 8. El comando por defecto será 'run'.
+CMD ["run"]

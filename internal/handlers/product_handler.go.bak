@@ -1,0 +1,300 @@
+package handlers
+
+import (
+	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/dtos"
+	"go-fiber-core/internal/dtos/requests" //nolint
+	"go-fiber-core/internal/dtos/responses"
+	"go-fiber-core/internal/models"
+	productService "go-fiber-core/internal/services/product"
+	"log" // <-- AÑADIDO: Para logging de ejemplo
+
+	fiber "github.com/gofiber/fiber/v2"
+)
+
+// Interfaz del Handler
+type ProductHandler interface {
+	Create(c *fiber.Ctx) error
+	GetAll(c *fiber.Ctx) error
+	GetByID(c *fiber.Ctx) error
+	Update(c *fiber.Ctx) error
+	SoftDelete(c *fiber.Ctx) error
+	HardDelete(c *fiber.Ctx) error
+	GetAllPaginated(c *fiber.Ctx) error
+	BulkInsertProducts(c *fiber.Ctx) error // 👈 Nuevo método
+
+	// --- NUEVOS MÉTODOS DE CONFIG ---
+	PrintRedisConfig(c *fiber.Ctx) error
+	PrintServiceConfigs(c *fiber.Ctx) error
+}
+
+// Handler concreto
+type productHandler struct {
+	writer    productService.ProductWriterService
+	reader    productService.ProductReaderService
+	paginator productService.ProductPaginationService
+
+	// --- NUEVOS CAMPOS ---
+	apiService        productService.ProductAPIService
+	serviceConfigServ productService.ProductServiceConfigService
+}
+
+// Constructor actualizado
+func NewProductHandler(
+	writer productService.ProductWriterService,
+	reader productService.ProductReaderService,
+	paginator productService.ProductPaginationService,
+	apiService productService.ProductAPIService,
+	serviceConfigServ productService.ProductServiceConfigService,
+) ProductHandler {
+	return &productHandler{
+		writer:            writer,
+		reader:            reader,
+		paginator:         paginator,
+		apiService:        apiService,
+		serviceConfigServ: serviceConfigServ,
+	}
+}
+
+// --- Métodos ---
+
+//////ACA Al crear el producto pasar userId
+
+func (h *productHandler) Create(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// AÑADIDO: Obtener el ID de usuario del contexto
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+	log.Printf("Usuario %d está creando un producto", userID)
+	// ---
+
+	var req requests.CreateProductRequest
+	if err := c.BodyParser(&req); err != nil {
+		return responses.Error(c, fiber.StatusBadRequest, "Error al parsear el cuerpo de la solicitud", err)
+	}
+
+	newProduct := models.Product{
+		Name:   req.Name,
+		Price:  req.Price,
+		UserID: &userID,
+		// Opcional: Podrías añadir CreatedByUserID: userID aquí si tu modelo lo soporta
+	}
+
+	if err := h.writer.Create(ctx, &newProduct); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Producto creado exitosamente", newProduct)
+}
+
+func (h *productHandler) GetAll(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// 🔒 Validar sesión
+	_, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+
+	// 📦 Obtener todos los productos
+	products, err := h.reader.GetAll(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusInternalServerError, "Error al obtener los productos", err)
+	}
+
+	// 🧭 Mapear la respuesta limpia (sin campos internos)
+	resp := responses.MapProductsToResponse(products)
+
+	return responses.Success(c, "Productos obtenidos exitosamente", resp)
+}
+
+func (h *productHandler) GetByID(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	_, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+
+	id, err := getUintID(c)
+	if err != nil {
+		return err
+	}
+
+	product, err := h.reader.GetByID(ctx, uint(id))
+	if err != nil {
+		return err
+	}
+
+	// 🔹 Usamos el mapper para limpiar la respuesta
+	resp := responses.MapProductToResponse(product)
+
+	return responses.Success(c, "Producto obtenido exitosamente", resp)
+}
+
+func (h *productHandler) Update(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// AÑADIDO: Obtener el ID de usuario del contexto
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+	// ---
+
+	id, err := getUintID(c) // Asumiendo que getUintID está en helpers.go
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Usuario %d está actualizando el producto %d", userID, id)
+
+	var req requests.UpdateProductRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	updatedProduct, err := h.writer.Update(ctx, uint(id), &models.Product{
+		Name:  req.Name,
+		Price: req.Price,
+	})
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Producto actualizado exitosamente", updatedProduct)
+}
+
+func (h *productHandler) SoftDelete(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// AÑADIDO: Obtener el ID de usuario del contexto
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+	// ---
+
+	id, err := getUintID(c) // Asumiendo que getUintID está en helpers.go
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Usuario %d está borrando lógicamente el producto %d", userID, id)
+
+	if err := h.writer.SoftDelete(ctx, uint(id)); err != nil {
+		return err
+	}
+	return responses.Success(c, "Producto borrado lógicamente", nil)
+}
+
+func (h *productHandler) HardDelete(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// AÑADIDO: Obtener el ID de usuario del contexto
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+	// ---
+
+	id, err := getUintID(c) // Asumiendo que getUintID está en helpers.go
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Usuario %d está borrando permanentemente el producto %d", userID, id)
+
+	if err := h.writer.HardDelete(ctx, uint(id)); err != nil {
+		return err
+	}
+	return responses.Success(c, "producto borrado permanentemente", nil)
+}
+
+func (h *productHandler) GetAllPaginated(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// AÑADIDO: Obtener el ID de usuario del contexto
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+	// ---
+
+	log.Printf("Usuario %d la solicita la paginación", userID)
+
+	var req dtos.PaginationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	response, err := h.paginator.GetAllPaginated(ctx, req)
+	if err != nil {
+		return err
+	}
+	return responses.Success(c, "Productos paginados obtenidos exitosamente", response)
+}
+
+// BulkInsertProducts permite insertar varios productos asociados a un usuario existente
+func (h *productHandler) BulkInsertProducts(c *fiber.Ctx) error {
+	var req requests.BulkCreateProductsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Error al parsear la solicitud: "+err.Error())
+	}
+
+	if len(req.Products) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "La lista de productos está vacía")
+	}
+
+	// Convertimos los datos a modelos
+	products := make([]models.Product, 0, len(req.Products))
+	for _, p := range req.Products {
+		products = append(products, models.Product{
+			Name:   p.Name,
+			Price:  p.Price,
+			UserID: &req.UserID, // 👈 se asigna el mismo usuario a todos
+		})
+	}
+
+	ctx := c.UserContext()
+	if err := h.writer.CreateBulk(ctx, products); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "Error al insertar productos: "+err.Error())
+	}
+
+	// 🔹 Respuesta uniforme
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"status":  "success",
+		"message": "Productos creados correctamente",
+		"data": fiber.Map{
+			"user_id":  req.UserID,
+			"products": products,
+		},
+	})
+}
+
+func (h *productHandler) PrintRedisConfig(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	if err := h.apiService.PrintRedisConfig(ctx); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  "success",
+		"message": "Redis config printed successfully",
+	})
+}
+
+func (h *productHandler) PrintServiceConfigs(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	if err := h.serviceConfigServ.PrintConfigs(ctx); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  "success",
+		"message": "Service config printed successfully",
+	})
+}

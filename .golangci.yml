@@ -1,0 +1,44 @@
+run:
+  timeout: 5m
+  tests: true
+  concurrency: 4
+  go: "1.25"
+linters-settings:
+  revive:
+    config: revive.toml
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-files:
+    - "cmd/api/di/wire_gen\\.go"
+  exclude-rules:
+    - path: _test\.go
+      text: "should have comment or be unexported"
+    - path: wire_gen\.go
+      linters:
+        - all
+    - path: cmd/api/di/wire_gen\.go
+      linters:
+        - all
+output:
+  formats: colored-line-number
+  print-issued-lines: true
+  uniq-by-line: true
+  sort-results: true
+skip-files:
+  - "mocks/"
+  - "gen/"
+  - "docs/"
+  - "tools/"
+  - "cmd/api/di/wire_gen.go"
+skip-dirs:
+  - "vendor/"
+  - "node_modules/"
+  - "tmp/"
+  - "certs/"
+  - "dockerfiles/"
+  - "doc/"
+  - "bruno/"
+  - "scripts/"
+  - "traefik/"

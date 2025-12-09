@@ -1,0 +1,107 @@
+package bank
+
+import (
+	"context"
+	"go-fiber-core/internal/dtos"
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/repositories/bank"
+
+	"gorm.io/gorm" // Asegúrate de importar gorm
+)
+
+type BankPaginationService interface {
+	GetAllPaginated(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Bank], error)
+}
+
+type bankPaginationService struct {
+	conn      *connect.ConnectDTO
+	paginator bank.BankPagination // Esta es la interfaz del repositorio
+}
+
+func NewBankPaginationService(
+	conn *connect.ConnectDTO,
+	paginator bank.BankPagination,
+) BankPaginationService {
+	return &bankPaginationService{
+		conn:      conn,
+		paginator: paginator,
+	}
+}
+
+// GetAllPaginated con cálculo de Extras (Sumas y Conteos)
+func (s *bankPaginationService) GetAllPaginated(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Bank], error) {
+
+	// 1. Define tu "receta" para calcular extras.
+	extrasCalc := func(query *gorm.DB) (map[string]any, error) {
+
+		// 'query' ES LA CONSULTA *YA FILTRADA* con los datos de 'req'.
+
+		var (
+			totalMontoActivo   float64
+			totalMontoInactivo float64
+			countActivo        int64
+			countInactivo      int64
+		)
+
+		// --- CÁLCULOS PARA ACTIVOS ---
+
+		// Clonamos la consulta filtrada y le agregamos el filtro de 'is_active'
+		queryActivos := query.Session(&gorm.Session{}).
+			Model(&models.Bank{}).
+			Where("is_active = ?", true)
+
+		// Calculamos la SUMA de activos
+		if err := queryActivos.Select("COALESCE(SUM(monto), 0)").Scan(&totalMontoActivo).Error; err != nil {
+			return nil, err
+		}
+
+		// Calculamos el CONTEO de activos (reutilizando queryActivos)
+		if err := queryActivos.Count(&countActivo).Error; err != nil {
+			return nil, err
+		}
+
+		// --- CÁLCULOS PARA INACTIVOS ---
+
+		// Clonamos la consulta filtrada original y le agregamos el filtro de 'is_active'
+		queryInactivos := query.Session(&gorm.Session{}).
+			Model(&models.Bank{}).
+			Where("is_active = ?", false)
+
+		// Calculamos la SUMA de inactivos
+		if err := queryInactivos.Select("COALESCE(SUM(monto), 0)").Scan(&totalMontoInactivo).Error; err != nil {
+			return nil, err
+		}
+
+		// Calculamos el CONTEO de inactivos
+		if err := queryInactivos.Count(&countInactivo).Error; err != nil {
+			return nil, err
+		}
+
+		// 2. Devuelve un mapa con todos tus resultados
+		return map[string]any{
+			"sum_monto_activo":   totalMontoActivo,
+			"sum_monto_inactivo": totalMontoInactivo,
+			"count_activo":       countActivo,
+			"count_inactivo":     countInactivo,
+		}, nil
+	} // Fin de la definición de 'extrasCalc'
+
+	// 3. Llama al paginador del repositorio, pasando la 'receta'
+	response, err := s.paginator.GetAllPaginated(
+		ctx,
+		s.conn.ConnectGormRead,
+		req,
+		nil,        // 'modifier'
+		extrasCalc, // <--- Pasamos nuestra receta
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. ¡Listo! 'response.Extras' ya contiene todos tus cálculos.
+	// Como bien dijiste, no necesitamos agregar 'count' manualmente.
+	// 'response.TotalRows' ya tiene el conteo total filtrado.
+
+	return response, nil
+}

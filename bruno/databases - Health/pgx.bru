@@ -1,0 +1,15 @@
+meta {
+  name: pxg
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}api/v1/database/health/pgx
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}

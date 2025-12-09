@@ -1,0 +1,43 @@
+package factories
+
+import (
+	"go-fiber-core/internal/database/models"
+	"math/rand"
+	"time"
+
+	"gorm.io/gorm"
+)
+
+func CreateBulkProcess(db *gorm.DB, count int) ([]models.BulkProcess, error) {
+	var processes []models.BulkProcess
+
+	// Generar los registros de proceso
+	for i := 0; i < count; i++ {
+		instanceRandow := rand.New(rand.NewSource(time.Now().UnixNano()))
+		refCode := instanceRandow.Intn(100) // Aleatorio entre 0 y 99
+
+		// Crear un proceso con datos aleatorios
+		process := models.BulkProcess{
+			ProcessStatusCode: rand.Intn(5) + 1, // Aleatorio entre 1 y 5
+			StatusCode:        rand.Intn(3) + 1, // Aleatorio entre 1 y 3
+			RefCode:           &refCode,         // Aleatorio entre 0 y 99
+			UserID:            rand.Intn(1000),  // Aleatorio entre 0 y 999
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+		}
+
+		// Usar punteros cuando corresponda (por ejemplo, si UserID es *int en el modelo)
+		// Ejemplo:
+		// process.UserID = &userID
+
+		// Agregar proceso a la lista
+		processes = append(processes, process)
+	}
+
+	// Insertar los registros en la base de datos
+	if err := db.Create(&processes).Error; err != nil {
+		return nil, err
+	}
+
+	return processes, nil
+}

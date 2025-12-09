@@ -1,0 +1,26 @@
+meta {
+  name: paginated-v10 test frontend
+  type: http
+  seq: 17
+}
+
+post {
+  url: http://localhost:9009/api/v1/banks/paginated
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjgxNDI5MTc4NjUsImlhdCI6MTc2MjgyMTYxMywic3ViIjoiMSIsInR5cCI6ImFjY2VzcyJ9.7gpH5nZc7G5E0_T1uGp-RV8NZpboe_jeWhUo7RHK2bU
+}
+
+body:json {
+    {
+        "sortBy": ["banks.name:fuzzy"],
+        "sortDesc": [false],
+        "filterBy": ["banks.name:fuzzy"],
+        "filterValues": ["provincia buenos"],
+        "rowsPerPage": 15,
+        "page": 1
+    }
+}

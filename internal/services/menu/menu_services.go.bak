@@ -1,0 +1,8 @@
+// type menuReaderService struct {
+// 	conn   *connect.ConnectDTO
+// 	reader menu.MenuReader
+// }
+
+func NewMenuReaderService(conn *connect.ConnectDTO, reader menu.MenuReader) MenuReaderService {
+	return &menuReaderService{conn: conn, reader: reader}
+}

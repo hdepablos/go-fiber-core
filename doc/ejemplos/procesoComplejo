@@ -1,0 +1,109 @@
+## Ejemplo Práctico: "Procesar Orden Compleja"
+Imaginemos un método en ProductService que, para procesar una orden, debe:
+
+Verificar que el producto exista.
+
+Verificar que haya stock suficiente en la tabla de inventario.
+
+Reducir el stock.
+
+Crear un registro en la tabla de órdenes.
+
+Actualizar la fecha del último pedido en la tabla de productos.
+
+1. Las Dependencias del Servicio
+Tu servicio se vería así. Nota cómo recibe los diferentes repositorios y la conexión a la BD.
+
+Go
+
+package services
+
+import (
+	"context"
+	"go-fiber-core/internal/repositories"
+	"gorm.io/gorm"
+)
+
+type ProductService interface {
+	ProcessComplexOrder(ctx context.Context, productID uint, userID uint, quantity int) error
+}
+
+type productService struct {
+	db             *gorm.DB // Conexión principal para iniciar transacciones
+	productRepo    repositories.ProductRepository
+	inventoryRepo  repositories.InventoryRepository
+	orderRepo      repositories.OrderRepository
+}
+
+// El constructor recibe todas las dependencias
+func NewProductService(db *gorm.DB, pr repositories.ProductRepository, ir repositories.InventoryRepository, or repositories.OrderRepository) ProductService {
+	return &productService{
+		db:             db,
+		productRepo:    pr,
+		inventoryRepo:  ir,
+		orderRepo:      or,
+	}
+}
+2. El Método de Orquestación con Transacción
+Aquí es donde ocurre la magia. El método orquesta las llamadas a los repositorios dentro de una transacción.
+
+Go
+
+func (s *productService) ProcessComplexOrder(ctx context.Context, productID uint, userID uint, quantity int) error {
+	// 1. Iniciar la transacción desde la conexión principal
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	// 2. Si algo falla, hacemos Rollback. `defer` garantiza que se ejecute al final.
+	defer tx.Rollback()
+
+	// 3. Orquestación de llamadas a los repositorios, PASANDO SIEMPRE `tx`
+	// El repositorio no sabe que está en una transacción, solo ejecuta su tarea.
+
+	// Paso A: Validar el producto
+	product, err := s.productRepo.GetByID(ctx, tx, productID)
+	if err != nil {
+		return err // Rollback se ejecutará por el defer
+	}
+
+	// Paso B: Validar y obtener el inventario
+	inventory, err := s.inventoryRepo.GetByProductID(ctx, tx, product.ID)
+	if err != nil {
+		return err
+	}
+	if inventory.Stock < quantity {
+		return errors.New("stock insuficiente")
+	}
+
+	// Paso C: Actualizar el stock
+	newStock := inventory.Stock - quantity
+	if err := s.inventoryRepo.UpdateStock(ctx, tx, inventory.ID, newStock); err != nil {
+		return err
+	}
+
+	// Paso D: Crear la orden
+	newOrder := &models.Order{ProductID: productID, UserID: userID, Quantity: quantity}
+	if err := s.orderRepo.Create(ctx, tx, newOrder); err != nil {
+		return err
+	}
+
+	// Paso E: Actualizar el producto (ej. fecha del último pedido)
+	if err := s.productRepo.UpdateLastOrderedDate(ctx, tx, product.ID, time.Now()); err != nil {
+		return err
+	}
+
+	// 4. Si todo fue exitoso, hacemos Commit.
+	// Esto confirma todos los cambios en la base de datos.
+	return tx.Commit().Error
+}
+## Conclusión
+Esta arquitectura te da lo mejor de ambos mundos:
+
+Mantiene la separación de capas: Tu servicio no sabe nada de GORM, solo de sus contratos (interfaces).
+
+Es altamente testable: Puedes probar la lógica de ProcessComplexOrder pasándole mocks de los repositorios.
+
+Maneja transacciones complejas de forma segura y atómica.
+
+Reutiliza la lógica de los repositorios: No reinventas la rueda para hacer un GetByID o un Create.

@@ -1,0 +1,37 @@
+meta {
+  name: create all
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{urlBase}}api/v1/users/full-new-if-not-exist
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "A1",
+    "email": "a1@test.com",
+    "password": "123456",
+    "products": [
+      { "name": "A1", "price": 1500.00 },
+      { "name": "A11", "price": 80.50 },
+      { "name": "A111", "price": 230.00 }
+    ],
+    "roles": [
+      { "name": "A1" },
+      { "name": "A11" }
+    ]
+  }
+  
+}

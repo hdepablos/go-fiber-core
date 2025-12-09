@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  go-worker:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.worker
+    env_file:
+      - .env
+    command: "/app/bin/worker"
+    restart: on-failure
+    networks:
+      - nginx-proxy

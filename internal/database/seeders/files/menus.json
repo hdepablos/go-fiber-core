@@ -1,0 +1,100 @@
+[
+	{
+		"item_type": "link",
+		"item_name": "Dashboard",
+		"to_path": "/",
+		"icon": "mdi-view-dashboard",
+		"order_index": 10
+	},
+	{
+		"item_type": "separator",
+		"item_name": "Gestión",
+		"order_index": 20
+	},
+	{
+		"item_type": "link",
+		"item_name": "Mensajes",
+		"to_path": "/messages",
+		"icon": "mdi-chat-processing-outline",
+		"order_index": 30
+	},
+	{
+		"item_type": "link",
+		"item_name": "Segmentos",
+		"to_path": "/segments",
+		"icon": "mdi-account-group",
+		"order_index": 40
+	},
+	{
+		"item_type": "line",
+		"item_name": "Línea Configuración",
+		"order_index": 50
+	},
+	{
+		"item_type": "group",
+		"item_name": "Tablas",
+		"icon": "mdi-table-large",
+		"order_index": 60,
+		"children": [
+			{
+				"item_type": "link",
+				"item_name": "Bancos V1",
+				"to_path": "/banks-v1",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 70
+			},
+			{
+				"item_type": "link",
+				"item_name": "Bancos V2",
+				"to_path": "/banks-v2",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 80
+			},
+			{
+				"item_type": "link",
+				"item_name": "Bancos V3",
+				"to_path": "/banks-v3",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 90
+			},
+			{
+				"item_type": "link",
+				"item_name": "Bancos V4",
+				"to_path": "/banks-v4",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 100
+			},
+			{
+				"item_type": "link",
+				"item_name": "Bancos V5",
+				"to_path": "/banks-v5",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 110
+			}
+		]
+	},
+	{
+		"item_type": "line",
+		"item_name": "Línea Configuración",
+		"order_index": 120
+	},
+	{
+		"item_type": "separator",
+		"item_name": "Archivos",
+		"order_index": 130
+	},
+	{
+		"item_type": "link",
+		"item_name": "Mis Archivos",
+		"to_path": "/brand-category-file-all",
+		"icon": "mdi-file-document-multiple",
+		"order_index": 140
+	},
+	{
+		"item_type": "link",
+		"item_name": "Notificaciones",
+		"to_path": "/messages",
+		"icon": "mdi-chat-outline",
+		"order_index": 150
+	}
+]

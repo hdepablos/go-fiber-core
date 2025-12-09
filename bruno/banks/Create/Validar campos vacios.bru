@@ -1,0 +1,26 @@
+meta {
+  name: Validar campos vacios
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/banks
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": null,
+    "entity_code": "0005"
+  }
+}

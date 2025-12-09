@@ -1,0 +1,6 @@
+fmt.Println("Ejemplo de un id aleatorio")
+// randomID := utils.GetRandomID[bulk_process](cnnt)
+// Ejemplo con el modelo User
+id := utils.GetRandomID(cnnt, &models.BulkProcessDetail{})
+fmt.Println("Random User ID:", id)
+return nil

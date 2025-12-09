@@ -1,0 +1,25 @@
+# ✅ Procedimiento Completo para Renombrar un Archivo
+
+Ejemplo: renombrar **`Product.go` → `product.go`**
+
+Pasos:
+    1. Verificar cómo Git registra el archivo:
+        git ls-files | grep -i product
+
+        Ejemplo de salida:
+            internal/models/Product.go
+
+    2. Renombrar el archivo usando un nombre temporal:
+        git mv internal/models/Product.go internal/models/product_temp.go
+
+    3. Registrar el cambio temporal:
+        git commit -m "temp rename Product.go"
+
+    4. Renombrar al nombre final deseado:
+        git mv internal/models/product_temp.go internal/models/product.go
+
+    5. Registrar el cambio final:
+        git commit -m "rename Product.go to product.go"
+
+En caso de que exista:
+	git rm --cached internal/models/User_Rol.go

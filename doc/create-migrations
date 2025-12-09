@@ -1,0 +1,20 @@
+--------------------------------------------------------------------
+| Acción       | Prefijo   	| Ejemplo                               |
+| ------------ | ---------- | ------------------------------------- |
+| Crear        | create_ 	| create_users_table                    |
+| Agregar      | add_    	| add_is_active_to_users                |
+| Renombrar    | rename_ 	| rename_username_to_user_name_in_users |
+| Alterar tipo | alter_  	| alter_users_age_type_to_integer       |
+| Eliminar     | drop_   	| drop_address_from_users               |
+--------------------------------------------------------------------
+
+Nota: Para las tablas pivote ambas singular role_user orden alfabético
+	Ejemplo: role → user
+
+
+Para crear una migración:
+	make create-migration name=create_users_table
+
+
+
+

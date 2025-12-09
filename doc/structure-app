@@ -1,0 +1,261 @@
+├── air.api.toml
+├── bin
+│   └── app
+├── bruno
+│   ├── app api.bru
+│   ├── Auth
+│   │   └── login.bru
+│   ├── banks
+│   │   ├── by id.bru
+│   │   ├── Create
+│   │   ├── delete hard.bru
+│   │   ├── delete soft.bru
+│   │   ├── edit.bru
+│   │   ├── get all.bru
+│   │   ├── paginated-v1.bru
+│   │   ├── paginated-v10.bru
+│   │   ├── paginated-v2.bru
+│   │   ├── paginated-v3.bru
+│   │   ├── paginated-v4.bru
+│   │   ├── paginated-v5.bru
+│   │   ├── paginated-v6.bru
+│   │   ├── paginated-v7.bru
+│   │   ├── paginated-v8.bru
+│   │   ├── paginated-v9.bru
+│   │   └── paginated.bru
+│   ├── bruno.json
+│   ├── databases - Health
+│   │   ├── gorm.bru
+│   │   ├── pgx.bru
+│   │   └── redis.bru
+│   ├── dlq.bru
+│   ├── environments
+│   │   ├── local.bru
+│   │   └── traefik.bru
+│   └── User
+│       └── create.bru
+├── certs
+│   └── site
+├── cmd
+│   ├── api
+│   │   └── main.go
+│   ├── cmd-cli
+│   │   ├── cmd
+│   │   ├── LICENSE
+│   │   └── main.go
+│   ├── tmp
+│   │   └── build-errors.log
+│   └── worker
+│       └── main.go
+├── coverage.html
+├── coverage.out
+├── doc
+│   ├── call
+│   ├── command-util.txt
+│   ├── convenciones
+│   ├── docker-compose-both-env
+│   ├── ejemplos
+│   │   ├── cancelacion
+│   │   ├── flujoPeticion
+│   │   └── procesoComplejo
+│   ├── file-create-proyecto.txt
+│   ├── like-avanced
+│   │   └── like-avanced
+│   ├── makefile-bkp
+│   ├── pasos-ssl.txt
+│   ├── pending
+│   ├── postgres
+│   │   └── backup
+│   ├── random_id
+│   ├── redis.txt
+│   ├── replace_base_file
+│   │   ├── Dockerfile.local
+│   │   └── Dockerfile.prod
+│   ├── run-proyecto.txt
+│   ├── structure.txt
+│   ├── traefik
+│   │   └── pasos
+│   ├── update-version
+│   └── uso-logger
+├── docker-compose-base.yml
+├── docker-compose-cmd.yml
+├── docker-compose-local-lint.yml
+├── docker-compose-local.yml
+├── docker-compose-prod.yml
+├── docker-compose-traefik-local.yml
+├── docker-compose-traefik-prod.yml
+├── docker-compose-traefik.yml
+├── docker-compose-worker.yml
+├── dockerfiles
+│   ├── analizar.txt
+│   ├── Dockerfile.api.local
+│   ├── Dockerfile.api.prod
+│   ├── Dockerfile.cmd.prod
+│   ├── Dockerfile.lint
+│   └── Dockerfile.worker.prod
+├── generate-local-cert.sh
+├── go.mod
+├── go.sum
+├── internal
+│   ├── adapters
+│   │   ├── backoffice_adapter_test.go
+│   │   ├── backoffice_adapter.go
+│   │   └── discord_adapter.go
+│   ├── appconfig
+│   │   ├── app_config.go
+│   │   ├── config.yml
+│   │   └── viper_loader.go
+│   ├── cronjobs
+│   │   └── tasks.go
+│   ├── database
+│   │   ├── connections
+│   │   ├── database.go
+│   │   ├── factories
+│   │   ├── migrations
+│   │   ├── models
+│   │   └── seeders
+│   ├── dtos
+│   │   ├── backoffice_reversal.go
+│   │   ├── config
+│   │   ├── connect
+│   │   ├── database.go
+│   │   ├── notification_discord.go
+│   │   ├── pagination.go
+│   │   ├── requests
+│   │   └── responses
+│   ├── handlers
+│   │   ├── auth_handler_test.go
+│   │   ├── auth_handler.go
+│   │   ├── bank_handler.go
+│   │   ├── database_handlers.go
+│   │   └── user_handler.go
+│   ├── interfaces
+│   │   └── pagination.go
+│   ├── jobqueue
+│   │   ├── dispatcher.go
+│   │   ├── handlers.go
+│   │   └── job.go
+│   ├── logger
+│   │   └── logger.go
+│   ├── middleware
+│   │   ├── auth_middleware_test.go
+│   │   ├── auth_middleware.go
+│   │   ├── middleware_test.go
+│   │   ├── rate_limit_middleware_test.go
+│   │   └── rate_limit_middleware.go
+│   ├── models
+│   │   ├── bank.go
+│   │   ├── refresh_token.go
+│   │   └── user.go
+│   ├── repositories
+│   │   ├── bank_repository.go
+│   │   ├── refresh_token_repository.go
+│   │   ├── user_repository_integration_test.go
+│   │   └── user_repository.go
+│   ├── routes
+│   │   ├── auth_routes.go
+│   │   ├── bank_routes.go
+│   │   ├── database_routes.go
+│   │   └── user_routes.go
+│   ├── server
+│   │   ├── register_routes.go
+│   │   └── server.go
+│   ├── services
+│   │   ├── auth_service_test.go
+│   │   ├── auth_service.go
+│   │   ├── bank_service.go
+│   │   ├── blacklist_bank_service.go
+│   │   ├── databases.go
+│   │   ├── email
+│   │   ├── loanrisk
+│   │   ├── pagination
+│   │   ├── serviceconfig
+│   │   ├── token_service.go
+│   │   └── user_service.go
+│   └── utils
+│       ├── conver_json_number_to_int.go
+│       ├── convert_map_to_dto.go
+│       ├── env.go
+│       ├── match_structs.go
+│       ├── password.go
+│       ├── random_id.go
+│       ├── response.go
+│       └── validator.go
+├── LICENSE
+├── Makefile
+├── pkg
+│   └── logger
+│       └── json
+├── README.md
+├── revive.toml
+├── scripts
+│   ├── check-swarm.sh
+│   ├── command
+│   ├── create-host.sh
+│   ├── generate_coverage_report.sh
+│   ├── generate-local-cert.sh
+│   ├── run_coverage.sh
+│   └── run_tests.sh
+├── tmp
+│   ├── build-errors.log
+│   └── localstack
+├── traefik
+│   ├── dynamic.yml
+│   └── traefik.yml
+└── vendor
+    ├── filippo.io
+    │   └── edwards25519
+    ├── github.com
+    │   ├── alicebob
+    │   ├── andybalholm
+    │   ├── cespare
+    │   ├── clipperhouse
+    │   ├── davecgh
+    │   ├── dgryski
+    │   ├── fsnotify
+    │   ├── gabriel-vasile
+    │   ├── go-playground
+    │   ├── go-resty
+    │   ├── go-sql-driver
+    │   ├── go-viper
+    │   ├── gofiber
+    │   ├── golang-jwt
+    │   ├── google
+    │   ├── inconshreveable
+    │   ├── jackc
+    │   ├── jinzhu
+    │   ├── joho
+    │   ├── klauspost
+    │   ├── leodido
+    │   ├── mattn
+    │   ├── mfridman
+    │   ├── pelletier
+    │   ├── pmezard
+    │   ├── pressly
+    │   ├── redis
+    │   ├── robfig
+    │   ├── russross
+    │   ├── sagikazarmark
+    │   ├── sethvargo
+    │   ├── spf13
+    │   ├── stretchr
+    │   ├── subosito
+    │   ├── valyala
+    │   └── yuin
+    ├── go.uber.org
+    │   ├── multierr
+    │   └── zap
+    ├── go.yaml.in
+    │   └── yaml
+    ├── golang.org
+    │   └── x
+    ├── gopkg.in
+    │   ├── alexcesaro
+    │   ├── gomail.v2
+    │   ├── natefinch
+    │   └── yaml.v3
+    ├── gorm.io
+    │   ├── datatypes
+    │   ├── driver
+    │   └── gorm
+    └── modules.txt

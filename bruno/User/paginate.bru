@@ -1,0 +1,30 @@
+meta {
+  name: paginate
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}api/v1/users/paginated
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": [],
+      "filterValues": [],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

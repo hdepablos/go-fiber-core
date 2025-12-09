@@ -1,0 +1,30 @@
+meta {
+  name: paginated-v9
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{urlBase}}api/v1/banks/paginated
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [false],
+      "filterBy": ["banks.name:fuzzy"],
+      "filterValues": ["buenos provincia"],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

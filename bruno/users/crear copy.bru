@@ -1,0 +1,35 @@
+meta {
+  name: crear copy
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{urlBase}}api/v1/users/full
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "Luis fadFernández",
+    "email": "luis.fernandefasdz@example.com",
+    "password": "mypassword",
+    "products": [
+      { "name": "Laptoadsfap mac", "price": 1200.00 },
+      { "name": "Mouse intelifasdfgente", "price": 35.99 }
+    ],
+    "roles": [
+      { "id": 1 },
+      { "id": 3 }
+    ]
+  }
+}

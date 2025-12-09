@@ -1,0 +1,8 @@
+2.4. Manera de retornar colecciones: []models.Bank vs []*models.Bank
+
+Ambas válidas:
+
+[]models.Bank copia structs al slice; sencillo y evita nils.
+
+[]*models.Bank evita copias (útil si models.Bank es grande) y permite mutaciones directas.
+Si models.Bank no es enorme y querés simplicidad, []models.Bank está bien. Si vas a actualizar elementos leídos y volverlos a guardar, los punteros []*models.Bank pueden ser más prácticos.

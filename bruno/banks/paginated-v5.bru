@@ -1,0 +1,26 @@
+meta {
+  name: paginated-v5
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{urlBase}}api/v1/banks/paginated
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": ["enabled","entity_code"],
+      "filterValues": [true,["0002","403","093","086"]],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

@@ -1,0 +1,13 @@
+Export
+docker-compose exec -T postgres pg_dump -U postgres go_bank_file_gen > backup.sql
+
+docker volume rm postgres_postgres_data
+
+Import
+cat backup.sql | docker-compose exec -T postgres psql -U $(cat postgres_user.txt) -d go_bank_file_gen
+
+
+
+Verificar si esta el plugin la instalado:
+SELECT * FROM pg_extension WHERE extname = 'pg_trgm';
+make migrations

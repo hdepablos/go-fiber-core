@@ -1,0 +1,8 @@
+{
+    "sortBy": ["customer.address.zip_code"],
+    "sortDesc": [false],
+    "filterBy": ["customer.address.zip_code"],
+    "filterValues": ["90210"],
+    "rowsPerPage": 15,
+    "page": 1
+}

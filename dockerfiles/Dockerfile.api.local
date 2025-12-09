@@ -1,0 +1,46 @@
+# Dockerfile.api.local
+FROM golang:1.25-alpine
+
+# Establecer la zona horaria de Argentina
+ENV TZ=America/Argentina/Buenos_Aires
+
+# Instalar tzdata (base de datos de zonas horarias)
+RUN apk add --no-cache tzdata
+
+# Instalar herramientas necesarias
+RUN apk add --no-cache bash git make
+
+# Configurar la variable GOBIN para asegurarnos de que los binarios se instalen en una ubicación conocida
+ENV GOBIN=/go/bin
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Crear directorios necesarios
+RUN mkdir -p /usr/local/bin bin
+
+# Instalar Air y Cobra CLI correctamente
+RUN go install github.com/air-verse/air@latest \
+    && go install github.com/spf13/cobra-cli@latest \
+    && mv /go/bin/air /usr/local/bin/air \
+    && mv /go/bin/cobra-cli /usr/local/bin/cobra-cli \
+    && ln -s /usr/local/bin/cobra-cli /usr/local/bin/cobra
+
+# Instalar Goose
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+# Instalar Google Wire
+RUN go install github.com/google/wire/cmd/wire@latest
+
+# Configurar PATH
+ENV PATH="/usr/local/bin:/go/bin:$PATH"
+
+# Copiar dependencias
+COPY go.mod go.sum ./
+RUN go mod download
+RUN go mod vendor
+
+# Copiar el código fuente
+COPY . .
+
+# Comando por defecto para ejecutar Air
+CMD ["air", "-c", "air.api.toml"] # <--- ¡IMPORTANTE! Usar el nuevo nombre

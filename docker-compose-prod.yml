@@ -1,0 +1,13 @@
+services:
+  go-fiber-core:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.api.prod
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - "9009:9009"
+    command: "/app/bin/app"
+    networks:
+      - nginx-proxy

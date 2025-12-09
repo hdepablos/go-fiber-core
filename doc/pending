@@ -1,0 +1,236 @@
+-- Listo
+adapters
+
+-- Listo
+migraciones
+    goose postgres "postgresql://user:password@localhost:5432/dbname" status
+    go run main.go rollback --db="postgres://user:password@localhost:5432/mydb"
+
+-- Listo
+factories
+
+-- Listo
+Ratelimit
+
+-- Listo
+Crons
+
+-- Listo
+seeders
+    data aleatoria
+    data determinada
+    data base de la app
+
+-- Listo
+crud
+
+-- Listo
+páginación y filtros
+    Con extras
+
+-- Listo
+email -- doc
+
+-- Listo
+reflection (cambiar el comportamiento de la app por base de datos)
+
+-- Listo
+-- Simular ejecución class config con parámetros
+
+-- Listo
+-- Traefik con https local con certificaciones
+-- Traefik con balance
+
+-- Listo
+-- Busquedas avanzadas con pg_trgm
+
+-- Listo
+-- sessiones y enlazarlo con rate limit
+
+-- Listo Pendiente
+| Herramienta                                 | ¿Para qué sirve?                                          |
+| ------------------------------------------- | --------------------------------------------------------- |
+| **[LocalStack](https://localstack.cloud/)** | Emula servicios AWS (Lambda, SQS, S3, etc.) en tu máquina |
+| **AWS SAM CLI**                             | Permite correr y testear Lambdas localmente               |
+| **Docker**                                  | Requisito para LocalStack y SAM en local                  |
+
+
+-- listo con aws con funciones Pendiente
+workder multi replicas
+
+-- listo multiple jobs
+
+-- listo Pendiente
+test (mock services, etc)
+
+-- listo Pendiente
+validaciones
+formrequest
+
+
+-- listo solucionado con funciones con aws Pendiente
+-- worker
+
+-- Listo pendiente
+Todas las respuestas tienen que ser con la misma estructura
+
+
+-- Listo pendiente
+Tomar el id de la session
+
+-- Listo pendiente
+Crear modelos para probar filtros y orders con multiples niveles
+
+-- Listo pendiente
+manejar sessiones
+avanzado como el de cardred
+
+*****************************************************
+SILVERIO LISTO
+*****************************************************
+comando sql para bank_id a productos:
+    WITH random_products AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY RANDOM()) AS rn
+        FROM products
+        LIMIT 36
+    ),
+    random_banks AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY RANDOM()) AS rn
+        FROM banks
+    )
+    UPDATE products
+    SET bank_id = rb.id
+    FROM random_products rp
+    JOIN random_banks rb ON rp.rn = rb.rn
+    WHERE products.id = rp.id;
+
+-- ==================================================
+-- ==================================================
+-- ==================================================
+
+-- pendiente
+recrear apilogger
+
+-- pendiente
+recrear el export por sistema en caso el export no tarde más de 15 seg. que es lo mismo con un limit total de registro, el cual vendría por una tabla de configuración como class_config si el limit pasa más de dicho limited pasar al plano de s3
+
+-- pendiente
+Recrear en el entorno aws el s3 con la configuración del MultipartUpload
+
+-- pendiente
+recrear el download file de backoffice y collections con un código único para la descarga del archivo con expirations tal cual como está en collection/backoffice con la ruta desde el s3
+
+-- Subir archivos al s3
+
+
+-- Pendiente
+-- Combinar los proyectos go-fiber-core y el del aws
+
+-- Pendiente
+-- Simular las queue y los process
+-- Validar que se ejecuten varias colas y que se procesen
+-- con la simulación del apilogger mandar email si falla
+
+-- Pendiente
+-- El crud avanzado por relaciones -> Silverio
+-- Sumatorias de totales en extras -> Silverio
+-- crear los sedders base del sistema por sql
+-- Crear comando para cragar data de la tablas validando la variable de session, solo != a production | igual a develop local
+-- Con el usuario de session
+-- Transacciones en productos y en otros cuando se apliquen 2 sentencias
+
+
+
+
+-- Pendiente
+-- simular process_batch_state
+-- Simular el comportamiento de versionado
+
+-- Pendiente
+GRPC
+
+-- Pendiente
+go rutinas (wg, chanels)
+
+-- Pendiente
+csv (exportar/importar)
+    Esto debe funcionar como el mattwebsite, mantener la funcionalidad de poder ejecutar los filtros de paginate
+
+-- Pendiente
+tablas de tablas
+controller por vistas de tablas de tablas como backoffice todas por get
+
+
+-- Pendiente
+Notificar por redis sesiones emitir un mensaje solo al cliente (Manejar notificaciones en el cliente cuadrar con la gente de front end)
+por redis
+Para implementar un sistema de publicación y suscripción (pub/sub) con Redis en Golang usando canales, se puede hacer de una manera eficiente y moderna aprovechando las características de Redis junto con las buenas prácticas de concurrencia en Go.
+
+
+-- Pendiente --> SILVERIO
+Enlace
+https://chatgpt.com/share/6910eb50-c594-8002-bbb3-64e98aa6de26
+
+crear las tablas para el menu dinamico
+El login tiene que devolver la siguiente estructura:
+
+token: "lsakdfjaksdjff",
+refreshToken: "sdfkjsldkfsldf",
+user_name: "Silverio Alejandro",
+rol_ids: [1,2];
+roles: []
+menu: MenuItem[];
+
+EndPonint que ya existen:
+usuario -> ya existe
+Roles -> ya existe
+
+EndPonint nuevos:
+Crear item en el menu
+Eliminar item en el menu
+
+Crear rol_id al menu_id
+Eliminar rol_id al menu_id
+
+-- **********************************************************************
+Ojo no se pueden repetir el rol_id a un menu_id
+-- **********************************************************************
+
+Item en el menu a la vez con los roles asociados
+
+Eliminar item del menu
+Eliminar rol_id del item del menu
+
+Asociar varios items del menu al varios rol_ids
+Desasociar varios items del menu a varios rol_ids
+
+Ejemplos:
+menu:[1,3,5,6,8],
+rol_id: [1,3]
+
+
+Saber cuales son los usuarios que están conectados
+Eliminar la conexión de los usurios
+
+
+
+
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ==================================================
+
+-- cliente en quasart
+
+-- pendiente
+encriptado tanto en el cliente como en el servidor
+
+-- pendiente
+Configurar 2 usuarios con roles diferentes y que ambos usuarios tengan acceso al mismo item:
+validar que no pinte 2 veces el mismo item
+
+

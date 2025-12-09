@@ -1,0 +1,24 @@
+services:
+  go-fiber-core:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.${APP_ENV}
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - ${PORT}:${PORT}
+    volumes:
+      - .:/app
+      - ./cmd:/app/cmd
+      - ./internal:/app/internal
+      - ./.air.toml:/app/.air.toml
+    command: >
+      sh -c "if [ ${APP_ENV} = 'local' ]; then air; else /app/bin/app; fi"
+    networks:
+      - network-default
+
+networks:
+  network-default:
+    name: nginx-proxy
+    external: true

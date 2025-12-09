@@ -1,0 +1,60 @@
+# revive configuration: profesional, limpio y equilibrado
+
+ignoreGeneratedHeader = false
+severity = "warning"
+confidence = 0.8
+errorCode = 2
+warningCode = 1
+
+#########################
+# 🧼 Limpieza de código
+#########################
+
+[rule.var-naming]
+[rule.receiver-naming]
+[rule.var-declaration]
+[rule.unused-parameter]
+[rule.unused-import]
+[rule.unreachable-code]
+[rule.empty-block]
+[rule.blank-imports]
+[rule.context-as-argument]
+[rule.indent-error-flow]
+
+##############################
+# 🧠 Buenas prácticas modernas
+##############################
+
+[rule.error-strings]
+[rule.function-length]
+  arguments = { maxLength = 80 }
+
+[rule.time-naming]
+[rule.if-return]
+[rule.struct-tag]
+
+##############################
+# 📄 Comentarios (deshabilitados completamente)
+##############################
+
+[rule.package-comments]
+  disabled = true
+
+[rule.exported]
+  disabled = true
+
+[rule.file-header]
+  disabled = true
+
+##############################
+# 🚫 Cosas que evitamos
+##############################
+
+[rule.dot-imports]
+  disabled = true
+
+[rule.line-length]
+  arguments = { limit = 120 }
+
+[rule.cognitive-complexity]
+  arguments = { maxComplexity = 20 }

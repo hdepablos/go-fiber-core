@@ -1,0 +1,26 @@
+meta {
+  name: paginated-v7
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{urlBase}}banks/paginated-v2
+  body: json
+  auth: none
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": ["created_at"],
+      "filterValues": [["2024-10-01","2024-10-03"]],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}

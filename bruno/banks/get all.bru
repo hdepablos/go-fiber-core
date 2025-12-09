@@ -1,0 +1,30 @@
+meta {
+  name: get all
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}api/v1/banks/
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": ["enabled","name"],
+      "filterValues": [false,"%Bank%"],
+      "rowsPerPage": 10,
+      "page": 1
+  }
+}

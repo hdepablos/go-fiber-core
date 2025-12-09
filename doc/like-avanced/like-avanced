@@ -1,0 +1,74 @@
+Sí, te explicaste perfectamente. Estás en lo correcto, y tu intuición es excelente.
+
+No te refieres a una sola cosa, sino a dos herramientas increíblemente potentes que PostgreSQL ofrece para búsquedas en texto, y que son muy superiores a un LIKE tradicional: Full-Text Search (Búsqueda de Texto Completo) y la Búsqueda por Similitud con Trigramas (extensión pg_trgm).
+
+Ambas te permiten sacar el máximo provecho de tus búsquedas, y la segunda es especialmente fácil de aplicar a tu filtro actual.
+
+1. Full-Text Search (FTS) - El "Google" de tu Base de Datos
+Esta es la herramienta más avanzada. No busca simplemente si una cadena de texto está dentro de otra; entiende el lenguaje.
+
+¿Qué hace? Procesa y normaliza el texto para entender las palabras. Por ejemplo, si buscas "correr", FTS puede encontrar registros que digan "corriendo" o "corrió" (esto se llama stemming). También ignora palabras comunes como "el", "un", "y" (stop words) para centrarse en lo importante.
+
+Conceptos Clave:
+
+tsvector: Es una versión optimizada de tu texto, almacenada como una lista de palabras únicas (lexemas).
+
+tsquery: Es tu búsqueda, que puede usar operadores lógicos como & (Y), | (O), y ! (NO).
+
+Caso de Uso: Ideal para buscar en campos de texto largos como descripciones de productos, cuerpos de artículos de blog, documentos, etc. Por ejemplo, buscar todos los productos que mencionen "zapatilla" Y "azul", pero NO "niño".
+
+¿Se puede aplicar a tu filtro? Sí, pero requeriría una lógica especial en tu servicio para construir un tsquery a partir del valor del filtro, lo que lo haría más complejo.
+
+2. Búsqueda por Similitud (pg_trgm) - El Superpoder para LIKE e ILIKE
+Esta es probablemente la mejora que más te interesa, porque acelera drásticamente las búsquedas con LIKE e ILIKE y es muy fácil de implementar.
+
+¿Qué hace? La extensión pg_trgm (trigramas) divide el texto en pedazos superpuestos de 3 caracteres.
+
+Por ejemplo, "Santander" se convierte en {"  S", " Sa", "San", "ant", "nta", "tan", "and", "nde", "der", "er "}.
+
+La Magia: Te permite crear un tipo de índice especial (GIN o GIST) sobre estos trigramas. Cuando haces una búsqueda como name ILIKE '%ande%', PostgreSQL no tiene que leer toda la tabla. En su lugar, usa el índice para encontrar de forma casi instantánea todos los registros que comparten suficientes trigramas con tu término de búsqueda.
+
+Caso de Uso:
+
+Acelerar búsquedas LIKE/ILIKE: Su principal ventaja. Pasa de segundos a milisegundos en tablas grandes.
+
+Búsqueda por similitud: Permite encontrar texto con errores de tipeo. Puedes buscar registros "similares" a "Santnder" y encontrará "Santander".
+
+¿Se puede aplicar a tu filtro? Sí, y es la mejora perfecta. No requiere casi ningún cambio en tu código de Go.
+
+¿Cuál usar y cómo implementarlo en tu servicio?
+Para tu servicio de paginación genérico, la Búsqueda por Similitud con Trigramas (pg_trgm) es la mejora ideal. Es transparente y superpotente.
+
+Pasos para Implementar pg_trgm
+Paso 1: Activar la Extensión en tu Base de Datos
+Esto se hace una sola vez por base de datos. Puedes incluirlo en una migración de Goose.
+
+SQL
+
+-- +goose Up
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- +goose Down
+-- No es común eliminar extensiones, pero por completitud:
+-- DROP EXTENSION pg_trgm;
+Paso 2: Crear el Índice Correcto en tus Campos de Texto
+En lugar de un índice B-Tree normal, creas un índice GIN sobre el campo que quieres buscar.
+
+SQL
+
+-- En otra migración, por ejemplo, para la tabla banks y la columna name:
+-- +goose Up
+CREATE INDEX idx_banks_name_gin_trgm ON banks USING GIN (name gin_trgm_ops);
+
+-- +goose Down
+DROP INDEX idx_banks_name_gin_trgm;
+Paso 3: ¡No hacer nada en tu código Go!
+Esta es la mejor parte. Si ya tienes la lógica condicional que usa ILIKE para PostgreSQL, no necesitas cambiar nada. El planificador de consultas de PostgreSQL es lo suficientemente inteligente como para usar automáticamente tu nuevo índice GIN cuando vea una consulta con ILIKE.
+
+Tu servicio de Go seguirá enviando la misma consulta, pero ahora la base de datos la resolverá de una forma increíblemente más rápida.
+
+Resumen Comparativo
+Característica	LIKE / ILIKE (sin índice)	Similitud (pg_trgm) + ILIKE	Full-Text Search (FTS)
+Caso de Uso	Búsquedas de substrings simples	Acelerar LIKE, búsquedas con typos	Búsqueda semántica, tipo "Google"
+Rendimiento	🐢 Lento (escaneo de tabla)	🚀 Muy rápido (usa índice GIN)	🚀 Muy rápido (usa índice GIN/GIST)
+Complejidad	Muy Baja	Baja (solo BBDD)	Alta (requiere lógica en la app)

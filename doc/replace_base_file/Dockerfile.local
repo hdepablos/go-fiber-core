@@ -1,0 +1,33 @@
+FROM golang:1.25-alpine
+
+# Instalar herramientas necesarias
+RUN apk add --no-cache bash git make
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Instalar Air
+# RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
+
+# Eliminar el binario si existe antes de compilar
+RUN rm -f bin/app
+
+# Crear la carpeta bin/app
+RUN mkdir -p bin
+
+RUN mv /go/bin/air /usr/local/bin/
+
+# Copiar dependencias
+COPY go.mod go.sum ./
+RUN go mod download
+RUN go mod vendor
+
+# Copiar el código fuente
+COPY . .
+
+# Exponer el puerto
+# EXPOSE 3006
+
+# Comando por defecto para ejecutar Air
+CMD ["air", "-c", ".air.toml"]

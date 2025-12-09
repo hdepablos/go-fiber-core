@@ -1,0 +1,56 @@
+package seeders
+
+import (
+	"fmt"
+	"go-fiber-core/internal/database/factories"
+	"go-fiber-core/internal/database/models"
+
+	"gorm.io/gorm"
+)
+
+// SeedBulkProcesses crea registros en bulk_process y bulk_process_details.
+func SeedBulkProcesses(db *gorm.DB) error {
+
+	processes, err := factories.CreateBulkProcess(db, 5) // Crea 5 registros en bulk_process
+	if err != nil {
+		return err
+	}
+
+	for _, process := range processes {
+		_, err := factories.CreateBulkProcessDetails(db, process.ID, 10) // Crea 10 registros por cada bulk_process
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Seeded bulk_process_id %d with 10 details\n", process.ID)
+	}
+
+	// uno predefinido
+	refCode := 999
+	process := models.BulkProcess{
+		ProcessStatusCode: 1,
+		StatusCode:        100,
+		RefCode:           &refCode,
+		UserID:            1,
+	}
+
+	if err := db.Create(&process).Error; err != nil {
+		return err
+	}
+
+	// Datos personalizados para los hijos
+	customerId := 1
+	childData := []models.BulkProcessDetail{
+		{BulkProcessID: process.ID, UniqueIdentifier: "ABC123", CustomerID: nil, StatusCode: 200},
+		{BulkProcessID: process.ID, UniqueIdentifier: "DEF456", CustomerID: &customerId, StatusCode: 201},
+		{BulkProcessID: process.ID, UniqueIdentifier: "GHI789", CustomerID: nil, StatusCode: 202},
+	}
+
+	// Insertar los registros hijos
+	if err := db.Create(&childData).Error; err != nil {
+		return err
+	}
+
+	fmt.Printf("Seeded bulk_process_id %d with %d custom details\n", process.ID, len(childData))
+
+	return nil
+}

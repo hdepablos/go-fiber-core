@@ -1,0 +1,15 @@
+meta {
+  name: gorm
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}api/v1/database/health/gorm
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}

@@ -1,0 +1,28 @@
+meta {
+  name: create item menu
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/menus
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "item_type": "link",
+    "item_name": "Dashboard",
+    "to": "/dashboard",
+    "icon": "home"
+  }
+}

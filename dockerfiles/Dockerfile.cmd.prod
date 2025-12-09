@@ -1,0 +1,42 @@
+# Etapa 1: Dependencias
+FROM golang:1.24-bookworm AS deps
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Etapa 2: Build
+FROM golang:1.24-bookworm AS builder
+
+WORKDIR /app
+
+# 👈 Asegura que estás en la raíz del proyecto al hacer el build
+COPY --from=deps /go/pkg /go/pkg
+COPY . .
+
+RUN mkdir -p /app/bin
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app/bin/cli ./cmd/cmd-cli
+
+
+# Etapa 3: Imagen final
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+ENV TZ=America/Argentina/Buenos_Aires
+
+RUN apt-get update && apt-get install -y tzdata && rm -rf /var/lib/apt/lists/*
+
+RUN getent group appuser || groupadd -r appuser
+RUN useradd -r -g appuser appuser
+
+COPY --from=builder /app/bin /app/bin
+COPY internal/appconfig /app/internal/appconfig
+COPY ./certs /etc/ssl/certs
+
+RUN chown -R appuser:appuser /app/bin
+
+USER appuser
+
+CMD ["help"]

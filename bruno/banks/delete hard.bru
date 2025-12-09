@@ -1,0 +1,15 @@
+meta {
+  name: delete hard
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{urlBase}}banks/hard/95
+  body: json
+  auth: none
+}
+
+headers {
+  X-Client-Code: 12345678
+}

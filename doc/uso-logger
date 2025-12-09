@@ -1,0 +1,10 @@
+import
+    "go-fiber-core/internal/logger"
+    "go.uber.org/zap"
+
+logger.GetLogger("punitive").Info("Se procesó correctamente")
+logger.GetLogger("user").Info("Usuario creado", zap.String("username", "juan"))
+logger.GetLogger("notificaciones").Info("Notificación enviada", zap.String("email", "a@b.com"))
+
+La ruta de salida
+    pkg/logs/*.log
