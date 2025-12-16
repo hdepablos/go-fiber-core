@@ -114,13 +114,15 @@ var repositorySet = wire.NewSet(
 	bank.NewBankCrudRepository,
 	bank.NewBankPaginationRepo,
 
+	menu.NewMenuReaderRepository,
+	menu.NewMenuWriterRepository,
+
 	refreshtoken.NewRefreshTokenReaderRepo,
 	refreshtoken.NewRefreshTokenWriterRepo,
 	refreshtoken.NewRefreshTokenRepository,
 
 	// --- Repositorios de Menú (Solo Lector) ---
 	// Cambiamos el nombre del constructor a la implementación existente:
-	menu.NewMenuReaderRepository,
 	// Comentamos los constructores de escritura y CRUD por ahora:
 	// menu.NewMenuWriterRepo,
 	// menu.NewMenuCrudRepo,
@@ -145,6 +147,7 @@ var serviceSet = wire.NewSet(
 	bank2.NewDeactivationService,
 
 	menu2.NewMenuReaderService,
+	menu2.NewMenuWriterService,
 	// Comentamos el servicio de escritura de menús:
 	// menu2.NewMenuWriterService,
 )
@@ -154,6 +157,7 @@ var handlerSet = wire.NewSet(
 	handlers.NewUserHandler,
 	handlers.NewBankHandler,
 	handlers.NewDatabaseHandler,
+	handlers.NewMenuHandler,
 	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
 	// necesitarás actualizar su constructor también.
 	// handlers.NewMenuHandler,

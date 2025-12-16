@@ -1,0 +1,25 @@
+meta {
+  name: delete bulk
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{urlBase}}api/v1/menus/14/roles
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "role_ids": [1, 3]
+  }
+}

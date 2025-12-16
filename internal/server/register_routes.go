@@ -18,7 +18,7 @@ func (s *FiberServer) RegisterRoutes(
 	userHandler handlers.UserHandler,
 	bankHandler handlers.BankHandler,
 	// productHandler handlers.ProductHandler,
-	// menuHandler handlers.MenuHandler,
+	menuHandler handlers.MenuHandler,
 	dbHandler handlers.DatabaseHandler,
 	tokenService authService.TokenService,
 ) {
@@ -46,7 +46,7 @@ func (s *FiberServer) RegisterRoutes(
 	routes.RegisterBankRoutes(protected, bankHandler)
 	routes.RegisterUserRoutes(protected, userHandler)
 	// routes.RegisterProductRoutes(protected, productHandler)
-	// routes.RegisterMenuRoutes(protected, menuHandler)
+	routes.RegisterMenuRoutes(protected, menuHandler)
 }
 
 // --- Handlers del Servidor ---
