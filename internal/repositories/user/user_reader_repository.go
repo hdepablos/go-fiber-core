@@ -99,7 +99,6 @@ func (r *UserWriterRepo) HardDelete(ctx context.Context, db *gorm.DB, id uint) e
 func (r *UserReaderRepo) GetByID(ctx context.Context, db *gorm.DB, id uint64) (*models.User, error) {
 	var user models.User
 	err := db.WithContext(ctx).
-		Preload("Products").
 		Preload("Roles").
 		First(&user, id).Error
 	return &user, err
@@ -110,7 +109,6 @@ func (r *UserReaderRepo) GetByID(ctx context.Context, db *gorm.DB, id uint64) (*
 func (r *UserReaderRepo) GetByEmail(ctx context.Context, db *gorm.DB, email string) (*models.User, error) {
 	var user models.User
 	err := db.WithContext(ctx).
-		Preload("Roles").
 		Where("email = ?", email).
 		First(&user).Error
 
@@ -146,7 +144,6 @@ func (r *UserReaderRepo) GetByEmailWithRolesAndMenus(ctx context.Context, db *go
 func (r *UserReaderRepo) GetAll(ctx context.Context, db *gorm.DB) ([]models.User, error) {
 	var users []models.User
 	err := db.WithContext(ctx).
-		Preload("Products").
 		Preload("Roles").
 		Find(&users).Error
 	return users, err
