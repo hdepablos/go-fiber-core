@@ -146,7 +146,6 @@ func (r *UserReaderRepo) GetByEmailWithRolesAndMenus(ctx context.Context, db *go
 func (r *UserReaderRepo) GetAll(ctx context.Context, db *gorm.DB) ([]models.User, error) {
 	var users []models.User
 	err := db.WithContext(ctx).
-		Preload("Products").
 		Preload("Roles").
 		Find(&users).Error
 	return users, err

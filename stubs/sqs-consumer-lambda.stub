@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  SqsQueueArn:
+    Type: String
+  SqsDlqArn:
+    Type: String
+  SqsQueueName:
+    Type: String
+
+Resources:
+  __SERVICE_NAME__:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: __SERVICE_NAME__
+      CodeUri: ../sam-compile/__FOLDER__/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          SQS_QUEUE_URL: !Sub "http://localhost:4566/000000000000/${SqsQueueName}"
+          SQS_QUEUE_NAME: !Ref SqsQueueName
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource: !Ref SqsQueueArn
+        - Statement:
+            Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource: !Ref SqsDlqArn
+      Events:
+        SqsQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref SqsQueueArn
+            BatchSize: 10
+            Enabled: true

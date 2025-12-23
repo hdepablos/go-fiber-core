@@ -1,0 +1,16 @@
+__SERVICE_NAME__:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: __FOLDER_NAME__
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - AWS_ENDPOINT=http://localstack:4566
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy

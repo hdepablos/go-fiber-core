@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  __PROJECT__ConsumerDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: __PROJECT_LOWER__dlq
+
+  __PROJECT__ConsumerQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: __PROJECT_LOWER__queue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt __PROJECT__ConsumerDLQ.Arn
+        maxReceiveCount: 3
+
+Outputs:
+  SqsQueueArn:
+    Value: !GetAtt __PROJECT__ConsumerQueue.Arn
+    Export:
+      Name: SqsQueueArn
+
+  SqsDlqArn:
+    Value: !GetAtt __PROJECT__ConsumerDLQ.Arn
+    Export:
+      Name: SqsDlqArn
+
+  SqsQueueUrl:
+    Value: !Ref __PROJECT__ConsumerQueue
+    Export:
+      Name: SqsQueueUrl
+
+  SqsQueueName:
+    Value: !GetAtt __PROJECT__ConsumerQueue.QueueName
+    Export:
+      Name: SqsQueueName

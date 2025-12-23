@@ -1,0 +1,32 @@
+# Etapa 1: dependencias (solo descarga módulos, sin vendorizar)
+FROM golang:1.25-bookworm AS deps
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Etapa 2: compilación y vendor
+FROM golang:1.25-bookworm AS builder
+
+ARG FUNC_NAME
+ARG FOLDER
+
+WORKDIR /app
+COPY . .
+
+RUN go mod tidy && go mod vendor
+
+# Compila la función específica según FOLDER (ejemplo ./cmd/dlq/main.go)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -mod=vendor -ldflags="-s -w" \
+    -o bootstrap ./cmd/${FOLDER}
+
+# Etapa final: empaquetado
+FROM golang:1.25-bookworm AS packager
+
+ARG FOLDER
+
+WORKDIR /app/${FOLDER}
+
+# Copia binario y .env
+COPY --from=builder /app/bootstrap ./bootstrap
+COPY --from=builder /app/.env ./.env

@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  SqsDlqArn:
+    Type: String
+Resources:
+  GoFiberCoreDlqConsumer:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GoFiberCoreDlqConsumer
+      CodeUri: GoFiberCoreDlqConsumer
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+      - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          SQS_DLQ_URL: http://localhost:4566/000000000000/Dlq
+      Policies:
+      - Statement:
+          Effect: Allow
+          Action:
+          - sqs:ReceiveMessage
+          - sqs:DeleteMessage
+          - sqs:GetQueueAttributes
+          Resource:
+            Ref: SqsDlqArn
+      Events:
+        SqsDlqEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Ref: SqsDlqArn
+            BatchSize: 1
+            Enabled: true
+    Metadata:
+      SamResourceId: GoFiberCoreDlqConsumer

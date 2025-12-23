@@ -32,6 +32,7 @@ import (
 
 // Injectors from wire.go:
 
+// InitializeServer: Firma RESTAURADA para retornar 3 valores.
 func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	appConfig, err := provideAppConfig(configPath)
 	if err != nil {

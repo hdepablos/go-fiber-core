@@ -1,0 +1,135 @@
+
+services:
+  # Infraestructura LocalStack
+  localstack:
+    container_name: localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+      - "4567:4567"
+    environment:
+      - DEV_MODE=true
+      - SERVICES=lambda,sqs,logs,cloudformation,iam,cloudwatch,apigateway,events,sts,ec2
+      - DATA_DIR=/tmp/localstack/data
+      - DEBUG=${DEBUG:-0}
+      - CLEAR_TMP_FOLDER=0
+      # - SERVICES=sqs,events
+      # - DEBUG=1
+      # - LOCALSTACK_HOST=localstack
+    volumes:
+      - ./localstack-init:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - nginx-proxy
+
+  # API REST con Air
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: api
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - API_PORT=${API_PORT}
+      - AWS_ENDPOINT=http://localstack:4566
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy
+    depends_on:
+      - localstack
+
+  # Consumer SQS
+  sqs-consumer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: sqs-consumer
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - AWS_ENDPOINT=http://localstack:4566
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy
+    depends_on:
+      - localstack
+
+  # DLQ Consumer
+  dlq-consumer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: dlq-consumer
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - AWS_ENDPOINT=http://localstack:4566
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy
+    depends_on:
+      - localstack
+
+  # Cron cada minuto
+  every-1min-cron:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: every-1min-cron
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - AWS_ENDPOINT=http://localstack:4566
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy
+    depends_on:
+      - localstack
+
+  # Cron diario
+  daily-24-cron:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        FOLDER: daily-24-cron
+    volumes:
+      - .:/app
+      - ./bin:/app/bin
+    environment:
+      - DEV_MODE=true
+      - APP_ENV=local
+      - AWS_ENDPOINT=http://localstack:4566
+    command: air -c .air-dev.toml
+    networks:
+      - nginx-proxy
+    depends_on:
+      - localstack
+
+networks:
+  nginx-proxy:
+    external: true

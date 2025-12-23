@@ -32,6 +32,7 @@ import (
 type PgxWritePool *pgxpool.Pool
 type PgxReadPool *pgxpool.Pool
 
+// InitializeServer: Firma RESTAURADA para retornar 3 valores.
 func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	wire.Build(
 		provideAppConfig,
@@ -39,8 +40,10 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 		repositorySet,
 		serviceSet,
 		handlerSet,
+		// Agregamos el constructor de tu servidor original:
 		server.NewFiberServer,
 	)
+	// El cuerpo de la función mock debe retornar ahora 3 valores nil
 	return nil, nil, nil
 }
 
@@ -118,12 +121,7 @@ var repositorySet = wire.NewSet(
 	refreshtoken.NewRefreshTokenWriterRepo,
 	refreshtoken.NewRefreshTokenRepository,
 
-	// --- Repositorios de Menú (Solo Lector) ---
-	// Cambiamos el nombre del constructor a la implementación existente:
 	menu.NewMenuReaderRepository,
-	// Comentamos los constructores de escritura y CRUD por ahora:
-	// menu.NewMenuWriterRepo,
-	// menu.NewMenuCrudRepo,
 )
 
 var serviceSet = wire.NewSet(
@@ -145,8 +143,6 @@ var serviceSet = wire.NewSet(
 	bank2.NewDeactivationService,
 
 	menu2.NewMenuReaderService,
-	// Comentamos el servicio de escritura de menús:
-	// menu2.NewMenuWriterService,
 )
 
 var handlerSet = wire.NewSet(
@@ -154,7 +150,4 @@ var handlerSet = wire.NewSet(
 	handlers.NewUserHandler,
 	handlers.NewBankHandler,
 	handlers.NewDatabaseHandler,
-	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
-	// necesitarás actualizar su constructor también.
-	// handlers.NewMenuHandler,
 )

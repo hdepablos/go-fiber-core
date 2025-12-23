@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Cron de GoFiberCoreDaily24Cron en daily-24-cron
+
+Resources:
+  GoFiberCoreDaily24Cron:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GoFiberCoreDaily24Cron
+      CodeUri: ../sam-compile/daily-24-cron/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: "rate(1 minute)"
+      Tags:
+        ForceUpdate: "2025-08-09-01"
