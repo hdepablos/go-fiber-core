@@ -1,0 +1,30 @@
+item de menu:
+
+Se hizo un comando sql postgres en donde se le pasan los nombres de los campos de la tabla de menu para crear un item de menu, sea group, separator, link o line
+
+separator, group y line no necesitan un parent_id
+link puede o no llevar un parent_id
+
+separator, group y line es NULL el to_path
+
+line y separator su icon es NULL
+
+ Pagina para los icon: https://pictogrammers.com/library/mdi/
+
+vista del menu:
+
+
+en el client-quasar hay dos cosas a modificar dentro del archivo src principalmente para mostrar la vista:
+
+routes.ts:
+
+el path debe ir el mismo nombre que el to_path de la base de datos de la tabla menu sin la necesidad de colocar la barra
+el component es el import de donde viene el template que se va a mostrar en la pagina
+
+
+pages.ts:
+
+se debe crear una carpeta con el nombre de la vista, luego crear su archivo correspondiente y ahi crear el template (html, css y js)
+
+
+Pagina para las vistas: https://quasar.dev/vue-components/pagination
