@@ -19,6 +19,7 @@ import (
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/menu"
+	"go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
@@ -26,6 +27,7 @@ import (
 	"go-fiber-core/internal/services/auth"
 	bank2 "go-fiber-core/internal/services/bank"
 	menu2 "go-fiber-core/internal/services/menu"
+	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
 	user2 "go-fiber-core/internal/services/user"
 )
@@ -160,6 +162,10 @@ func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
 
+func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+	return pagination.NewPaginationService[models.MenuUser]()
+}
+
 var connectionSet = wire.NewSet(
 	provideGormService,
 	provideRedisClient,
@@ -168,11 +174,11 @@ var connectionSet = wire.NewSet(
 	provideConnectDTO,
 )
 
-var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository)
+var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository)
 
 var serviceSet = wire.NewSet(
 	provideTokenService, auth.NewAuthService, provideUserPaginationService,
-	provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService,
+	provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, menu_user2.NewMenuUserPaginationService,
 )
 
-var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler)
+var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler)

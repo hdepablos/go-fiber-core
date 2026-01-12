@@ -13,7 +13,7 @@ import (
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/menu"
-
+	"go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
@@ -23,6 +23,7 @@ import (
 	menu2 "go-fiber-core/internal/services/menu"
 	"go-fiber-core/internal/services/pagination"
 	user2 "go-fiber-core/internal/services/user"
+	menu_user2 "go-fiber-core/internal/services/menu_user"
 
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -94,6 +95,9 @@ func provideUserPaginationService() *pagination.PaginationService[models.User] {
 func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
+func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+	return pagination.NewPaginationService[models.MenuUser]()
+}
 
 var connectionSet = wire.NewSet(
 	provideGormService,
@@ -116,6 +120,8 @@ var repositorySet = wire.NewSet(
 
 	menu.NewMenuReaderRepository,
 	menu.NewMenuWriterRepository,
+
+	menu_user.NewMenuUserPaginationRepository,
 
 	refreshtoken.NewRefreshTokenReaderRepo,
 	refreshtoken.NewRefreshTokenWriterRepo,
@@ -148,6 +154,8 @@ var serviceSet = wire.NewSet(
 
 	menu2.NewMenuReaderService,
 	menu2.NewMenuWriterService,
+
+	menu_user2.NewMenuUserPaginationService,
 	// Comentamos el servicio de escritura de menús:
 	// menu2.NewMenuWriterService,
 )
@@ -158,6 +166,7 @@ var handlerSet = wire.NewSet(
 	handlers.NewBankHandler,
 	handlers.NewDatabaseHandler,
 	handlers.NewMenuHandler,
+	handlers.NewMenuUserHandler,
 	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
 	// necesitarás actualizar su constructor también.
 	// handlers.NewMenuHandler,

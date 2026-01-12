@@ -19,6 +19,7 @@ func (s *FiberServer) RegisterRoutes(
 	bankHandler handlers.BankHandler,
 	// productHandler handlers.ProductHandler,
 	menuHandler handlers.MenuHandler,
+	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
 	tokenService authService.TokenService,
 ) {

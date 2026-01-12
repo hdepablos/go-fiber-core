@@ -29,6 +29,7 @@ func NewFiberServer(
 	bankHandler handlers.BankHandler,
 	// productHandler handlers.ProductHandler,
 	menuHandler handlers.MenuHandler,
+	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
 	tokenService authService.TokenService,
 	userWriterService userService.UserWriterService, // 👈 agregado
@@ -59,7 +60,7 @@ func NewFiberServer(
 	server.App.Use(middleware.RateLimitMiddleware(connect.ConnectRedis, rateLimitConfig))
 
 	// Registrar rutas
-	server.RegisterRoutes(authHandler, userHandler, bankHandler, menuHandler, dbHandler, tokenService)
+	server.RegisterRoutes(authHandler, userHandler, bankHandler, menuHandler, menuUserHandler, dbHandler, tokenService)
 	// server.RegisterRoutes(authHandler, userHandler, bankHandler, dbHandler, tokenService)
 
 	// Cleanup combinado (Wire lo mezcla con cleanup global)
