@@ -284,19 +284,78 @@ update-env-url-base: ## ✏️ Actualiza la URL_BASE en el archivo .env.
 	@echo "$(SUCCESS)✅ URL_BASE actualizada en .env$(RESET)"
 
 
+.PHONY: set-env
+set-env: ## ✏️ Setea APP_ENV (ej: make set-env ENV=local | ENV=lambda)
+	@if [ -z "$(ENV)" ]; then \
+		echo "❌ Debes pasar ENV=local | ENV=lambda"; \
+		exit 1; \
+	fi; \
+	if grep -q '^APP_ENV=' .env; then \
+		if [ "$$(uname)" = "Darwin" ]; then \
+			sed -i '' -E "s|^APP_ENV=.*|APP_ENV=$(ENV)|" .env; \
+		else \
+			sed -i -E "s|^APP_ENV=.*|APP_ENV=$(ENV)|" .env; \
+		fi; \
+	else \
+		echo "APP_ENV=$(ENV)" >> .env; \
+	fi
+	@echo "$(SUCCESS)✅ APP_ENV=$(ENV)$(RESET)"
+
 .PHONY: update-bruno-url-base
-update-bruno-url-base: ## ✏️ Actualiza la URL en Bruno (Postman alternativo).
-	@API_BASE="$$(cat .api_base_tmp)"; \
-	API_BASE="$${API_BASE%/}/"; \
-	if [ "$$(uname)" = "Darwin" ]; then sed -i '' -E "s|urlBase: .*|urlBase: $$API_BASE|" bruno/environments/local.bru; \
-	else sed -i -E "s|urlBase: .*|urlBase: $$API_BASE|" bruno/environments/lambda.bru; fi
-	@echo "$(SUCCESS)✅ urlBase actualizada en Bruno.$(RESET)"
+update-bruno-url-base: ## ✏️ Actualiza urlBase en Bruno según ENV (local | lambda)
+	@if [ -z "$(ENV)" ]; then \
+		echo "$(ERROR)❌ Debes pasar ENV=local o ENV=lambda$(RESET)"; \
+		exit 1; \
+	fi; \
+	BRUNO_ENV_FILE="bruno/environments/$(ENV).bru"; \
+	if [ ! -f "$$BRUNO_ENV_FILE" ]; then \
+		echo "$(ERROR)❌ No existe $$BRUNO_ENV_FILE$(RESET)"; \
+		exit 1; \
+	fi; \
+	if [ "$(ENV)" = "lambda" ]; then \
+		if [ ! -f .api_base_tmp ]; then echo "❌ Faltan .api_base_tmp"; exit 1; fi; \
+		API_BASE=$$(cat .api_base_tmp); \
+	else \
+		API_BASE="http://127.0.0.1:$(PORT)/"; \
+	fi; \
+	if [ "$$(uname)" = "Darwin" ]; then \
+		sed -i '' -E "s|urlBase: .*|urlBase: $$API_BASE|" "$$BRUNO_ENV_FILE"; \
+	else \
+		sed -i -E "s|urlBase: .*|urlBase: $$API_BASE|" "$$BRUNO_ENV_FILE"; \
+	fi; \
+	echo "$(SUCCESS)✅ urlBase actualizada a [$$API_BASE] en Bruno ($(ENV))$(RESET)"
 
 
 .PHONY: update-url-all
 update-url-all: ## ✏️✏️ Sincroniza la URL en .env y Bruno.
 	@$(MAKE) update-env-url-base
 	@$(MAKE) update-bruno-url-base
+
+.PHONY: watch-lambda
+watch-lambda: ## 📊 Despliega infra, captura URL y sincroniza con Bruno.
+	@echo "$(INFO)🚀 Iniciando despliegue rápido de infraestructura...$(RESET)"
+	@$(MAKE) set-env ENV=lambda
+	@# Ejecutamos Terraform dentro de su carpeta
+	@cd terraform && tflocal apply \
+		-var-file="local.tfvars" \
+		-auto-approve \
+		-refresh=true \
+		-parallelism=10
+	@$(MAKE) write-api-base
+	@$(MAKE) update-bruno-url-base ENV=lambda
+	@echo "$(SUCCESS)🔥 Entorno Lambda actualizado y sincronizado con Bruno.$(RESET)"
+
+
+.PHONY: write-api-base
+write-api-base: ## 📝 Extrae la URL desde el output de Terraform
+	@echo "$(INFO)🔗 Obteniendo URL desde Terraform...$(RESET)"
+	@API_BASE=$$(cd terraform && tflocal output -raw api_base_url 2>/dev/null); \
+	if [ -z "$$API_BASE" ] || [ "$$API_BASE" = "None" ]; then \
+		echo "$(ERROR)❌ No se pudo obtener la URL. Revisa el archivo outputs.tf$(RESET)"; \
+		exit 1; \
+	fi; \
+	echo "$$API_BASE" > .api_base_tmp
+	@echo "$(SUCCESS)✅ URL guardada en .api_base_tmp$(RESET)"
 
 
 .PHONY: update-function
@@ -400,6 +459,10 @@ logs-all: ## 📊 Muestra logs de TODAS las lambdas (Sintaxis corregida)
 		awslocal logs tail /aws/lambda/gofibercore-local-1min-cron --follow & \
 		wait
 
+.PHONY: watch-lambda
+wath-lambda: ## 📊 Levanta todas las lambdas local con terraform
+	tflocal apply -var-file="local.tfvars" -auto-approve -refresh=false -parallelism=10
+
 
 .PHONY: update-fn
 update-fn: ## 🔄 Actualización rápida de código en LocalStack.
@@ -500,9 +563,10 @@ localstack-down: ## 🗑️ Apaga y limpia profundamente LocalStack (requiere co
 
 .PHONY: watch
 watch: ## 🏎️ Inicia API con live-reload (Air).
-## remplazar APP_ENV=local
+	@$(MAKE) set-env ENV=local
+	@$(MAKE) update-bruno-url-base ENV=local
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
-	$(DC_BASE) -p $(PROJECT_SLUG)-$(APP_ENV) up --remove-orphans --force-recreate
+	$(DC_BASE) -p $(PROJECT_SLUG)-local up --remove-orphans --force-recreate
 
 
 .PHONY: aws-down

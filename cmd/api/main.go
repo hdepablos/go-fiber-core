@@ -40,7 +40,7 @@ var (
 func isLambdaEnvironment() bool {
 	// 1. Detección por variable de entorno APP_ENV (primaria)
 	if appEnv == "local" {
-		return true
+		return false
 	}
 	// 2. Detección por variables de entorno de AWS Lambda (secundaria)
 	return os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" ||

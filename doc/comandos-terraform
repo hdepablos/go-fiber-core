@@ -38,3 +38,12 @@ Verificar las Variables de Entorno
 
 Obtén el ID real de tu API actual
 	awslocal apigateway get-rest-apis
+
+
+cd terraform && tflocal state list | grep api_gateway
+aws_api_gateway_deployment.deployment
+aws_api_gateway_integration.lambda_integration
+aws_api_gateway_method.proxy_method
+aws_api_gateway_resource.proxy
+aws_api_gateway_rest_api.api
+aws_api_gateway_stage.prod
