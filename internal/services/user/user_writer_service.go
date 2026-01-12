@@ -41,7 +41,7 @@ func NewUserWriterService(
 		TransactionManager: services.NewTransactionManager(conn),
 		conn:               *conn,
 		userWriter:         writer,
-		userReader:         reader,
+		//userReader:         reader,
 	}
 }
 
