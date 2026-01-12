@@ -104,6 +104,10 @@ comando sql para bank_id a productos:
     JOIN random_banks rb ON rp.rn = rb.rn
     WHERE products.id = rp.id;
 
+
+-- Listo Pendiente
+-- Transacciones en productos y en otros cuando se apliquen 2 sentencias
+
 -- ==================================================
 -- ==================================================
 -- ==================================================
@@ -132,12 +136,14 @@ recrear el download file de backoffice y collections con un código único para 
 -- con la simulación del apilogger mandar email si falla
 
 -- Pendiente
+-- Conectar al log de elasticsearch
+
+-- Pendiente
 -- El crud avanzado por relaciones -> Silverio
 -- Sumatorias de totales en extras -> Silverio
 -- crear los sedders base del sistema por sql
--- Crear comando para cragar data de la tablas validando la variable de session, solo != a production | igual a develop local
+-- Crear comando para cagar data de la tablas validando la variable de session, solo != a production | igual a develop local
 -- Con el usuario de session
--- Transacciones en productos y en otros cuando se apliquen 2 sentencias
 
 
 
@@ -158,13 +164,20 @@ csv (exportar/importar)
 
 -- Pendiente
 tablas de tablas
+Luego de loguearse debe cargar en memoria todos los filtros
 controller por vistas de tablas de tablas como backoffice todas por get
+
 
 
 -- Pendiente
 Notificar por redis sesiones emitir un mensaje solo al cliente (Manejar notificaciones en el cliente cuadrar con la gente de front end)
 por redis
 Para implementar un sistema de publicación y suscripción (pub/sub) con Redis en Golang usando canales, se puede hacer de una manera eficiente y moderna aprovechando las características de Redis junto con las buenas prácticas de concurrencia en Go.
+
+
+-- Pendiente
+-- Implementar terraform
+-- Montar las variables del config en los cron
 
 
 -- Pendiente --> SILVERIO
@@ -215,11 +228,6 @@ Eliminar la conexión de los usurios
 
 
 
-
-
-
-
-
 -- ==================================================
 -- ==================================================
 -- ==================================================
@@ -232,5 +240,14 @@ encriptado tanto en el cliente como en el servidor
 -- pendiente
 Configurar 2 usuarios con roles diferentes y que ambos usuarios tengan acceso al mismo item:
 validar que no pinte 2 veces el mismo item
+
+-- Luego de loguearse se deben cargar todos los filtros en localstore
+
+-- Ojo no persiste en memoria el ocultar columnas
+
+-- Validar que no puede mostrar una ruta la cual no tenga acceso por el menu, de lo
+	contrario debe redireccionar al dashboard
+
+
 
 

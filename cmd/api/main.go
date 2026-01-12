@@ -39,7 +39,7 @@ var (
 // isLambdaEnvironment detecta si estamos en modo Lambda
 func isLambdaEnvironment() bool {
 	// 1. Detección por variable de entorno APP_ENV (primaria)
-	if appEnv == "lambda" {
+	if appEnv == "local" {
 		return true
 	}
 	// 2. Detección por variables de entorno de AWS Lambda (secundaria)
@@ -114,7 +114,10 @@ func main() {
 	// 3. Ejecutar la lógica de arranque según el entorno
 	if isLambdaEnvironment() {
 		// --- ARRANQUE EN MODO LAMBDA ---
-		log.Println("🔥 Iniciando en modo AWS Lambda...")
+		var BuildMarker = "lambda0api"
+		_ = BuildMarker
+
+		log.Println("🔥 Iniciando en modo AWS lambda0api")
 		lambda.Start(Handler)
 	} else {
 		// --- ARRANQUE EN MODO HTTP TRADICIONAL (Local/Server) ---

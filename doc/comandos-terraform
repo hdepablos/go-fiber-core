@@ -1,0 +1,40 @@
+tflocal init
+
+
+Cuando quieres actualizar la versión de un Provider
+Cuando cambias la versión de un Módulo
+Para solucionar errores del "Lock File"
+Ejecutar:
+	tflocal init -upgrade
+
+
+
+Ahora tus comandos serían consistentes para los tres:
+	Local: tflocal apply -var-file="local.tfvars"
+	Staging: terraform apply -var-file="staging.tfvars"
+	Production: terraform apply -var-file="production.tfvars"
+
+Ejecutar desde 0
+# 1. Borra los plugins descargados y el archivo de bloqueo
+rm -rf .terraform
+rm -f .terraform.lock.hcl
+
+# 2. Re-inicializa descargando la versión correcta (~> 5.0)
+tflocal init
+
+# 3. Aplica los cambios con tu archivo de variables corregido
+tflocal apply -var-file="local.tfvars"
+
+
+Limpia el archivo de estado:
+	rm -f terraform.tfstate*
+
+
+Verificar las Variables de Entorno
+	Para estar 100% seguros de que tus 30+ variables llegaron a la Lambda, puedes ejecutar este comando:
+	tflocal lambda get-function-configuration --function-name gofibercore-local-api
+
+
+
+Obtén el ID real de tu API actual
+	awslocal apigateway get-rest-apis

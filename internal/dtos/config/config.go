@@ -103,30 +103,43 @@ type ApiConfig struct {
 // NewAppConfig carga y retorna la configuración de la aplicación.
 func NewAppConfig(configPath string) (*AppConfig, error) {
 	v := viper.New()
-	v.SetConfigFile(configPath)
+
+	// 🔴 ESTO TIENE QUE IR ANTES
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
+	v.SetConfigFile(configPath)
+
 	if err := v.ReadInConfig(); err != nil {
-		// CAMBIO: En lugar de Fatalln, devolvemos un error.
-		return nil, fmt.Errorf("error al cargar el archivo de configuración desde '%s': %w", configPath, err)
+		return nil, fmt.Errorf(
+			"error al cargar el archivo de configuración desde '%s': %w",
+			configPath,
+			err,
+		)
 	}
 
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-
-	// Expandir variables de entorno en los valores
+	// Expandir variables de entorno (${VAR})
 	for _, key := range v.AllKeys() {
 		value := v.GetString(key)
+		fmt.Println("esto es el valor")
+		fmt.Println(value)
 		if strings.Contains(value, "${") {
+
+			fmt.Println("Entro xxxxx")
+			fmt.Println("Entro")
+			fmt.Println(value)
+
 			v.Set(key, os.ExpandEnv(value))
 		}
 	}
 
 	cfg := &AppConfig{}
 	if err := v.Unmarshal(cfg); err != nil {
-		// CAMBIO: En lugar de Fatalln, devolvemos un error.
-		return nil, fmt.Errorf("error al deserializar la configuración principal: %w", err)
+		return nil, fmt.Errorf(
+			"error al deserializar la configuración principal: %w",
+			err,
+		)
 	}
 
-	// CAMBIO: Devolvemos el config y un error nulo.
 	return cfg, nil
 }

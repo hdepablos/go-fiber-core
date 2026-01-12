@@ -8,25 +8,21 @@ services:
     environment:
       - SERVICES=lambda,sqs,logs,cloudformation,iam,cloudwatch,apigateway,events,sts,ec2
       - DATA_DIR=/tmp/localstack/data
-      - DEBUG=1
+      - DEBUG=${DEBUG:-0}
       - CLEAR_TMP_FOLDER=0
 
-      # 🔥 CAMBIO CRÍTICO: Usa 'local' en lugar de 'docker'
-      - LAMBDA_EXECUTOR=local  # ← CAMBIA ESTO
-      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=30
-
-      # Estas ya no son necesarias con 'local'
-      # - LAMBDA_DOCKER_NETWORK=nginx-proxy
-      # - LAMBDA_CONCURRENCY=5
-      # - LAMBDA_REUSE_CONTAINERS=0
-      # - LAMBDA_STAY_OPEN_MODE=0
-      # - DOCKER_HOST=unix:///var/run/docker.sock
+      # 🚀 CONFIGURACIÓN PARA ESCALADO HORIZONTAL (CONCURRENCIA)
+      - LAMBDA_EXECUTOR=docker       # Obliga a crear un contenedor por instancia
+      - LAMBDA_DOCKER_NETWORK=nginx-proxy
+      - LAMBDA_CONCURRENCY=5        # Permite hasta 10 contenedores simultáneos
+      - LAMBDA_REUSE_CONTAINERS=0 # Deshabilita el reuse para pruebas más realistas
+      - LAMBDA_STAY_OPEN_MODE=0
+      - DOCKER_HOST=unix:///var/run/docker.sock
 
     volumes:
       - "./localstack-data:/tmp/localstack/data"
       - "./localstack-data:/var/lib/localstack"
-      # Ya no necesitas el socket de Docker
-      # - "/var/run/docker.sock:/var/run/docker.sock"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 10s

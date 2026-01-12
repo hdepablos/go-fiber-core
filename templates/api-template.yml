@@ -33,11 +33,17 @@ Resources:
               - sqs:SendMessage
             Resource: !Ref SqsQueueArn
       Events:
-        ApiEvent:
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+
+        ApiProxy:
           Type: Api
           Properties:
             Path: /{proxy+}
-            Method: any
+            Method: ANY
 
 Outputs:
   ApiUrl:

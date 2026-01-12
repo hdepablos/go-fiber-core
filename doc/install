@@ -1,0 +1,11 @@
+brew install terraform
+brew install pipx terraform
+pipx ensurepath
+
+pipx install terraform-local
+
+tflocal --version
+
+tflocal init
+
+

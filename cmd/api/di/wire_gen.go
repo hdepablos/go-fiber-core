@@ -9,6 +9,7 @@ package di
 import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"go-fiber-core/internal/database/connections/gorm"
 	"go-fiber-core/internal/database/connections/pgx"
@@ -28,13 +29,15 @@ import (
 	menu2 "go-fiber-core/internal/services/menu"
 	"go-fiber-core/internal/services/pagination"
 	user2 "go-fiber-core/internal/services/user"
+	"log"
+	"os"
 )
 
 // Injectors from wire.go:
 
-// InitializeServer: Firma RESTAURADA para retornar 3 valores.
+// InitializeServer para API (Local/Docker)
 func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
-	appConfig, err := provideAppConfig(configPath)
+	appConfig, err := provideAppConfigServer(configPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -103,14 +106,154 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	}, nil
 }
 
+// InitializeAppContainer para Crons, Lambdas y CLI (Lógica pura)
+func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
+	appConfig, err := provideAppConfigAWS(configPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	gormConnectService, cleanup, err := provideGormService(appConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	pgxWritePool, cleanup2, err := providePgxWritePool(appConfig)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	pgxReadPool, cleanup3, err := providePgxReadPool(appConfig)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	client, cleanup4, err := provideRedisClient(appConfig)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	connectDTO := provideConnectDTO(gormConnectService, pgxWritePool, pgxReadPool, client)
+	userWriter := user.NewUserWriterRepo()
+	userReader := user.NewUserReaderRepo()
+	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
+	paginationService := provideUserPaginationService()
+	userPaginator := user.NewUserPaginatorRepo(paginationService)
+	userReaderService := user2.NewUserReaderService(connectDTO, userReader, userPaginator)
+	bankWriter := bank.NewBankWriterRepo()
+	bankReader := bank.NewBankReaderRepo()
+	bankWriterService := bank2.NewBankWriterService(connectDTO, bankWriter, bankReader)
+	bankReaderService := bank2.NewBankReaderService(connectDTO, bankReader)
+	refreshTokenReader := refreshtoken.NewRefreshTokenReaderRepo()
+	refreshTokenWriter := refreshtoken.NewRefreshTokenWriterRepo()
+	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
+	tokenService := provideTokenService(appConfig)
+	menuReader := menu.NewMenuReaderRepository(connectDTO)
+	menuReaderService := menu2.NewMenuReaderService(menuReader)
+	authService := auth.NewAuthService(userReader, refreshTokenRepository, tokenService, menuReaderService, connectDTO)
+	databaseService := services.NewDatabaseService(appConfig, connectDTO)
+	appContainer := &AppContainer{
+		Config:            appConfig,
+		Connect:           connectDTO,
+		UserWriterService: userWriterService,
+		UserReaderService: userReaderService,
+		BankWriterService: bankWriterService,
+		BankReaderService: bankReaderService,
+		AuthService:       authService,
+		DatabaseService:   databaseService,
+	}
+	return appContainer, func() {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
+}
+
+// InitializeAWS (Mantenido por compatibilidad simple)
+func InitializeAWS(configPath string) (*AWSConfigResponse, func(), error) {
+	appConfig, err := provideAppConfigAWS(configPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	gormConnectService, cleanup, err := provideGormService(appConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	pgxWritePool, cleanup2, err := providePgxWritePool(appConfig)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	pgxReadPool, cleanup3, err := providePgxReadPool(appConfig)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	client, cleanup4, err := provideRedisClient(appConfig)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	connectDTO := provideConnectDTO(gormConnectService, pgxWritePool, pgxReadPool, client)
+	awsConfigResponse := &AWSConfigResponse{
+		Config:  appConfig,
+		Connect: connectDTO,
+	}
+	return awsConfigResponse, func() {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
+}
+
 // wire.go:
 
 type PgxWritePool *pgxpool.Pool
 
 type PgxReadPool *pgxpool.Pool
 
-func provideAppConfig(configPath string) (*config.AppConfig, error) {
+// AppContainer contiene la lógica de negocio completa sin el servidor HTTP
+type AppContainer struct {
+	Config            *config.AppConfig
+	Connect           *connect.ConnectDTO
+	UserWriterService user2.UserWriterService
+	UserReaderService user2.UserReaderService
+	BankWriterService bank2.BankWriterService
+	BankReaderService bank2.BankReaderService
+	AuthService       auth.AuthService
+	DatabaseService   *services.DatabaseService
+}
+
+// AWSConfigResponse se mantiene para compatibilidad si lo usas en otros lados
+type AWSConfigResponse struct {
+	Config  *config.AppConfig
+	Connect *connect.ConnectDTO
+}
+
+func provideAppConfigServer(configPath string) (*config.AppConfig, error) {
+	_ = godotenv.Load()
 	return config.NewAppConfig(configPath)
+}
+
+func provideAppConfigAWS(configPath string) (*config.AppConfig, error) {
+	_ = godotenv.Load()
+	validateLambdaEnv()
+	return config.NewAppConfig(configPath)
+}
+
+func validateLambdaEnv() {
+	required := []string{"JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"}
+	for _, v := range required {
+		if os.Getenv(v) == "" {
+			log.Fatalf("❌ Variable de entorno requerida no definida: %s", v)
+		}
+	}
 }
 
 func provideGormService(cfg *config.AppConfig) (*gorm.GormConnectService, func(), error) {
@@ -131,18 +274,13 @@ func providePgxReadPool(cfg *config.AppConfig) (PgxReadPool, func(), error) {
 	return PgxReadPool(pool), cleanup, err
 }
 
-func provideConnectDTO(
-	gormService *gorm.GormConnectService,
-	writePool PgxWritePool,
-	readPool PgxReadPool,
-	redisClient *redis.Client,
-) *connect.ConnectDTO {
+func provideConnectDTO(gormService *gorm.GormConnectService, w PgxWritePool, r PgxReadPool, rd *redis.Client) *connect.ConnectDTO {
 	return &connect.ConnectDTO{
 		ConnectGormWrite: gormService.GetWriteDB(),
 		ConnectGormRead:  gormService.GetReadDB(),
-		ConnectPgxWrite:  (*pgxpool.Pool)(writePool),
-		ConnectPgxRead:   (*pgxpool.Pool)(readPool),
-		ConnectRedis:     redisClient,
+		ConnectPgxWrite:  (*pgxpool.Pool)(w),
+		ConnectPgxRead:   (*pgxpool.Pool)(r),
+		ConnectRedis:     rd,
 	}
 }
 
@@ -169,8 +307,7 @@ var connectionSet = wire.NewSet(
 var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, menu.NewMenuReaderRepository)
 
 var serviceSet = wire.NewSet(
-	provideTokenService, auth.NewAuthService, provideUserPaginationService,
-	provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService,
+	provideTokenService, auth.NewAuthService, provideUserPaginationService, provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService,
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler)
