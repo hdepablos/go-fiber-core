@@ -53,3 +53,31 @@ func (r *menuWriterRepository) BulkRemoveUsers(
 		Delete(&models.MenuUser{}).
 		Error
 }
+
+func (r *menuWriterRepository) Create(
+	ctx context.Context,
+	db *gorm.DB,
+	menu *models.Menu,
+) error {
+
+	return db.WithContext(ctx).
+		Create(menu).
+		Error
+}
+
+func (r *menuWriterRepository) GetByID(
+	ctx context.Context,
+	db *gorm.DB,
+	id uint,
+) (*models.Menu, error) {
+
+	var menu models.Menu
+
+	if err := db.WithContext(ctx).
+		First(&menu, id).
+		Error; err != nil {
+		return nil, err
+	}
+
+	return &menu, nil
+}

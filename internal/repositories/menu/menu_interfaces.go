@@ -18,6 +18,8 @@ import (
 type MenuWriter interface {
 	AddBulkUsers(ctx context.Context, db *gorm.DB, menuIDs []uint64, userIDs []uint64) error
 	BulkRemoveUsers(ctx context.Context, db *gorm.DB, menuIDs []uint64, userIDs []uint64) error
+	Create(ctx context.Context, db *gorm.DB, menu *models.Menu) error
+	GetByID(ctx context.Context, db *gorm.DB, id uint) (*models.Menu, error)
 }
 
 type MenuReader interface {

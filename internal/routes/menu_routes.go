@@ -12,6 +12,11 @@ import (
 func RegisterMenuRoutes(router fiber.Router, menuHandler handlers.MenuHandler) {
 	menuGroup := router.Group("/menus")
 
+	menuGroup.Post(
+    "/",
+    utils.Validate(new(requests.CreateMenuRequest)),
+    menuHandler.CreateMenu,
+)
 	// --- 1) OBTENER MENÚ DEL USUARIO AUTENTICADO ---
 	// GET /menus/my
 	menuGroup.Get("/my", menuHandler.GetMenuByUser)

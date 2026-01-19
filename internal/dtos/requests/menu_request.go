@@ -1,10 +1,10 @@
 package requests
 
-// CreateMenuRequest define los campos necesarios para crear un menú.
 type CreateMenuRequest struct {
-	ItemType string  `json:"item_type" validate:"required"` // Ej: "link", "submenu"
-	ItemName string  `json:"item_name" validate:"required"` // Nombre visible
-	ToPath   *string `json:"to,omitempty"`                  // Ruta o enlace opcional
-	Icon     *string `json:"icon,omitempty"`                // Icono opcional
-	ParentID *uint   `json:"parent_id,omitempty"`           // ID del padre (si es submenu)
+	ItemType   string  `json:"item_type" validate:"required,oneof=link separator group line"`
+	ItemName   string  `json:"item_name" validate:"required"`
+	ToPath     *string `json:"to_path,omitempty"`
+	Icon       *string `json:"icon,omitempty"`
+	ParentID   *uint   `json:"parent_id"`
+	OrderIndex int     `json:"order_index"`
 }

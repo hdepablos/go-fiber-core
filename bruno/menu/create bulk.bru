@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{urlBase}}api/v1/menus
+  url: {{urlBase}}api/v1/menus/users/bulk
   body: json
   auth: bearer
 }
@@ -20,9 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "item_type": "link",
-    "item_name": "Dashboard",
-    "to": "/dashboard",
-    "icon": "home"
+    "menu_ids": [10],
+    "user_ids": [1]
   }
+  
 }
