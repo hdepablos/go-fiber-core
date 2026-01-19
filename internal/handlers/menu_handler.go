@@ -14,10 +14,12 @@ import (
 // INTERFAZ DEL HANDLER
 // ─────────────────────────────────────────────
 type MenuHandler interface {
+	CreateMenu(c *fiber.Ctx) error
 	AddBulkUsers(c *fiber.Ctx) error
 	BulkRemoveUsers(c *fiber.Ctx) error
 	GetMenuByUser(c *fiber.Ctx) error
 }
+
 
 // ─────────────────────────────────────────────
 // HANDLER
@@ -112,4 +114,45 @@ func (h *menuHandler) GetMenuByUser(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Menú obtenido correctamente", tree)
+}
+
+// ─────────────────────────────────────────────
+// CREATE MENU ITEM → Writer
+// ─────────────────────────────────────────────
+func (h *menuHandler) CreateMenu(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	// Validar sesión
+	userID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(
+			c,
+			fiber.StatusUnauthorized,
+			"Error de autenticación",
+			err,
+		)
+	}
+
+	log.Printf("Usuario %d está creando un ítem de menú", userID)
+
+	var req requests.CreateMenuRequest
+	if err := c.BodyParser(&req); err != nil {
+		return responses.Error(
+			c,
+			fiber.StatusBadRequest,
+			"Error al parsear el cuerpo de la solicitud",
+			err,
+		)
+	}
+
+	menu, err := h.writer.CreateMenu(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(
+		c,
+		"Ítem de menú creado correctamente",
+		menu,
+	)
 }

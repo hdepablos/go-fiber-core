@@ -89,7 +89,7 @@ func (h *bankHandler) GetAll(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return responses.Success(c, "Bancos obtenidos exitosamente", banks)
+	return responses.Success(c, "Bancos obtenidos exitosamente...", banks)
 }
 
 func (h *bankHandler) GetByID(c *fiber.Ctx) error {

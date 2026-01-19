@@ -14,7 +14,7 @@ import (
 	// CAMBIO: Se importa el paquete 'di' que contiene el inyector de Wire.
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/server"
-	"go-fiber-core/internal/services/product"
+	//"go-fiber-core/internal/services/product"
 
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -61,8 +61,8 @@ func main() {
 	// Se ejecutará cuando la función main termine.
 	defer cleanup()
 
-	testService := product.NewProductAPIService(server.AppConfig)
-	testService.PrintRedisConfig(context.Background()) // 👈 Esto imprimirá en la consola
+	//testService := product.NewProductAPIService(server.AppConfig)
+	//testService.PrintRedisConfig(context.Background()) // 👈 Esto imprimirá en la consola
 
 	// --- ARRANQUE Y CIERRE ORDENADO ---
 	done := make(chan bool, 1)
