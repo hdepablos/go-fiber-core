@@ -113,11 +113,7 @@ func main() {
 
 	// 3. Ejecutar la lógica de arranque según el entorno
 	if isLambdaEnvironment() {
-		// --- ARRANQUE EN MODO LAMBDA ---
-		var BuildMarker = "lambda0api"
-		_ = BuildMarker
-
-		log.Println("🔥 Iniciando en modo AWS lambda0api")
+		// --- ARRANQUE EN MODO AWS LAMBDA ---
 		lambda.Start(Handler)
 	} else {
 		// --- ARRANQUE EN MODO HTTP TRADICIONAL (Local/Server) ---

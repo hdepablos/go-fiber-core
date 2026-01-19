@@ -121,14 +121,7 @@ func NewAppConfig(configPath string) (*AppConfig, error) {
 	// Expandir variables de entorno (${VAR})
 	for _, key := range v.AllKeys() {
 		value := v.GetString(key)
-		fmt.Println("esto es el valor")
-		fmt.Println(value)
 		if strings.Contains(value, "${") {
-
-			fmt.Println("Entro xxxxx")
-			fmt.Println("Entro")
-			fmt.Println(value)
-
 			v.Set(key, os.ExpandEnv(value))
 		}
 	}
