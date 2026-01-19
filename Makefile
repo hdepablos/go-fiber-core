@@ -83,6 +83,7 @@ install-all-pkg: # Install multiple Go dependencies
 	make install-pkg pkg=gorm.io/gorm
 	make install-pkg pkg=gorm.io/driver/postgres
 	make install-pkg pkg=github.com/jackc/pgx/v5
+	make install-pkg pkg=github.com/jackc/pgx/v5/tracelog
 	make install-pkg pkg=github.com/spf13/viper
 	make install-pkg pkg=github.com/gofiber/fiber/v2
 	make install-pkg pkg=github.com/gofiber/fiber/v2/middleware/limiter

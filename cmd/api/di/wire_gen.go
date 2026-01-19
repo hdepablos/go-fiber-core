@@ -88,9 +88,13 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	menuWriter := menu.NewMenuWriterRepository(connectDTO)
 	menuWriterService := menu2.NewMenuWriterService(menuWriter, connectDTO)
 	menuHandler := handlers.NewMenuHandler(menuWriterService, menuReaderService)
+	paginationService2 := provideMenuUserPaginationService()
+	menuUserPagination := menu_user.NewMenuUserPaginationRepository(paginationService2)
+	menuUserPaginationService := menu_user2.NewMenuUserPaginationService(connectDTO, menuUserPagination)
+	menuUserHandler := handlers.NewMenuUserHandler(menuUserPaginationService)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
-	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, menuHandler, databaseHandler, tokenService, userWriterService)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, menuHandler, menuUserHandler, databaseHandler, tokenService, userWriterService)
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -178,7 +182,8 @@ var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, 
 
 var serviceSet = wire.NewSet(
 	provideTokenService, auth.NewAuthService, provideUserPaginationService,
-	provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, menu_user2.NewMenuUserPaginationService,
+	provideBankPaginationService,
+	provideMenuUserPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, menu_user2.NewMenuUserPaginationService,
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler)

@@ -48,6 +48,7 @@ func (s *FiberServer) RegisterRoutes(
 	routes.RegisterUserRoutes(protected, userHandler)
 	// routes.RegisterProductRoutes(protected, productHandler)
 	routes.RegisterMenuRoutes(protected, menuHandler)
+	routes.RegisterMenuUserRoutes(protected, menuUserHandler)
 }
 
 // --- Handlers del Servidor ---

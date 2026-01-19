@@ -34,7 +34,6 @@ func (h *menuUserHandler) GetAllPaginated(c *fiber.Ctx) error {
 	if err != nil {
 		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
 	}
-	// ---
 
 	log.Printf("Usuario %d la solicita la paginación", userID)
 

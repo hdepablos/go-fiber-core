@@ -7,7 +7,7 @@ import (
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/menu_user"
 )
-	
+
 type MenuUserPaginationService interface {
 	GetAllPaginated(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.MenuUser], error)
 }

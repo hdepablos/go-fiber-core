@@ -140,6 +140,7 @@ var serviceSet = wire.NewSet(
 
 	provideUserPaginationService,
 	provideBankPaginationService,
+	provideMenuUserPaginationService,
 
 	services.NewTransactionManager,
 	services.NewDatabaseService,

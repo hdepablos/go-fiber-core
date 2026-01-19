@@ -1,11 +1,11 @@
 meta {
-  name: paginated
+  name: paginated copy
   type: http
-  seq: 6
+  seq: 21
 }
 
 post {
-  url: {{urlBase}}api/v1/banks/paginated
+  url: {{urlBase}}api/v1/menu-users/paginated
   body: json
   auth: bearer
 }
@@ -16,7 +16,7 @@ auth:bearer {
 
 body:json {
   {
-      "sortBy": ["id"],
+      "sortBy": ["menu_user.menus.item_name"],
       "sortDesc": [true],
       "filterBy": [],
       "filterValues": [],
