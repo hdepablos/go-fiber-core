@@ -459,10 +459,6 @@ logs-all: ## 📊 Muestra logs de TODAS las lambdas (Sintaxis corregida)
 		awslocal logs tail /aws/lambda/gofibercore-local-1min-cron --follow & \
 		wait
 
-.PHONY: watch-lambda
-wath-lambda: ## 📊 Levanta todas las lambdas local con terraform
-	tflocal apply -var-file="local.tfvars" -auto-approve -refresh=false -parallelism=10
-
 
 .PHONY: update-fn
 update-fn: ## 🔄 Actualización rápida de código en LocalStack.
