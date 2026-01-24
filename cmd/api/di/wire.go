@@ -15,6 +15,7 @@ import (
 	"go-fiber-core/internal/handlers"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bank"
+	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/session"
@@ -23,6 +24,7 @@ import (
 	"go-fiber-core/internal/services"
 	"go-fiber-core/internal/services/auth"
 	bank2 "go-fiber-core/internal/services/bank"
+	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
 	"go-fiber-core/internal/services/pagination"
 	user2 "go-fiber-core/internal/services/user"
@@ -187,6 +189,7 @@ var repositorySet = wire.NewSet(
 	refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository,
 	session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository,
 	menu.NewMenuReaderRepository,
+	catalog.NewCatalogRepository,
 )
 
 var serviceSet = wire.NewSet(
@@ -196,8 +199,9 @@ var serviceSet = wire.NewSet(
 	user2.NewUserReaderService, user2.NewUserWriterService,
 	bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService,
 	menu2.NewMenuReaderService,
+	catalog2.NewCatalogService,
 )
 
 var handlerSet = wire.NewSet(
-	handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler,
+	handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewCatalogHandler, handlers.NewDatabaseHandler,
 )

@@ -5,6 +5,7 @@ import (
 	"context"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/services/pagination"
 
 	"gorm.io/gorm"
@@ -15,9 +16,13 @@ type BankReaderRepo struct{}
 
 func NewBankReaderRepo() BankReader { return &BankReaderRepo{} }
 
-type BankWriterRepo struct{}
+type BankWriterRepo struct {
+	catalogRepo catalog.CatalogRepository
+}
 
-func NewBankWriterRepo() BankWriter { return &BankWriterRepo{} }
+func NewBankWriterRepo(catalogRepo catalog.CatalogRepository) BankWriter {
+	return &BankWriterRepo{catalogRepo: catalogRepo}
+}
 
 type BankPaginationRepo struct {
 	ps *pagination.PaginationService[models.Bank]
@@ -40,20 +45,34 @@ func NewBankCrudRepository(r BankReader, w BankWriter) *bankCrudRepository {
 
 // Writer (sin cambios)
 func (r *BankWriterRepo) Create(ctx context.Context, db *gorm.DB, bank *models.Bank) error {
-	return db.WithContext(ctx).Create(bank).Error
+	if err := db.WithContext(ctx).Create(bank).Error; err != nil {
+		return err
+	}
+	// Invalidate catalog cache
+	return r.catalogRepo.InvalidateCache(ctx)
 }
 
 func (r *BankWriterRepo) Update(ctx context.Context, db *gorm.DB, bank *models.Bank) error {
-	return db.WithContext(ctx).Save(bank).Error
+	if err := db.WithContext(ctx).Save(bank).Error; err != nil {
+		return err
+	}
+	return r.catalogRepo.InvalidateCache(ctx)
 }
 
 func (r *BankWriterRepo) SoftDelete(ctx context.Context, db *gorm.DB, id uint) error {
-	return db.WithContext(ctx).Delete(&models.Bank{}, id).Error
+	if err := db.WithContext(ctx).Delete(&models.Bank{}, id).Error; err != nil {
+		return err
+	}
+	return r.catalogRepo.InvalidateCache(ctx)
 }
 
 func (r *BankWriterRepo) HardDelete(ctx context.Context, db *gorm.DB, id uint) error {
-	return db.WithContext(ctx).Unscoped().Delete(&models.Bank{}, id).Error
+	if err := db.WithContext(ctx).Unscoped().Delete(&models.Bank{}, id).Error; err != nil {
+		return err
+	}
+	return r.catalogRepo.InvalidateCache(ctx)
 }
+
 
 // Reader
 func (r *BankReaderRepo) GetByID(ctx context.Context, db *gorm.DB, id uint) (*models.Bank, error) {

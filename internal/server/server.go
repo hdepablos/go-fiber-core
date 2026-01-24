@@ -27,6 +27,7 @@ func NewFiberServer(
 	authHandler handlers.AuthHandler,
 	userHandler handlers.UserHandler,
 	bankHandler handlers.BankHandler,
+	catalogHandler handlers.CatalogHandler,
 	// productHandler handlers.ProductHandler,
 	// menuHandler handlers.MenuHandler,
 	dbHandler handlers.DatabaseHandler,
@@ -38,6 +39,7 @@ func NewFiberServer(
 		App: fiber.New(fiber.Config{
 			ServerHeader: appConfig.Server.ServerHeader,
 			AppName:      appConfig.App.AppName,
+			ErrorHandler: middleware.GlobalErrorHandler, // 👈 Registramos el manejador global
 		}),
 		AppConfig:         appConfig,
 		UserWriterService: userWriterService, // 👈 guardamos la instancia para uso externo
@@ -60,7 +62,7 @@ func NewFiberServer(
 
 	// Registrar rutas
 	// server.RegisterRoutes(authHandler, userHandler, bankHandler, productHandler, menuHandler, dbHandler, tokenService)
-	server.RegisterRoutes(authHandler, userHandler, bankHandler, dbHandler, tokenService, connect.ConnectRedis)
+	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, dbHandler, tokenService, connect.ConnectRedis)
 
 	// Cleanup combinado (Wire lo mezcla con cleanup global)
 	cleanup := func() {}

@@ -104,18 +104,6 @@ func (s *authService) Login(ctx context.Context, req requests.LoginRequest, user
 			return fmt.Errorf("error al crear sesión: %w", err)
 		}
 
-		// Manejo de RefreshToken (Legacy/Compatibilidad)
-		// Nota: Si queremos permitir múltiples sesiones, NO deberíamos borrar todos los tokens anteriores.
-		// Pero para mantener limpia la tabla refresh_tokens (que no tiene session_id),
-		// podríamos optar por borrar. Sin embargo, para soportar multidispositivo real,
-		// deberíamos dejar que coexistan.
-		// Voy a comentar el borrado masivo para permitir múltiples sesiones.
-		/*
-			if err := s.refreshTokenRepo.DeleteByUserID(ctx, tx, user.ID); err != nil {
-				log.Printf("ADVERTENCIA: no se pudo eliminar el refresh token anterior: %v", err)
-			}
-		*/
-
 		newRefreshToken := &models.RefreshToken{
 			UserID:    user.ID,
 			Token:     refreshToken,
