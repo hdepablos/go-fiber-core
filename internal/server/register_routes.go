@@ -11,6 +11,7 @@ import (
 	"go-fiber-core/internal/utils"
 
 	fiber "github.com/gofiber/fiber/v2"
+	redis "github.com/redis/go-redis/v9"
 )
 
 func (s *FiberServer) RegisterRoutes(
@@ -21,6 +22,7 @@ func (s *FiberServer) RegisterRoutes(
 	// menuHandler handlers.MenuHandler,
 	dbHandler handlers.DatabaseHandler,
 	tokenService authService.TokenService,
+	redisClient *redis.Client,
 ) {
 	blacklistBankService := services.NewBlacklistBankService()
 	utils.SetupValidator(blacklistBankService)
@@ -38,13 +40,14 @@ func (s *FiberServer) RegisterRoutes(
 
 	// --- Rutas Protegidas ---
 	// Requieren un token de autenticación válido.
-	authMiddleware := middleware.AuthMiddleware(tokenService)
+	authMiddleware := middleware.AuthMiddleware(tokenService, redisClient)
 	protected := api.Group("/", authMiddleware)
 
 	// Registramos las rutas que usarán este grupo protegido.
-	protected.Post("/auth/logout", authHandler.Logout)
+	routes.RegisterProtectedAuthRoutes(protected, authHandler)
 	routes.RegisterBankRoutes(protected, bankHandler)
 	routes.RegisterUserRoutes(protected, userHandler)
+
 	// routes.RegisterProductRoutes(protected, productHandler)
 	// routes.RegisterMenuRoutes(protected, menuHandler)
 }

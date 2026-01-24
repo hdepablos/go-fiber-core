@@ -18,15 +18,15 @@ func NewTokenService(cfg *config.AppConfig) TokenService {
 	return &tokenService{cfg: cfg.JWTConfig}
 }
 
-func (s *tokenService) GenerateTokens(userID string) (string, string, error) {
+func (s *tokenService) GenerateTokens(userID, sessionID string) (string, string, error) {
 	accessTTL := time.Minute * time.Duration(s.cfg.JwtAccessTtlMinutes)
-	accessToken, err := s.createToken(userID, accessTTL, s.cfg.JwtAccessSecret, "access")
+	accessToken, err := s.createToken(userID, sessionID, accessTTL, s.cfg.JwtAccessSecret, "access")
 	if err != nil {
 		return "", "", err
 	}
 
 	refreshTTL := time.Hour * 24 * time.Duration(s.cfg.JwtRefreshTtlDays)
-	refreshToken, err := s.createToken(userID, refreshTTL, s.cfg.JwtRefreshSecret, "refresh")
+	refreshToken, err := s.createToken(userID, sessionID, refreshTTL, s.cfg.JwtRefreshSecret, "refresh")
 	if err != nil {
 		return "", "", err
 	}
@@ -34,13 +34,16 @@ func (s *tokenService) GenerateTokens(userID string) (string, string, error) {
 	return accessToken, refreshToken, nil
 }
 
-func (s *tokenService) createToken(userID string, ttl time.Duration, secret, tokenType string) (string, error) {
+func (s *tokenService) createToken(userID, sessionID string, ttl time.Duration, secret, tokenType string) (string, error) {
 	if secret == "" {
 		return "", fmt.Errorf("el secreto JWT para '%s' no está configurado", tokenType)
 	}
 	claims := jwt.MapClaims{
-		"sub": userID, "typ": tokenType,
-		"exp": time.Now().Add(ttl).Unix(), "iat": time.Now().Unix(),
+		"sub": userID,
+		"sid": sessionID, // Session ID Claim
+		"typ": tokenType,
+		"exp": time.Now().Add(ttl).Unix(),
+		"iat": time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))

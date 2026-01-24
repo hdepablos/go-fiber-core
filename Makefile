@@ -626,3 +626,37 @@ create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command nam
         mv "./cmd/$(name).go" "./cmd/cmd-cli/cmd/"; \
         echo "✅ ¡Comando creado"; \
     '
+
+## --------------------------------------------------------------------------
+## Gestión de Base de Datos
+## --------------------------------------------------------------------------
+
+# Crea un nuevo archivo de migración SQL.
+# Uso: make create-migration name=nombre_descriptivo_de_la_migracion
+create-migration:
+	@if [ -z "$(name)" ]; then \
+		echo "❌ Por favor, especifique el nombre. Uso: make create-migration name=create_users_table"; \
+		exit 1; \
+	fi
+	@echo "🌱 Creando migración: $(name)..."
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations create $(name)
+
+# Aplica todas las migraciones pendientes.
+migrate-up:
+	@echo "🚀 Aplicando migraciones..."
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations up
+
+# Revierte la última migración aplicada.
+migrate-down:
+	@echo "⏪ Revertiendo la última migración..."
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations down
+
+# Muestra el estado de todas las migraciones.
+migrate-status:
+	@echo "ℹ️  Estado de las migraciones:"
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations status
+
+# Muestra el estado de todas las migraciones.
+migrate-reset:
+	@echo "ℹ️  Reviendo todas las migraciones..."
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations reset

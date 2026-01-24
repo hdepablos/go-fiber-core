@@ -14,3 +14,13 @@ func RegisterAuthRoutes(router fiber.Router, authHandler handlers.AuthHandler) {
 	auth.Post("/login", authHandler.Login)
 	auth.Post("/refresh", authHandler.Refresh)
 }
+
+// RegisterProtectedAuthRoutes registra las rutas de autenticación que requieren protección (middleware).
+func RegisterProtectedAuthRoutes(router fiber.Router, authHandler handlers.AuthHandler) {
+	auth := router.Group("/auth")
+
+	auth.Post("/logout", authHandler.Logout)
+	auth.Post("/revoke-session", authHandler.RevokeSession)
+	auth.Post("/revoke-user-sessions", authHandler.RevokeUserSessions)
+	auth.Post("/active-sessions", authHandler.GetActiveSessions)
+}

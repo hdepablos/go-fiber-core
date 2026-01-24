@@ -60,7 +60,7 @@ func NewFiberServer(
 
 	// Registrar rutas
 	// server.RegisterRoutes(authHandler, userHandler, bankHandler, productHandler, menuHandler, dbHandler, tokenService)
-	server.RegisterRoutes(authHandler, userHandler, bankHandler, dbHandler, tokenService)
+	server.RegisterRoutes(authHandler, userHandler, bankHandler, dbHandler, tokenService, connect.ConnectRedis)
 
 	// Cleanup combinado (Wire lo mezcla con cleanup global)
 	cleanup := func() {}

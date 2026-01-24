@@ -7,10 +7,6 @@
 package di
 
 import (
-	"github.com/google/wire"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 	"go-fiber-core/internal/database/connections/gorm"
 	"go-fiber-core/internal/database/connections/pgx"
 	redis2 "go-fiber-core/internal/database/connections/redis"
@@ -21,6 +17,7 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/menu"
 	"go-fiber-core/internal/repositories/refreshtoken"
+	"go-fiber-core/internal/repositories/session"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
 	"go-fiber-core/internal/services"
@@ -31,6 +28,11 @@ import (
 	user2 "go-fiber-core/internal/services/user"
 	"log"
 	"os"
+
+	"github.com/google/wire"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 // Injectors from wire.go:
@@ -68,23 +70,28 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	refreshTokenReader := refreshtoken.NewRefreshTokenReaderRepo()
 	refreshTokenWriter := refreshtoken.NewRefreshTokenWriterRepo()
 	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
+	sessionReader := session.NewSessionReaderRepo()
+	sessionWriter := session.NewSessionWriterRepo()
+	paginationService := provideSessionPaginationService()
+	sessionPagination := session.NewSessionPaginationRepo(paginationService)
+	sessionRepository := session.NewSessionRepository(sessionReader, sessionWriter, sessionPagination)
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, refreshTokenRepository, tokenService, menuReaderService, connectDTO)
+	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	authHandler := handlers.NewAuthHandler(authService)
 	userWriter := user.NewUserWriterRepo()
 	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
-	paginationService := provideUserPaginationService()
-	userPaginator := user.NewUserPaginatorRepo(paginationService)
+	paginationPaginationService := provideUserPaginationService()
+	userPaginator := user.NewUserPaginatorRepo(paginationPaginationService)
 	userReaderService := user2.NewUserReaderService(connectDTO, userReader, userPaginator)
 	userHandler := handlers.NewUserHandler(userWriterService, userReaderService)
 	bankWriter := bank.NewBankWriterRepo()
 	bankReader := bank.NewBankReaderRepo()
 	bankWriterService := bank2.NewBankWriterService(connectDTO, bankWriter, bankReader)
 	bankReaderService := bank2.NewBankReaderService(connectDTO, bankReader)
-	paginationPaginationService := provideBankPaginationService()
-	bankPagination := bank.NewBankPaginationRepo(paginationPaginationService)
+	paginationService2 := provideBankPaginationService()
+	bankPagination := bank.NewBankPaginationRepo(paginationService2)
 	bankPaginationService := bank2.NewBankPaginationService(connectDTO, bankPagination)
 	bankHandler := handlers.NewBankHandler(bankWriterService, bankReaderService, bankPaginationService)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
@@ -148,10 +155,15 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	refreshTokenReader := refreshtoken.NewRefreshTokenReaderRepo()
 	refreshTokenWriter := refreshtoken.NewRefreshTokenWriterRepo()
 	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
+	sessionReader := session.NewSessionReaderRepo()
+	sessionWriter := session.NewSessionWriterRepo()
+	paginationPaginationService := provideSessionPaginationService()
+	sessionPagination := session.NewSessionPaginationRepo(paginationPaginationService)
+	sessionRepository := session.NewSessionRepository(sessionReader, sessionWriter, sessionPagination)
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, refreshTokenRepository, tokenService, menuReaderService, connectDTO)
+	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	appContainer := &AppContainer{
 		Config:            appConfig,
@@ -296,6 +308,10 @@ func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
 
+func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
+	return pagination.NewPaginationService[models.Session]()
+}
+
 var connectionSet = wire.NewSet(
 	provideGormService,
 	provideRedisClient,
@@ -304,10 +320,10 @@ var connectionSet = wire.NewSet(
 	provideConnectDTO,
 )
 
-var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, menu.NewMenuReaderRepository)
+var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository)
 
 var serviceSet = wire.NewSet(
-	provideTokenService, auth.NewAuthService, provideUserPaginationService, provideBankPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService,
+	provideTokenService, auth.NewAuthService, provideUserPaginationService, provideBankPaginationService, provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService,
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler)

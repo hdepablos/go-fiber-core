@@ -17,6 +17,7 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/menu"
 	"go-fiber-core/internal/repositories/refreshtoken"
+	"go-fiber-core/internal/repositories/session"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
 	"go-fiber-core/internal/services"
@@ -164,6 +165,10 @@ func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
 
+func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
+	return pagination.NewPaginationService[models.Session]()
+}
+
 // ──────────────────────────────
 // SETS
 // ──────────────────────────────
@@ -180,12 +185,13 @@ var repositorySet = wire.NewSet(
 	user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository,
 	bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo,
 	refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository,
+	session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository,
 	menu.NewMenuReaderRepository,
 )
 
 var serviceSet = wire.NewSet(
 	provideTokenService, auth.NewAuthService,
-	provideUserPaginationService, provideBankPaginationService,
+	provideUserPaginationService, provideBankPaginationService, provideSessionPaginationService,
 	services.NewTransactionManager, services.NewDatabaseService,
 	user2.NewUserReaderService, user2.NewUserWriterService,
 	bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService,
