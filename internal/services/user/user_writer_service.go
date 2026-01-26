@@ -20,6 +20,7 @@ type UpdateUserDTO struct {
 
 type UserWriterService interface {
 	Create(ctx context.Context, user *models.User) error
+	CreateWithRole(ctx context.Context, user *models.User, roleID uint64) error
 	Update(ctx context.Context, id uint64, data UpdateUserDTO) (*models.User, error)
 	SoftDelete(ctx context.Context, id uint64) error
 	HardDelete(ctx context.Context, id uint) error
@@ -116,6 +117,46 @@ func (s *userWriterService) CreateWithProductsAndRoles(ctx context.Context, user
 			if err := tx.Model(user).Association("Roles").Replace(roles); err != nil {
 				return err
 			}
+		}
+
+		return nil
+	})
+}
+
+func (s *userWriterService) CreateWithRole(
+	ctx context.Context,
+	user *models.User,
+	roleID uint64,
+) error {
+
+	return s.conn.ConnectGormWrite.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+
+		// Hash password
+		hashedPassword, err := bcrypt.GenerateFromPassword(
+			[]byte(user.Password),
+			bcrypt.DefaultCost,
+		)
+		if err != nil {
+			return err
+		}
+
+		user.Password = string(hashedPassword)
+		user.IsActive = true
+
+		// 1️⃣ Crear usuario
+		if err := s.userWriter.Create(ctx, tx, user); err != nil {
+			return err
+		}
+
+		// 2️⃣ Buscar rol
+		var role models.Role
+		if err := tx.First(&role, roleID).Error; err != nil {
+			return err
+		}
+
+		// 3️⃣ Asociar rol → INSERT role_user
+		if err := tx.Model(user).Association("Roles").Append(&role); err != nil {
+			return err
 		}
 
 		return nil

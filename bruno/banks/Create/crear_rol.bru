@@ -1,11 +1,11 @@
 meta {
-  name: delete soft
+  name: crear_rol
   type: http
-  seq: 4
+  seq: 7
 }
 
-delete {
-  url: {{urlBase}}api/v1/users/3
+post {
+  url: {{urlBase}}api/v1/roles
   body: json
   auth: bearer
 }
@@ -16,4 +16,10 @@ headers {
 
 auth:bearer {
   token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "Banco de prueba v2"
+  }
 }

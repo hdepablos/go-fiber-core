@@ -45,12 +45,6 @@ func NewUserHandler(writer userService.UserWriterService, reader userService.Use
 func (h *userHandler) CreateUser(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	requestingUserID, err := getUserIDUint64FromCtx(ctx)
-	if err != nil {
-		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
-	}
-	log.Printf("Usuario %d está creando un nuevo usuario", requestingUserID)
-
 	var req requests.CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return domain.ErrInvalidArgument
@@ -62,12 +56,13 @@ func (h *userHandler) CreateUser(c *fiber.Ctx) error {
 		Password: req.Password,
 	}
 
-	if err := h.userWriter.Create(ctx, user); err != nil {
+	if err := h.userWriter.CreateWithRole(ctx, user, req.RoleID); err != nil {
 		return err
 	}
 
 	return responses.Success(c, "Usuario creado exitosamente", user)
 }
+
 
 func (h *userHandler) GetAllUsers(c *fiber.Ctx) error {
 	ctx := c.UserContext()

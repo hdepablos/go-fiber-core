@@ -14,6 +14,7 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/menu"
 	"go-fiber-core/internal/repositories/menu_user"
+	"go-fiber-core/internal/repositories/rol"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
@@ -21,6 +22,7 @@ import (
 	"go-fiber-core/internal/services/auth"
 	bank2 "go-fiber-core/internal/services/bank"
 	menu2 "go-fiber-core/internal/services/menu"
+	rol2 "go-fiber-core/internal/services/rol"
 	"go-fiber-core/internal/services/pagination"
 	user2 "go-fiber-core/internal/services/user"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
@@ -92,6 +94,10 @@ func provideUserPaginationService() *pagination.PaginationService[models.User] {
 	return pagination.NewPaginationService[models.User]()
 }
 
+func provideRolPaginationService() *pagination.PaginationService[models.Role] {
+	return pagination.NewPaginationService[models.Role]()
+}
+
 func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
@@ -123,6 +129,11 @@ var repositorySet = wire.NewSet(
 
 	menu_user.NewMenuUserPaginationRepository,
 
+	rol.NewRolReaderRepo,
+	rol.NewRolWriterRepo,
+	rol.NewRolCrudRepository,
+	rol.NewRolPaginationRepo,
+
 	refreshtoken.NewRefreshTokenReaderRepo,
 	refreshtoken.NewRefreshTokenWriterRepo,
 	refreshtoken.NewRefreshTokenRepository,
@@ -141,6 +152,7 @@ var serviceSet = wire.NewSet(
 	provideUserPaginationService,
 	provideBankPaginationService,
 	provideMenuUserPaginationService,
+	provideRolPaginationService,
 
 	services.NewTransactionManager,
 	services.NewDatabaseService,
@@ -156,6 +168,10 @@ var serviceSet = wire.NewSet(
 	menu2.NewMenuReaderService,
 	menu2.NewMenuWriterService,
 
+	rol2.NewRolReaderService,
+	rol2.NewRolWriterService,
+	rol2.NewRolPaginationService,
+
 	menu_user2.NewMenuUserPaginationService,
 	// Comentamos el servicio de escritura de menús:
 	// menu2.NewMenuWriterService,
@@ -168,6 +184,7 @@ var handlerSet = wire.NewSet(
 	handlers.NewDatabaseHandler,
 	handlers.NewMenuHandler,
 	handlers.NewMenuUserHandler,
+	handlers.NewRolHandler,
 	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
 	// necesitarás actualizar su constructor también.
 	// handlers.NewMenuHandler,

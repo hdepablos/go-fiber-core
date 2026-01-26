@@ -17,7 +17,7 @@ func (s *FiberServer) RegisterRoutes(
 	authHandler handlers.AuthHandler,
 	userHandler handlers.UserHandler,
 	bankHandler handlers.BankHandler,
-	// productHandler handlers.ProductHandler,
+	rolHandler handlers.RolHandler,
 	menuHandler handlers.MenuHandler,
 	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
@@ -46,7 +46,7 @@ func (s *FiberServer) RegisterRoutes(
 	protected.Post("/auth/logout", authHandler.Logout)
 	routes.RegisterBankRoutes(protected, bankHandler)
 	routes.RegisterUserRoutes(protected, userHandler)
-	// routes.RegisterProductRoutes(protected, productHandler)
+	routes.RegisterRoleRoutes(protected, rolHandler)
 	routes.RegisterMenuRoutes(protected, menuHandler)
 	routes.RegisterMenuUserRoutes(protected, menuUserHandler)
 }

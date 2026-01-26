@@ -6,7 +6,7 @@ import (
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/pagination"
-
+	"fmt"
 	"gorm.io/gorm"
 )
 
@@ -48,6 +48,7 @@ func (r *BankWriterRepo) Update(ctx context.Context, db *gorm.DB, bank *models.B
 }
 
 func (r *BankWriterRepo) SoftDelete(ctx context.Context, db *gorm.DB, id uint) error {
+	fmt.Println("Entrando a SoftDelete del BankRepository")
 	return db.WithContext(ctx).Delete(&models.Bank{}, id).Error
 }
 

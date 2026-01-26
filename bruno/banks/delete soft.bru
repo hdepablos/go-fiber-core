@@ -5,11 +5,11 @@ meta {
 }
 
 delete {
-  url: {{urlBase}}banks/71
+  url: {{urlBase}}api/v1/banks/soft/10
   body: json
-  auth: none
+  auth: bearer
 }
 
-headers {
-  X-Client-Code: 12345678
+auth:bearer {
+  token: {{access_token}}
 }

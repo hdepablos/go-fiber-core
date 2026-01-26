@@ -140,6 +140,7 @@ func (r *UserReaderRepo) GetByEmailWithRolesAndMenus(ctx context.Context, db *go
 	return &user, nil
 }
 
+
 // GetAll obtiene todos los usuarios con sus relaciones básicas
 func (r *UserReaderRepo) GetAll(ctx context.Context, db *gorm.DB) ([]models.User, error) {
 	var users []models.User

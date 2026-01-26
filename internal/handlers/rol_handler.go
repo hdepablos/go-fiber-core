@@ -7,14 +7,14 @@ import (
 	"go-fiber-core/internal/dtos/requests" //nolint
 	"go-fiber-core/internal/dtos/responses"
 	"go-fiber-core/internal/models"
-	bankService "go-fiber-core/internal/services/bank"
+	rolService "go-fiber-core/internal/services/rol"
 	"log" // <-- AÑADIDO: Para logging de ejemplo
 
 	fiber "github.com/gofiber/fiber/v2"
 )
 
 // Interfaz del Handler
-type BankHandler interface {
+type RolHandler interface {
 	Create(c *fiber.Ctx) error
 	GetAll(c *fiber.Ctx) error
 	GetByID(c *fiber.Ctx) error
@@ -24,20 +24,19 @@ type BankHandler interface {
 	GetAllPaginated(c *fiber.Ctx) error
 }
 
-// Handler concreto
-type bankHandler struct {
-	writer    bankService.BankWriterService
-	reader    bankService.BankReaderService
-	paginator bankService.BankPaginationService
+type rolHandler struct {
+	writer    rolService.RolWriterService
+	reader    rolService.RolReaderService
+	paginator rolService.RolPaginationService
 }
 
 // Constructor
-func NewBankHandler(
-	writer bankService.BankWriterService,
-	reader bankService.BankReaderService,
-	paginator bankService.BankPaginationService,
-) BankHandler {
-	return &bankHandler{
+func NewRolHandler(
+	writer rolService.RolWriterService,
+	reader rolService.RolReaderService,
+	paginator rolService.RolPaginationService,
+) RolHandler {
+	return &rolHandler{
 		writer:    writer,
 		reader:    reader,
 		paginator: paginator,
@@ -46,7 +45,7 @@ func NewBankHandler(
 
 // --- Métodos ---
 
-func (h *bankHandler) Create(c *fiber.Ctx) error {
+func (h *rolHandler) Create(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
@@ -54,29 +53,27 @@ func (h *bankHandler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
 	}
-	log.Printf("Usuario %d está creando un banco", userID)
+	log.Printf("Usuario %d está creando un rol", userID)
 	// ---
 
-	var req requests.CreateBankRequest
+	var req requests.CreateRoleRequest
 	if err := c.BodyParser(&req); err != nil {
 		return responses.Error(c, fiber.StatusBadRequest, "Error al parsear el cuerpo de la solicitud", err)
 	}
 
-	newBank := models.Bank{
+	newRol := models.Role{
 		Name:       req.Name,
-		EntityCode: req.EntityCode,
-		Enabled:    true,
-		// Opcional: Podrías añadir CreatedByUserID: userID aquí si tu modelo lo soporta
+		IsActive:    true,
 	}
 
-	if err := h.writer.Create(ctx, &newBank); err != nil {
+	if err := h.writer.Create(ctx, &newRol); err != nil {
 		return err
 	}
 
-	return responses.Success(c, "Banco creado exitosamente", newBank)
+	return responses.Success(c, "Rol creado exitosamente", newRol)
 }
 
-func (h *bankHandler) GetAll(c *fiber.Ctx) error {
+func (h *rolHandler) GetAll(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// AÑADIDO: Obtener el ID de usuario del contexto (aunque no se use, valida la sesión)
@@ -90,10 +87,10 @@ func (h *bankHandler) GetAll(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return responses.Success(c, "Bancos obtenidos exitosamente", banks)
+	return responses.Success(c, "Roles obtenidos exitosamente", banks)
 }
 
-func (h *bankHandler) GetByID(c *fiber.Ctx) error {
+func (h *rolHandler) GetByID(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
@@ -112,12 +109,12 @@ func (h *bankHandler) GetByID(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return responses.Success(c, "Banco obtenido exitosamente", bank)
+	return responses.Success(c, "Roles obtenido exitosamente", bank)
 }
 
-func (h *bankHandler) Update(c *fiber.Ctx) error {
+func (h *rolHandler) Update(c *fiber.Ctx) error {
 	ctx := c.UserContext()
-	fmt.Println("Entrando a Update del BankHandler")
+	fmt.Println("Entrando a Update del RoleHandler")
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
 	userID, err := getUserIDUint64FromCtx(ctx)
@@ -131,28 +128,27 @@ func (h *bankHandler) Update(c *fiber.Ctx) error {
 		return err
 	}
 
-	log.Printf("Usuario %d está actualizando el banco %d", userID, id)
+	log.Printf("Usuario %d está actualizando el rol %d", userID, id)
 
-	var req requests.UpdateBankRequest
+	var req requests.UpdateRoleRequest
 	if err := c.BodyParser(&req); err != nil {
 		return domain.ErrInvalidArgument
 	}
 
-	updatedBank, err := h.writer.Update(ctx, uint(id), &models.Bank{
+	updatedRole, err := h.writer.Update(ctx, uint(id), &models.Role{
 		Name:       req.Name,
-		EntityCode: req.EntityCode,
-		Enabled:    req.Enabled,
+		IsActive:   req.IsActive,
 	})
 	if err != nil {
 		return err
 	}
 
-	return responses.Success(c, "Banco actualizado exitosamente", updatedBank)
+	return responses.Success(c, "Rol actualizado exitosamente", updatedRole)
 }
 
-func (h *bankHandler) SoftDelete(c *fiber.Ctx) error {
+func (h *rolHandler) SoftDelete(c *fiber.Ctx) error {
 	ctx := c.UserContext()
-	fmt.Println("Entrando a SoftDelete del BankHandler")
+	fmt.Println("Entrando a SoftDelete del RoleHandler")
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
 	userID, err := getUserIDUint64FromCtx(ctx)
@@ -166,15 +162,15 @@ func (h *bankHandler) SoftDelete(c *fiber.Ctx) error {
 		return err
 	}
 
-	log.Printf("Usuario %d está borrando lógicamente el banco %d", userID, id)
+	log.Printf("Usuario %d está borrando lógicamente el rol %d", userID, id)
 
 	if err := h.writer.SoftDelete(ctx, uint(id)); err != nil {
 		return err
 	}
-	return responses.Success(c, "Banco borrado lógicamente", nil)
+	return responses.Success(c, "Rol borrado lógicamente", nil)
 }
 
-func (h *bankHandler) HardDelete(c *fiber.Ctx) error {
+func (h *rolHandler) HardDelete(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
@@ -189,15 +185,15 @@ func (h *bankHandler) HardDelete(c *fiber.Ctx) error {
 		return err
 	}
 
-	log.Printf("Usuario %d está borrando permanentemente el banco %d", userID, id)
+	log.Printf("Usuario %d está borrando permanentemente el rol %d", userID, id)
 
 	if err := h.writer.HardDelete(ctx, uint(id)); err != nil {
 		return err
 	}
-	return responses.Success(c, "Banco borrado permanentemente", nil)
+	return responses.Success(c, "Rol borrado permanentemente", nil)
 }
 
-func (h *bankHandler) GetAllPaginated(c *fiber.Ctx) error {
+func (h *rolHandler) GetAllPaginated(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
 	// AÑADIDO: Obtener el ID de usuario del contexto
@@ -218,5 +214,5 @@ func (h *bankHandler) GetAllPaginated(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return responses.Success(c, "Bancos paginados obtenidos exitosamente", response)
+	return responses.Success(c, "Roles paginados obtenidos exitosamente", response)
 }
