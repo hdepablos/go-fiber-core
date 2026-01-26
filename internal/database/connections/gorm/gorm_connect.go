@@ -1,10 +1,10 @@
-// internal/database/connections/gorm/gorm_connect.go
 package gorm
 
 import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // GormConnectService no cambia su estructura.
@@ -23,24 +24,59 @@ type GormConnectService struct {
 	sqlDBRead  *sql.DB
 }
 
-// createGormConnection no necesita cambios.
+// createGormConnection crea una conexión GORM con logger configurado.
 func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, error) {
-	// ... (sin cambios en esta función)
 	var dialector gorm.Dialector
+
 	switch strings.ToLower(cfg.Driver) {
 	case "postgres":
-		dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=disable search_path=%s",
-			cfg.Host, cfg.Port, cfg.Username, cfg.Database, cfg.Password, cfg.Schema)
+		dsn := fmt.Sprintf(
+			"host=%s port=%d user=%s dbname=%s password=%s sslmode=disable search_path=%s",
+			cfg.Host,
+			cfg.Port,
+			cfg.Username,
+			cfg.Database,
+			cfg.Password,
+			cfg.Schema,
+		)
 		dialector = postgres.Open(dsn)
+
 	case "mysql":
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
-			cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
+		dsn := fmt.Sprintf(
+			"%s:%s@tcp(%s:%d)/%s?parseTime=true",
+			cfg.Username,
+			cfg.Password,
+			cfg.Host,
+			cfg.Port,
+			cfg.Database,
+		)
 		dialector = mysql.Open(dsn)
+
 	default:
 		return nil, nil, fmt.Errorf("driver GORM no soportado: %s", cfg.Driver)
 	}
 
-	db, err := gorm.Open(dialector, &gorm.Config{})
+	// --------------------------------------------------
+	// Logger GORM (imprime SQL fuera de producción)
+	// --------------------------------------------------
+	logLevel := logger.Silent
+	APP_ENV := "local"
+	if APP_ENV != "production" {
+		logLevel = logger.Info
+	}
+
+	gormLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold: time.Second,
+			LogLevel:      logLevel,
+			Colorful:      true,
+		},
+	)
+
+	db, err := gorm.Open(dialector, &gorm.Config{
+		Logger: gormLogger,
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("falló al abrir la conexión GORM hacia %s: %w", cfg.Host, err)
 	}
@@ -62,7 +98,7 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 	return db, sqlDB, nil
 }
 
-// CAMBIO: NewGormConnectService ahora retorna una función de limpieza.
+// NewGormConnectService ahora retorna una función de cleanup.
 func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService, func(), error) {
 	dbWrite, sqlDBWrite, err := createGormConnection(cfg.Gorm.Write)
 	if err != nil {
@@ -71,7 +107,6 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 
 	dbRead, sqlDBRead, err := createGormConnection(cfg.Gorm.Read)
 	if err != nil {
-		// Si la conexión de lectura falla, cerramos la de escritura antes de salir.
 		sqlDBWrite.Close()
 		return nil, nil, err
 	}
@@ -83,9 +118,9 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 		sqlDBRead:  sqlDBRead,
 	}
 
-	// Esta es la función que Wire usará para limpiar los recursos.
 	cleanup := func() {
 		log.Println("🔌 Desconectando de las bases de datos (GORM)...")
+
 		if err := sqlDBWrite.Close(); err != nil {
 			log.Printf("❌ Error cerrando la conexión de escritura GORM: %v", err)
 		}
@@ -97,7 +132,7 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 	return service, cleanup, nil
 }
 
-// GetWriteDB y GetReadDB no cambian.
+// Getters
 func (s *GormConnectService) GetWriteDB() *gorm.DB {
 	return s.dbWrite
 }
@@ -106,7 +141,6 @@ func (s *GormConnectService) GetReadDB() *gorm.DB {
 	return s.dbRead
 }
 
-// GetWriteSQLDB y GetReadSQLDB no cambian.
 func (s *GormConnectService) GetWriteSQLDB() *sql.DB {
 	return s.sqlDBWrite
 }

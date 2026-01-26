@@ -27,3 +27,8 @@ type BankWriter interface {
 type BankPagination interface {
 	GetAllPaginated(ctx context.Context, db *gorm.DB, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Bank], error)
 }
+
+type BankCrudRepository interface {
+	BankReader
+	BankWriter
+}

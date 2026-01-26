@@ -28,8 +28,9 @@ func NewFiberServer(
 	userHandler handlers.UserHandler,
 	bankHandler handlers.BankHandler,
 	catalogHandler handlers.CatalogHandler,
-	// productHandler handlers.ProductHandler,
+	rolHandler handlers.RolHandler,
 	menuHandler handlers.MenuHandler,
+	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
 	tokenService authService.TokenService,
 	userWriterService userService.UserWriterService, // 👈 agregado
@@ -62,7 +63,9 @@ func NewFiberServer(
 
 	// Registrar rutas
 	// server.RegisterRoutes(authHandler, userHandler, bankHandler, productHandler, menuHandler, dbHandler, tokenService)
-	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, dbHandler, tokenService, connect.ConnectRedis)
+	// server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, dbHandler, tokenService, connect.ConnectRedis)
+	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, dbHandler, tokenService, connect.ConnectRedis)
+	// server.RegisterRoutes(authHandler, userHandler, bankHandler, dbHandler, tokenService)
 
 	// Cleanup combinado (Wire lo mezcla con cleanup global)
 	cleanup := func() {}

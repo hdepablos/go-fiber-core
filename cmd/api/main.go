@@ -15,7 +15,6 @@ import (
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/dtos/config"
 	"go-fiber-core/internal/dtos/connect" // Importado el server struct
-	"go-fiber-core/internal/services/product"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -66,10 +65,6 @@ func initializeApp() func() {
 	appConfig = serverInstance.AppConfig
 	// El connectDTO no se guarda en FiberServer, pero el AppConfig sí.
 	appCleanup = cleanup
-
-	// Ejemplo de uso de un servicio para prueba (usando la AppConfig extraída)
-	testService := product.NewProductAPIService(appConfig)
-	testService.PrintRedisConfig(context.Background())
 
 	// Si estamos en Lambda, inicializamos el adaptador Lambda
 	if isLambdaEnvironment() {

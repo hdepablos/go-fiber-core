@@ -1,11 +1,11 @@
 meta {
-  name: edit
+  name: post menu_user
   type: http
-  seq: 3
+  seq: 6
 }
 
-put {
-  url: {{urlBase}}api/v1/banks/9
+post {
+  url: {{urlBase}}api/v1/menus/users/bulk
   body: json
   auth: bearer
 }
@@ -20,7 +20,8 @@ auth:bearer {
 
 body:json {
   {
-   "name": "Banco Teasdfasdf",
-    "entity_code": "005"
+    "user_ids": [1],
+    "menu_ids": [27]
   }
+  
 }

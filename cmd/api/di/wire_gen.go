@@ -17,6 +17,7 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
+	"go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/session"
 	"go-fiber-core/internal/repositories/user"
@@ -26,7 +27,9 @@ import (
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
+	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
+	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
 	"log"
 	"os"
@@ -97,11 +100,32 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	bankPagination := bank.NewBankPaginationRepo(paginationService2)
 	bankPaginationService := bank2.NewBankPaginationService(connectDTO, bankPagination)
 	bankHandler := handlers.NewBankHandler(bankWriterService, bankReaderService, bankPaginationService)
+<<<<<<< HEAD
 	catalogService := catalog2.NewCatalogService(catalogRepository, connectDTO)
 	catalogHandler := handlers.NewCatalogHandler(catalogService)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
 	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, databaseHandler, tokenService, userWriterService)
+=======
+	rolWriter := rol.NewRolWriterRepo()
+	rolReader := rol.NewRolReaderRepo()
+	rolWriterService := rol2.NewRolWriterService(connectDTO, rolWriter, rolReader)
+	rolReaderService := rol2.NewRolReaderService(connectDTO, rolReader)
+	paginationService2 := provideRolPaginationService()
+	rolPagination := rol.NewRolPaginationRepo(paginationService2)
+	rolPaginationService := rol2.NewRolPaginationService(connectDTO, rolPagination)
+	rolHandler := handlers.NewRolHandler(rolWriterService, rolReaderService, rolPaginationService)
+	menuWriter := menu.NewMenuWriterRepository(connectDTO)
+	menuWriterService := menu2.NewMenuWriterService(menuWriter, connectDTO)
+	menuHandler := handlers.NewMenuHandler(menuWriterService, menuReaderService)
+	paginationService3 := provideMenuUserPaginationService()
+	menuUserPagination := menu_user.NewMenuUserPaginationRepository(paginationService3)
+	menuUserPaginationService := menu_user2.NewMenuUserPaginationService(connectDTO, menuUserPagination)
+	menuUserHandler := handlers.NewMenuUserHandler(menuUserPaginationService)
+	databaseService := services.NewDatabaseService(appConfig, connectDTO)
+	databaseHandler := handlers.NewDatabaseHandler(databaseService)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, tokenService, userWriterService)
+>>>>>>> main
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -310,12 +334,21 @@ func provideUserPaginationService() *pagination.PaginationService[models.User] {
 	return pagination.NewPaginationService[models.User]()
 }
 
+func provideRolPaginationService() *pagination.PaginationService[models.Role] {
+	return pagination.NewPaginationService[models.Role]()
+}
+
 func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
 
+<<<<<<< HEAD
 func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
 	return pagination.NewPaginationService[models.Session]()
+=======
+func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+	return pagination.NewPaginationService[models.MenuUser]()
+>>>>>>> main
 }
 
 var connectionSet = wire.NewSet(
@@ -326,6 +359,7 @@ var connectionSet = wire.NewSet(
 	provideConnectDTO,
 )
 
+<<<<<<< HEAD
 var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, catalog.NewCatalogRepository)
 
 var serviceSet = wire.NewSet(
@@ -333,3 +367,15 @@ var serviceSet = wire.NewSet(
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewCatalogHandler, handlers.NewDatabaseHandler)
+=======
+var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository)
+
+var serviceSet = wire.NewSet(
+	provideTokenService, auth.NewAuthService, provideUserPaginationService,
+	provideBankPaginationService,
+	provideMenuUserPaginationService,
+	provideRolPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService,
+)
+
+var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler, handlers.NewRolHandler)
+>>>>>>> main

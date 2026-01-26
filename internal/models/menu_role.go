@@ -6,14 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
-type MenuUser struct {
+type MenuRole struct {
 	ID uint `json:"id" gorm:"primaryKey"`
 
 	MenuID uint `json:"menu_id"`
-	UserID uint `json:"user_id"`
-
+	RoleID uint `json:"role_id"`
 	Menu Menu `gorm:"foreignKey:MenuID"`
-	User User `gorm:"foreignKey:UserID"`
+	Role Role `gorm:"foreignKey:RoleID"`
 
 	IsActive  bool           `json:"is_active"`
 	CreatedAt time.Time      `json:"created_at"`
@@ -23,6 +22,6 @@ type MenuUser struct {
 
 
 
-func (MenuUser) TableName() string {
-	return "menu_user"
+func (MenuRole) TableName() string {
+	return "menu_role"
 }

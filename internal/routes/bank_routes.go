@@ -31,7 +31,7 @@ func RegisterBankRoutes(router fiber.Router, bankHandler handlers.BankHandler) {
 	)
 
 	// DELETE /banks/:id - Borrado lógico
-	bankGroup.Delete("/:id", bankHandler.SoftDelete)
+	bankGroup.Delete("/soft/:id", bankHandler.SoftDelete)
 
 	// DELETE /banks/hard/:id - Borrado físico
 	bankGroup.Delete("/hard/:id", bankHandler.HardDelete)

@@ -6,6 +6,7 @@ type CreateUserRequest struct {
 	Name     string `json:"name" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8"`
+	RoleID   uint64 `json:"role_id" validate:"required"`
 }
 
 // UpdateUserRequest se utiliza para actualizar un usuario existente.
@@ -15,3 +16,4 @@ type UpdateUserRequest struct {
 	// Podrías añadir más campos opcionales aquí si lo necesitas
 	// Password string `json:"password,omitempty" validate:"omitempty,min=8"`
 }
+

@@ -17,7 +17,9 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
+	"go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
+	"go-fiber-core/internal/repositories/rol"
 	"go-fiber-core/internal/repositories/session"
 	"go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/server"
@@ -26,7 +28,9 @@ import (
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
+	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
+	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
 
 	"github.com/google/wire"
@@ -163,8 +167,15 @@ func provideUserPaginationService() *pagination.PaginationService[models.User] {
 	return pagination.NewPaginationService[models.User]()
 }
 
+func provideRolPaginationService() *pagination.PaginationService[models.Role] {
+	return pagination.NewPaginationService[models.Role]()
+}
+
 func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
+}
+func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+	return pagination.NewPaginationService[models.MenuUser]()
 }
 
 func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
@@ -204,4 +215,67 @@ var serviceSet = wire.NewSet(
 
 var handlerSet = wire.NewSet(
 	handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewCatalogHandler, handlers.NewDatabaseHandler,
+	menu.NewMenuWriterRepository,
+
+	menu_user.NewMenuUserPaginationRepository,
+
+	rol.NewRolReaderRepo,
+	rol.NewRolWriterRepo,
+	rol.NewRolCrudRepository,
+	rol.NewRolPaginationRepo,
+
+	refreshtoken.NewRefreshTokenReaderRepo,
+	refreshtoken.NewRefreshTokenWriterRepo,
+	refreshtoken.NewRefreshTokenRepository,
+
+	// --- Repositorios de Menú (Solo Lector) ---
+	// Cambiamos el nombre del constructor a la implementación existente:
+	// Comentamos los constructores de escritura y CRUD por ahora:
+	// menu.NewMenuWriterRepo,
+	// menu.NewMenuCrudRepo,
+)
+
+var serviceSet = wire.NewSet(
+	provideTokenService,
+	auth.NewAuthService,
+
+	provideUserPaginationService,
+	provideBankPaginationService,
+	provideMenuUserPaginationService,
+	provideRolPaginationService,
+
+	services.NewTransactionManager,
+	services.NewDatabaseService,
+
+	user2.NewUserReaderService,
+	user2.NewUserWriterService,
+
+	bank2.NewBankReaderService,
+	bank2.NewBankWriterService,
+	bank2.NewBankPaginationService,
+	bank2.NewDeactivationService,
+
+	menu2.NewMenuReaderService,
+	menu2.NewMenuWriterService,
+
+	rol2.NewRolReaderService,
+	rol2.NewRolWriterService,
+	rol2.NewRolPaginationService,
+
+	menu_user2.NewMenuUserPaginationService,
+	// Comentamos el servicio de escritura de menús:
+	// menu2.NewMenuWriterService,
+)
+
+var handlerSet = wire.NewSet(
+	handlers.NewAuthHandler,
+	handlers.NewUserHandler,
+	handlers.NewBankHandler,
+	handlers.NewDatabaseHandler,
+	handlers.NewMenuHandler,
+	handlers.NewMenuUserHandler,
+	handlers.NewRolHandler,
+	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
+	// necesitarás actualizar su constructor también.
+	// handlers.NewMenuHandler,
 )

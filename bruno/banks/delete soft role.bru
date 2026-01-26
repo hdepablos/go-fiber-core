@@ -1,17 +1,13 @@
 meta {
-  name: delete soft
+  name: delete soft role
   type: http
-  seq: 4
+  seq: 22
 }
 
 delete {
-  url: {{urlBase}}api/v1/users/3
+  url: {{urlBase}}api/v1/roles/soft/5
   body: json
   auth: bearer
-}
-
-headers {
-  X-Client-Code: 12345678
 }
 
 auth:bearer {

@@ -73,7 +73,6 @@ func (r *BankWriterRepo) HardDelete(ctx context.Context, db *gorm.DB, id uint) e
 	return r.catalogRepo.InvalidateCache(ctx)
 }
 
-
 // Reader
 func (r *BankReaderRepo) GetByID(ctx context.Context, db *gorm.DB, id uint) (*models.Bank, error) {
 	var bank models.Bank
