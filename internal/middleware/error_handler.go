@@ -2,15 +2,21 @@ package middleware
 
 import (
 	"errors"
-	"go-fiber-core/internal/domain" // Importamos nuestros errores
+	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos/responses"
-	"log"
 
-	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2"
 )
 
-func ErrorHandler(c *fiber.Ctx, err error) error {
-	// Revisa el tipo de error y decide qué respuesta enviar.
+// GlobalErrorHandler es el middleware para manejar errores centralizadamente.
+func GlobalErrorHandler(c *fiber.Ctx, err error) error {
+	// 1. Errores de Fiber (ej: 404 ruta no encontrada, 405 método no permitido)
+	var fiberErr *fiber.Error
+	if errors.As(err, &fiberErr) {
+		return responses.Error(c, fiberErr.Code, fiberErr.Message)
+	}
+
+	// 2. Mapeo de errores de Dominio a Códigos HTTP
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		return responses.Error(c, fiber.StatusNotFound, err.Error())
@@ -21,12 +27,14 @@ func ErrorHandler(c *fiber.Ctx, err error) error {
 	case errors.Is(err, domain.ErrAuthentication):
 		return responses.Error(c, fiber.StatusUnauthorized, err.Error())
 
-	// Y así para otros errores personalizados...
+	// Agrega más casos según tus necesidades
+	// case errors.Is(err, domain.ErrConflict):
+	// 	return responses.Error(c, fiber.StatusConflict, err.Error())
 
 	default:
-		// Si es un error que no esperamos, lo registramos para depuración
-		// y devolvemos un error genérico 500.
-		log.Printf("Error no manejado en la API: %v", err)
-		return responses.Error(c, fiber.StatusInternalServerError, "Ha ocurrido un error inesperado en el servidor.")
+		// 3. Error desconocido (Internal Server Error)
+		// En producción, aquí podrías loguear el error original detallado (err.Error())
+		// pero retornar un mensaje genérico al cliente por seguridad.
+		return responses.Error(c, fiber.StatusInternalServerError, "Ha ocurrido un error interno inesperado")
 	}
 }

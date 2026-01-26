@@ -1,0 +1,64 @@
+# master-template.yml (versión con debug mejorado)
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Stack principal que orquesta el despliegue de todos los microservicios
+  en LocalStack.
+
+Resources:
+  GoFiberCoreSqsQueues:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/sqs-queues-template.yml
+
+  GoFiberCoreSqs:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/sqs-consumer-template.yml
+      Parameters:
+        SqsQueueArn: !ImportValue SqsQueueArn
+        SqsDlqArn: !ImportValue SqsDlqArn
+        SqsQueueName: !ImportValue SqsQueueName
+    DependsOn: GoFiberCoreSqsQueues
+
+  GoFiberCoreDlq:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/dlq-consumer-template.yml
+      Parameters:
+        SqsDlqArn: !ImportValue SqsDlqArn
+    DependsOn: GoFiberCoreSqsQueues
+
+  GoFiberCoreApi:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/api-template.yml
+      Parameters:
+        SqsQueueUrl: !Sub "http://localhost:4566/000000000000/${GoFiberCoreSqsQueues.Outputs.SqsQueueName}"
+        SqsQueueName: !GetAtt GoFiberCoreSqsQueues.Outputs.SqsQueueName
+        SqsQueueArn: !ImportValue SqsQueueArn
+    DependsOn: GoFiberCoreSqsQueues
+
+  GoFiberCoreEvery1minCron:
+    Type: AWS::Serverless::Application
+    DependsOn: GoFiberCoreSqsQueues
+    Properties:
+      Location: templates/every-1min-cron-template.yml
+
+  GoFiberCoreDaily24Cron:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/daily-24-cron-template.yml
+
+Outputs:
+  ApiUrl:
+    Description: "URL de la API Gateway"
+    Value: !GetAtt GoFiberCoreApi.Outputs.ApiUrl
+
+  SqsQueueUrlFromExport:
+    Description: "URL de la cola SQS desde Export"
+    Value: !ImportValue SqsQueueUrl
+
+  SqsQueueNameFromExport:
+    Description: "Nombre de la cola SQS desde Export"
+    Value: !ImportValue SqsQueueName

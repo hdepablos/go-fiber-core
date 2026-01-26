@@ -1,0 +1,42 @@
+
+Ejecutar el cron sin esperar a su ejecución
+aws --endpoint-url=http://localhost:4566 lambda invoke --function-name GoFiberCoreEvery1minCron /dev/stdout
+
+
+-- lista las funciones
+aws lambda list-functions \
+    --endpoint-url=http://localhost:4566 \
+    --region us-east-1 \
+    --profile localstack \
+    --query 'Functions[*].FunctionName'
+
+-- limpia cache
+aws --endpoint-url=http://localhost:4566 s3 rm s3://sqsv4-bucket/sam/Sqsv4Every1minCron/ --recursive
+
+
+-- Verificar si existe el string string en el binario
+strings sam-compile/every-1min-cron/bootstrap | grep -o "V70"
+
+strings sam-compile/every-1min-cron/bootstrap | grep -o "===> v.4"
+
+
+Buscar dentro del zip
+	unzip -c .aws-sam/build/Sqsv4Every1minCron/SqsV4Every1minCron/function.zip | grep -o "V60"
+
+Buscar dentro de un binario bootstrap
+	strings bootstrap | grep -q "Lambda-api"
+
+
+
+-- obtener el hash de la functions
+aws --endpoint-url=http://localhost:4566 lambda get-function \
+    --function-name SqsV4Every1minCron \
+    --query 'Configuration.CodeSha256'
+
+-- V60
+LFBS9opXo57HlMYKl4cNeWBMwGVpKiCRfeeBd+P9ZNk=
+
+
+¿Cómo verificar que AMBOS están configurados?
+	# Listar las reglas de EventBridge
+	aws --endpoint-url=http://localhost:4566 events list-rules

@@ -1,0 +1,24 @@
+services:
+  lambda:
+    build:
+      context: .
+      dockerfile: Dockerfiles/Dockerfile.sqs.lambda
+    container_name: sqsv4-sqs
+
+    # Variables de entorno para el contenedor Lambda.
+    # Estas son las que tu código Go leerá con os.Getenv().
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "${LAMBDA_RIE_PORT}:8080"
+
+    networks:
+      - nginx-proxy
+
+    restart: unless-stopped
+
+networks:
+  nginx-proxy:
+    external: true

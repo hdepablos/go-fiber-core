@@ -40,3 +40,31 @@ certs/
 pkg/logger/json
 pkg/logs/*.log
 
+# --- Compilación de Go y Lambdas ---
+# Carpeta donde se guardan los binarios y ZIPs para Terraform
+sam-compile/
+# Carpeta temporal de construcción de AWS SAM
+.aws-sam/
+# Binarios generados localmente por go build
+bootstrap
+
+# --- Archivos temporales del Makefile ---
+.api_base_tmp
+output.json
+
+# --- Terraform ---
+# Archivos de estado y módulos de Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# --- Variables de Entorno (IMPORTANTE) ---
+# No subir credenciales o configuraciones locales
+.env
+# Excepto si tienes un ejemplo:
+# !.env.example
+
+# --- Docker ---
+# Logs de contenedores si los rediriges a archivos
+*.log

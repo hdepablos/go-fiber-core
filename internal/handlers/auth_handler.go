@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"fmt"
+	"go-fiber-core/internal/contextkeys"
 	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
 	authService "go-fiber-core/internal/services/auth"
@@ -14,6 +17,9 @@ type AuthHandler interface {
 	Login(c *fiber.Ctx) error
 	Refresh(c *fiber.Ctx) error
 	Logout(c *fiber.Ctx) error
+	RevokeSession(c *fiber.Ctx) error
+	RevokeUserSessions(c *fiber.Ctx) error
+	GetActiveSessions(c *fiber.Ctx) error
 }
 
 type authHandler struct {
@@ -39,7 +45,10 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 
 	// fmt.Printf("Intentando login para usuario: %s\n", req.Email)
 
-	resp, err := h.authService.Login(c.Context(), req)
+	userAgent := c.Get("User-Agent")
+	clientIP := c.IP()
+
+	resp, err := h.authService.Login(c.Context(), req, userAgent, clientIP)
 	if err != nil {
 		return err
 	}
@@ -53,7 +62,7 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 		"menu":          resp.Menu,
 	}
 
-	return responses.Success(c, "Inicio de sesión exitoso", data)
+	return responses.Success(c, "Inicio de sesión exitoso v4...", data)
 }
 
 func (h *authHandler) Refresh(c *fiber.Ctx) error {
@@ -79,7 +88,8 @@ func (h *authHandler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *authHandler) Logout(c *fiber.Ctx) error {
-	userIDStr, ok := c.Locals("userID").(string)
+	fmt.Println("Entro a cerrar sessión")
+	userIDStr, ok := contextkeys.GetUserID(c.UserContext())
 	if !ok || userIDStr == "" {
 		// Este es un error de autorización que el middleware de errores
 		// puede traducir a un 401 si lo configuramos.
@@ -96,4 +106,58 @@ func (h *authHandler) Logout(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Cierre de sesión exitoso", nil)
+}
+
+type revokeSessionRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+type revokeUserSessionsRequest struct {
+	UserID uint64 `json:"user_id"`
+}
+
+func (h *authHandler) RevokeSession(c *fiber.Ctx) error {
+	var req revokeSessionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+	if req.SessionID == "" {
+		return domain.ErrInvalidArgument
+	}
+
+	if err := h.authService.RevokeSession(c.Context(), req.SessionID); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Sesión revocada exitosamente", nil)
+}
+
+func (h *authHandler) RevokeUserSessions(c *fiber.Ctx) error {
+	var req revokeUserSessionsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+	if req.UserID == 0 {
+		return domain.ErrInvalidArgument
+	}
+
+	if err := h.authService.RevokeUserSessions(c.Context(), req.UserID); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Sesiones del usuario revocadas exitosamente", nil)
+}
+
+func (h *authHandler) GetActiveSessions(c *fiber.Ctx) error {
+	var req dtos.PaginationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	response, err := h.authService.GetActiveSessions(c.Context(), req)
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Sesiones activas obtenidas exitosamente", response)
 }

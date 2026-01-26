@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"go-fiber-core/cmd/api/di"
+
 	"go-fiber-core/internal/models"
 
 	"github.com/spf13/cobra"
@@ -20,17 +21,24 @@ var createUserCmd = &cobra.Command{
 		fmt.Println("▶️ Iniciando creación de usuario de prueba...")
 
 		// --- 1. Inicializar dependencias con Wire ---
-		server, cleanup, err := di.InitializeServer("internal/appconfig/config.yml")
+		// USAMOS InitializeAppContainer en lugar de InitializeServer
+		// porque el CLI no necesita arrancar un servidor HTTP.
+		container, cleanup, err := di.InitializeAppContainer("internal/appconfig/config.yml")
 		if err != nil {
 			return fmt.Errorf("❌ Error inicializando dependencias: %w", err)
 		}
 		defer cleanup()
 		fmt.Println("⚙️ Dependencias inicializadas correctamente.")
 
+		fmt.Println("######")
+		fmt.Println("mostrar variables config")
+		fmt.Printf("%+v\n", container.Config)
+		fmt.Println("######")
+
 		// --- 2. Acceder al servicio de usuarios ---
-		userService := server.UserWriterService
+		userService := container.UserWriterService
 		if userService == nil {
-			return fmt.Errorf("❌ No se pudo obtener UserWriterService desde el servidor")
+			return fmt.Errorf("❌ No se pudo obtener UserWriterService desde el contenedor")
 		}
 		fmt.Println("🔧 Servicio de usuario obtenido desde el contenedor DI.")
 

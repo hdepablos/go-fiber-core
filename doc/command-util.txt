@@ -52,3 +52,5 @@ brew install tree
 
 find . -maxdepth 3
 
+-- Buscar en todo el proyecto una palabra
+grep -rnw --color=auto . -e 'PROYECTO'

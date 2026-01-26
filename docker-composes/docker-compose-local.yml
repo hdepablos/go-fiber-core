@@ -1,0 +1,20 @@
+# docker-compose-local.yml
+services:
+  go-bank-file-gen:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile.api.${APP_ENV}
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - ${PORT}:${PORT}
+    volumes:
+      - .:/app
+      - ./cmd:/app/cmd
+      - ./internal:/app/internal
+      - ./air.api.toml:/app/air.api.toml # <--- ¡IMPORTANTE! Montar el nuevo archivo
+    command: >
+      sh -c "if [ ${APP_ENV} = 'local' ]; then air -c air.api.toml; else /app/bin/app; fi" # <--- ¡IMPORTANTE! Indicarle a Air que use air.api.toml
+    networks:
+      - nginx-proxy

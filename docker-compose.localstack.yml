@@ -1,0 +1,41 @@
+services:
+  localstack:
+    container_name: localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+      - "4567:4567"
+    environment:
+      - SERVICES=lambda,sqs,logs,cloudformation,iam,cloudwatch,apigateway,events,sts,ec2
+      - DATA_DIR=/tmp/localstack/data
+      - DEBUG=1
+      - CLEAR_TMP_FOLDER=0
+
+      # 🔥 CAMBIO CRÍTICO: Usa 'local' en lugar de 'docker'
+      - LAMBDA_EXECUTOR=local  # ← CAMBIA ESTO
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=30
+
+      # Estas ya no son necesarias con 'local'
+      # - LAMBDA_DOCKER_NETWORK=nginx-proxy
+      # - LAMBDA_CONCURRENCY=5
+      # - LAMBDA_REUSE_CONTAINERS=0
+      # - LAMBDA_STAY_OPEN_MODE=0
+      # - DOCKER_HOST=unix:///var/run/docker.sock
+
+    volumes:
+      - "./localstack-data:/tmp/localstack/data"
+      - "./localstack-data:/var/lib/localstack"
+      # Ya no necesitas el socket de Docker
+      # - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - nginx-proxy
+
+networks:
+  nginx-proxy:
+    external: true
