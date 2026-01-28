@@ -17,7 +17,7 @@ import (
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
-	"go-fiber-core/internal/repositories/menu_user"
+	menu_user "go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
 	"go-fiber-core/internal/repositories/rol"
 	"go-fiber-core/internal/repositories/session"
@@ -199,40 +199,10 @@ var repositorySet = wire.NewSet(
 	bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo,
 	refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository,
 	session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository,
-	menu.NewMenuReaderRepository,
-	catalog.NewCatalogRepository,
-)
-
-var serviceSet = wire.NewSet(
-	provideTokenService, auth.NewAuthService,
-	provideUserPaginationService, provideBankPaginationService, provideSessionPaginationService,
-	services.NewTransactionManager, services.NewDatabaseService,
-	user2.NewUserReaderService, user2.NewUserWriterService,
-	bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService,
-	menu2.NewMenuReaderService,
-	catalog2.NewCatalogService,
-)
-
-var handlerSet = wire.NewSet(
-	handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewCatalogHandler, handlers.NewDatabaseHandler,
-	menu.NewMenuWriterRepository,
-
+	menu.NewMenuReaderRepository, menu.NewMenuWriterRepository,
 	menu_user.NewMenuUserPaginationRepository,
-
-	rol.NewRolReaderRepo,
-	rol.NewRolWriterRepo,
-	rol.NewRolCrudRepository,
-	rol.NewRolPaginationRepo,
-
-	refreshtoken.NewRefreshTokenReaderRepo,
-	refreshtoken.NewRefreshTokenWriterRepo,
-	refreshtoken.NewRefreshTokenRepository,
-
-	// --- Repositorios de Menú (Solo Lector) ---
-	// Cambiamos el nombre del constructor a la implementación existente:
-	// Comentamos los constructores de escritura y CRUD por ahora:
-	// menu.NewMenuWriterRepo,
-	// menu.NewMenuCrudRepo,
+	rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo,
+	catalog.NewCatalogRepository,
 )
 
 var serviceSet = wire.NewSet(
@@ -243,6 +213,7 @@ var serviceSet = wire.NewSet(
 	provideBankPaginationService,
 	provideMenuUserPaginationService,
 	provideRolPaginationService,
+	provideSessionPaginationService,
 
 	services.NewTransactionManager,
 	services.NewDatabaseService,
@@ -263,8 +234,7 @@ var serviceSet = wire.NewSet(
 	rol2.NewRolPaginationService,
 
 	menu_user2.NewMenuUserPaginationService,
-	// Comentamos el servicio de escritura de menús:
-	// menu2.NewMenuWriterService,
+	catalog2.NewCatalogService,
 )
 
 var handlerSet = wire.NewSet(
@@ -275,7 +245,5 @@ var handlerSet = wire.NewSet(
 	handlers.NewMenuHandler,
 	handlers.NewMenuUserHandler,
 	handlers.NewRolHandler,
-	// NOTA: Si handlers.NewMenuHandler inyecta MenuWriterService,
-	// necesitarás actualizar su constructor también.
-	// handlers.NewMenuHandler,
+	handlers.NewCatalogHandler,
 )

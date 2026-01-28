@@ -1,6 +1,10 @@
 tflocal init
 
 
+make deploy-all
+
+
+
 Cuando quieres actualizar la versión de un Provider
 Cuando cambias la versión de un Módulo
 Para solucionar errores del "Lock File"

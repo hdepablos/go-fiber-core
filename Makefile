@@ -398,6 +398,10 @@ compile-fn: ## 🏗️ Compila el binario y genera el ZIP para Terraform.
 	@$(eval LOGICAL_ID := $(PROJECT_NAME_PASCAL)$(FUNC_PASCAL))
 	@printf "build-$(LOGICAL_ID):\n\tcp -r * \$$(ARTIFACTS_DIR)/\n\tchmod +x \$$(ARTIFACTS_DIR)/bootstrap\n" > $(OUT_DIR)/Makefile
 
+	# 5. Generar ZIP para Terraform
+	@cd $(OUT_DIR) && zip -r ../$(FOLDER).zip .
+	@echo "$(SUCCESS)📦 ZIP generado en sam-compile/$(FOLDER).zip$(RESET)"
+
 	# 5. 📦 Generar el ZIP para Terraform/LocalStack
 	@echo "$(INFO)📦 Empaquetando ZIP para Terraform...$(RESET)"
 	@cd $(OUT_DIR) && \
@@ -474,6 +478,13 @@ update-fn: ## 🔄 Actualización rápida de código en LocalStack.
 
 	@# 3. Mover el binario a la carpeta de salida
 	@mv cmd/$(FOLDER)/bootstrap $(OUT_DIR)/bootstrap
+
+	@# 3.1 Copiar archivo de configuración y otros recursos necesarios
+	@echo "$(INFO)📂 Copiando recursos estáticos...$(RESET)"
+	@mkdir -p $(OUT_DIR)/internal/appconfig
+	@cp internal/appconfig/config.yml $(OUT_DIR)/internal/appconfig/
+	@mkdir -p $(OUT_DIR)/internal/services/email/templates
+	@cp -r internal/services/email/templates/* $(OUT_DIR)/internal/services/email/templates/ 2>/dev/null || :
 
 	@# 4. Generar el Makefile para SAM (compatibilidad)
 	@$(eval FUNC_PASCAL := $(shell echo "$(FOLDER)" | awk -F '-' '{for(i=1;i<=NF;i++) printf toupper(substr($$i,1,1)) substr($$i,2)}'))

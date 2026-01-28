@@ -48,7 +48,7 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 	userAgent := c.Get("User-Agent")
 	clientIP := c.IP()
 
-	resp, err := h.authService.Login(c.Context(), req, userAgent, clientIP)
+	resp, err := h.authService.Login(c.UserContext(), req, userAgent, clientIP)
 	if err != nil {
 		return err
 	}
