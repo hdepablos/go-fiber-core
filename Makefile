@@ -428,7 +428,7 @@ deploy-all: ## 🌎 Compila todas las funciones y despliega toda la infraestruct
 
 # 2. Compilar y Desplegar una SOLA función (Hot-reload)
 .PHONY: deploy
-deploy: ## ⚡ Compila y actualiza una sola función (Uso: make deploy FOLDER=api)
+deploy: infra-init ## ⚡ Compila y actualiza una sola función (Uso: make deploy FOLDER=api)
 	@echo "$(INFO)🔄 Actualizando componente: [$(FOLDER)]...$(RESET)"
 	@$(MAKE) compile-fn FOLDER=$(FOLDER)
 	@$(MAKE) infra-deploy

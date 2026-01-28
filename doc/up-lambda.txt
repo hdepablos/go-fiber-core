@@ -1,0 +1,30 @@
+AWSCLI:
+
+1️⃣ Instalá AWS CLI:
+
+brew install awscli
+
+2️⃣ Verificá:
+
+aws --version
+
+PIPX:
+
+1️⃣ Instalar pipx (con Homebrew):
+
+brew install pipx
+pipx ensurepath
+
+2️⃣ Instalar awslocal:
+
+pipx install awscli-local
+
+3️⃣ Verificar:
+
+awslocal --version
+
+LEVANTAR LAMBDA:
+1️⃣ make infra-init
+2️⃣ make localstack-up
+3️⃣ make deploy-all
+4️⃣ make watch-lambda
