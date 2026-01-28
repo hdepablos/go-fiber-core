@@ -1,3 +1,5 @@
+truncate table menus cascade;
+
 INSERT INTO public.menus
 (id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
 VALUES(1, 'link', 'Dashboard', '/', 'mdi-view-dashboard', NULL, 10, true, '2025-12-09 21:10:48.716', '2025-12-09 21:10:48.716', NULL);
