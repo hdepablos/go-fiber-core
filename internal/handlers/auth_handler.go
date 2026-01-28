@@ -62,7 +62,7 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 		"menu":          resp.Menu,
 	}
 
-	return responses.Success(c, "Inicio de sesión exitoso v4...", data)
+	return responses.Success(c, "Inicio de sesión exitoso v5", data)
 }
 
 func (h *authHandler) Refresh(c *fiber.Ctx) error {
