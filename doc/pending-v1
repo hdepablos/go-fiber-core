@@ -1,0 +1,7 @@
+-- Quitar de los orm la configuración de local para que muestre las sql de las peticiones
+
+-- crear en el frontend el catalago-all y almacenarlo en el localstore
+
+-- Que los filtros funcionen con el cuadro de texto que se almacenan con el localstore
+
+-- el rango de fecha para el componente y que se pueda limpiar
