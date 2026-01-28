@@ -316,7 +316,7 @@ update-bruno-url-base: ## ✏️ Actualiza urlBase en Bruno según ENV (local | 
 		if [ ! -f .api_base_tmp ]; then echo "❌ Faltan .api_base_tmp"; exit 1; fi; \
 		API_BASE=$$(cat .api_base_tmp); \
 	else \
-		API_BASE="http://127.0.0.1:$(PORT)/"; \
+		API_BASE="http://127.0.0.1:$(SERVER_PORT)/"; \
 	fi; \
 	if [ "$$(uname)" = "Darwin" ]; then \
 		sed -i '' -E "s|urlBase: .*|urlBase: $$API_BASE|" "$$BRUNO_ENV_FILE"; \
