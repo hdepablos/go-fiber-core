@@ -1,0 +1,32 @@
+meta {
+  name: create user con role
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/users
+  body: json
+  auth: bearer
+}
+
+headers {
+  X-Client-Code: 12345678
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "A1",
+    "email": "a1@test.com",
+    "password": "123456",
+    "role_ids": [
+      1,
+      4
+    ]
+  }
+  
+}

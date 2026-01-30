@@ -6,8 +6,19 @@ type CreateUserRequest struct {
 	Name     string `json:"name" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8"`
-	RoleID   uint64 `json:"role_id" validate:"required"`
+	RoleIDs  []uint64 `json:"role_ids" validate:"required"`
 }
+
+type RemoveUserRolesRequest struct {
+	UserIDs []uint64 `json:"user_ids"`
+	RoleIDs []uint64 `json:"role_ids"`
+}
+
+type AssignRolesRequest struct {
+	UserIDs []uint64 `json:"user_ids" validate:"required,min=1"`
+	RoleIDs []uint64 `json:"role_ids" validate:"required,min=1"`
+}
+
 
 // UpdateUserRequest se utiliza para actualizar un usuario existente.
 type UpdateUserRequest struct {

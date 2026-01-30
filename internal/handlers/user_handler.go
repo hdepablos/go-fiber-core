@@ -9,6 +9,8 @@ import (
 	userService "go-fiber-core/internal/services/user"
 	"log"
 	"strconv"
+	"errors"
+	"gorm.io/gorm"
 
 	fiber "github.com/gofiber/fiber/v2"
 )
@@ -19,8 +21,10 @@ type UserHandler interface {
 	// CreateUserWithRelations(c *fiber.Ctx) error // 👈 Nuevo método
 	// CreateUserWithExistingRelations(c *fiber.Ctx) error
 	// CreateUserWithNewProductsAndRolesIfNotExist(c *fiber.Ctx) error
+	AssignRolesToUsers(c *fiber.Ctx) error
 	GetAllUsers(c *fiber.Ctx) error
 	GetUserByID(c *fiber.Ctx) error
+	RemoveRoles(c *fiber.Ctx) error
 	UpdateUser(c *fiber.Ctx) error
 	SoftDelete(c *fiber.Ctx) error
 	HardDelete(c *fiber.Ctx) error
@@ -50,13 +54,23 @@ func (h *userHandler) CreateUser(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
+	// Validación mínima
+	if len(req.RoleIDs) == 0 {
+		return domain.ErrInvalidArgument
+	}
+	for _, id := range req.RoleIDs {
+		if id == 0 {
+			return domain.ErrInvalidArgument
+		}
+	}
+
 	user := &models.User{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
 	}
 
-	if err := h.userWriter.CreateWithRole(ctx, user, req.RoleID); err != nil {
+	if err := h.userWriter.CreateWithRole(ctx, user, req.RoleIDs); err != nil {
 		return err
 	}
 
@@ -215,168 +229,62 @@ func (h *userHandler) GetAllPaginatedUsers(c *fiber.Ctx) error {
 	return responses.Success(c, "Usuarios paginados obtenidos exitosamente", response)
 }
 
-// func (h *userHandler) CreateUserWithRelations(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithRelationsRequest
+func (h *userHandler) RemoveRoles(c *fiber.Ctx) error {
+	ctx := c.UserContext()
 
-// 	if err := c.BodyParser(&req); err != nil {
-// 		// return responses.Error(c, 400, err.Error())
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 		// return domain.ErrInvalidArgument
-// 	}
+	var req requests.RemoveUserRolesRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
 
-// 	// Convertir los productos y roles del request a modelos
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
+	if len(req.UserIDs) == 0 || len(req.RoleIDs) == 0 {
+		return domain.ErrInvalidArgument
+	}
 
-// 	// Asignar productos (si hay)
-// 	for _, p := range req.Products {
-// 		user.Products = append(user.Products, models.Product{
-// 			Name:  p.Name,
-// 			Price: p.Price,
-// 		})
-// 	}
+	for _, id := range req.UserIDs {
+		if id == 0 {
+			return domain.ErrInvalidArgument
+		}
+	}
+	for _, id := range req.RoleIDs {
+		if id == 0 {
+			return domain.ErrInvalidArgument
+		}
+	}
 
-// 	// Obtener los IDs de roles
-// 	roleIDs := make([]uint64, len(req.Roles))
-// 	for i, r := range req.Roles {
-// 		roleIDs[i] = r.ID
-// 	}
+	if err := h.userWriter.RemoveRolesFromUsers(ctx, req.UserIDs, req.RoleIDs); err != nil {
+		return err
+	}
 
-// 	// Crear usuario + relaciones
-// 	if err := h.userDeactivation.CreateWithProductsAndRoles(ctx, user, roleIDs); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
+	return responses.Success(c, "Roles desasignados correctamente", nil)
+}
 
-// 	return responses.Success(c, "Usuario creado con productos y roles exitosamente", user)
-// }
+func (h *userHandler) AssignRolesToUsers(c *fiber.Ctx) error {
+	var req requests.AssignRolesRequest
 
-// // Crear usuario con productos y roles ya existentes (por IDs)
-// func (h *userHandler) CreateUserWithExistingRelations(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithExistingRelationsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "json inválido")
+	}
 
-// 	if err := c.BodyParser(&req); err != nil {
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 	}
+	if len(req.UserIDs) == 0 || len(req.RoleIDs) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "user_ids y role_ids son obligatorios")
+	}
 
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
+	if err := h.userWriter.AssignRolesToUsers(
+		c.Context(),
+		req.UserIDs,
+		req.RoleIDs,
+	); err != nil {
 
-// 	// Llama al service que maneja productos y roles existentes
-// 	if err := h.userDeactivation.CreateWithExistingProductsAndRoles(ctx, user, req.ProductIDs, req.RoleIDs); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "usuario o rol inexistente")
+		}
 
-// 	return responses.Success(c, "Usuario creado con productos y roles existentes", user)
-// }
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
 
-// func (h *userHandler) CreateUserWithNewProductsAndRolesIfNotExist(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithNewProductsAndRolesRequest
-
-// 	if err := c.BodyParser(&req); err != nil {
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 	}
-
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
-
-// 	if err := h.userDeactivation.CreateUserWithNewProductsAndRolesIfNotExist(ctx, user, req.Products, req.Roles); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
-
-// 	return responses.Success(c, "Usuario creado con productos y roles nuevos exitosamente", user)
-// }
-
-// func (h *userHandler) CreateUserWithRelations(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithRelationsRequest
-
-// 	if err := c.BodyParser(&req); err != nil {
-// 		// return responses.Error(c, 400, err.Error())
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 		// return domain.ErrInvalidArgument
-// 	}
-
-// 	// Convertir los productos y roles del request a modelos
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
-
-// 	// Asignar productos (si hay)
-// 	for _, p := range req.Products {
-// 		user.Products = append(user.Products, models.Product{
-// 			Name:  p.Name,
-// 			Price: p.Price,
-// 		})
-// 	}
-
-// 	// Obtener los IDs de roles
-// 	roleIDs := make([]uint64, len(req.Roles))
-// 	for i, r := range req.Roles {
-// 		roleIDs[i] = r.ID
-// 	}
-
-// 	// Crear usuario + relaciones
-// 	if err := h.userDeactivation.CreateWithProductsAndRoles(ctx, user, roleIDs); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
-
-// 	return responses.Success(c, "Usuario creado con productos y roles exitosamente", user)
-// }
-
-// Crear usuario con productos y roles ya existentes (por IDs)
-// func (h *userHandler) CreateUserWithExistingRelations(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithExistingRelationsRequest
-
-// 	if err := c.BodyParser(&req); err != nil {
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 	}
-
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
-
-// 	// Llama al service que maneja productos y roles existentes
-// 	if err := h.userDeactivation.CreateWithExistingProductsAndRoles(ctx, user, req.ProductIDs, req.RoleIDs); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
-
-// 	return responses.Success(c, "Usuario creado con productos y roles existentes", user)
-// }
-
-// func (h *userHandler) CreateUserWithNewProductsAndRolesIfNotExist(c *fiber.Ctx) error {
-// 	ctx := c.UserContext()
-// 	var req requests.CreateUserWithNewProductsAndRolesRequest
-
-// 	if err := c.BodyParser(&req); err != nil {
-// 		return responses.Error(c, 422, domain.ErrInvalidArgument.Error())
-// 	}
-
-// 	user := &models.User{
-// 		Name:     req.Name,
-// 		Email:    req.Email,
-// 		Password: req.Password,
-// 	}
-
-// 	if err := h.userDeactivation.CreateUserWithNewProductsAndRolesIfNotExist(ctx, user, req.Products, req.Roles); err != nil {
-// 		return responses.Error(c, 400, err.Error())
-// 	}
-
-// 	return responses.Success(c, "Usuario creado con productos y roles nuevos exitosamente", user)
-// }
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":  "ok",
+		"message": "roles asignados correctamente",
+	})
+}

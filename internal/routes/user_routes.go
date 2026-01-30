@@ -20,6 +20,8 @@ func RegisterUserRoutes(router fiber.Router, userHandler handlers.UserHandler) {
 	users.Get("/", userHandler.GetAllUsers)
 	users.Get("/:id", userHandler.GetUserByID)
 	users.Put("/:id", userHandler.UpdateUser)
+	users.Post("roles", userHandler.RemoveRoles)
+	users.Post("/assign-roles", userHandler.AssignRolesToUsers)
 	users.Delete("/:id", userHandler.SoftDelete) // Pendiente: cambiar password
 	users.Delete("/hard/:id", userHandler.HardDelete)
 
