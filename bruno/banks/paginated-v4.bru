@@ -16,10 +16,10 @@ auth:bearer {
 
 body:json {
   {
-      "sortBy": ["id"],
-      "sortDesc": [true],
-      "filterBy": ["enabled"],
-      "filterValues": [false],
+      "sortBy": ["banks.created_at"],
+      "sortDesc": [false],
+      "filterBy": ["banks.created_at"],
+      "filterValues": [["2025-12-01","2025-12-03"]],
       "rowsPerPage": 15,
       "page": 1
   }

@@ -159,6 +159,22 @@ func (p *PaginationService[T]) ApplyFilters(db *gorm.DB, req dtos.PaginationRequ
 				finalColumnName = currentAlias + "." + finalFieldName
 			}
 
+			if _, isDate := dateColumns[finalFieldName]; isDate {
+				if values, ok := filterValue.([]any); ok && len(values) == 2 {
+					startStr, ok1 := values[0].(string)
+					endStr, ok2 := values[1].(string)
+					if ok1 && ok2 {
+						start, err1 := time.Parse("2006-01-02", startStr)
+						end, err2 := time.Parse("2006-01-02", endStr)
+						if err1 == nil && err2 == nil {
+							endOfDay := end.Add(24 * time.Hour)
+							db = db.Where(finalColumnName+" >= ? AND "+finalColumnName+" < ?", start, endOfDay)
+							continue
+						}
+					}
+				}
+			}
+
 			if values, ok := filterValue.([]any); ok {
 				db = db.Where(finalColumnName+" IN ?", values)
 			} else if val, ok := filterValue.(bool); ok {
