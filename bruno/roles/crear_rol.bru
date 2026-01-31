@@ -1,11 +1,11 @@
 meta {
-  name: delete hard role
+  name: crear_rol
   type: http
-  seq: 23
+  seq: 10
 }
 
-delete {
-  url: {{urlBase}}api/v1/roles/hard/5
+post {
+  url: {{urlBase}}api/v1/roles
   body: json
   auth: bearer
 }
@@ -16,4 +16,10 @@ headers {
 
 auth:bearer {
   token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "Banco de prueba v2"
+  }
 }

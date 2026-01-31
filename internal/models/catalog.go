@@ -10,4 +10,6 @@ type Catalog struct {
 type AllCatalogsResponse struct {
 	Banks []Catalog `json:"banks"`
 	Roles []Catalog `json:"roles"`
+	Users []Catalog `json:"users"`
+	Menus []Catalog `json:"menus"`
 }

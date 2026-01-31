@@ -57,6 +57,16 @@ func (r *catalogRepository) GetAll(ctx context.Context, db *gorm.DB) (models.All
 			Select("id, name, is_active").
 			Where("deleted_at IS NULL").Scan(&response.Roles).Error
 	})
+	g.Go(func() error {
+		return db.WithContext(ctx).Table("users").
+			Select("id, name, is_active").
+			Where("deleted_at IS NULL").Scan(&response.Users).Error
+	})
+	g.Go(func() error {
+		return db.WithContext(ctx).Table("menus").
+			Select("id, item_name as name, is_active").
+			Where("deleted_at IS NULL").Scan(&response.Menus).Error
+	})
 
 	if err := g.Wait(); err != nil {
 		return models.AllCatalogsResponse{}, err

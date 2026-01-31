@@ -1,11 +1,11 @@
 meta {
-  name: delete soft rol menu
+  name: delete hard role
   type: http
-  seq: 4
+  seq: 21
 }
 
 delete {
-  url: {{urlBase}}api/v1/menus/14/roles
+  url: {{urlBase}}api/v1/roles/hard/5
   body: json
   auth: bearer
 }
@@ -16,10 +16,4 @@ headers {
 
 auth:bearer {
   token: {{access_token}}
-}
-
-body:json {
-  {
-    "role_ids": [1, 3]
-  }
 }

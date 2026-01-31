@@ -24,6 +24,9 @@ type UserWriterService interface {
 	RemoveRolesFromUsers(ctx context.Context, userIDs []uint64, roleIDs []uint64) error
 	AssignRolesToUsers(ctx context.Context, userIDs []uint64, roleIDs []uint64) error
 	Update(ctx context.Context, id uint64, data UpdateUserDTO) (*models.User, error)
+	Activate(ctx context.Context, id uint64, operatorID uint64) error
+	Deactivate(ctx context.Context, id uint64, operatorID uint64) error
+	SetActiveBulk(ctx context.Context, ids []uint64, active bool, operatorID uint64) error 
 	SoftDelete(ctx context.Context, id uint64) error
 	HardDelete(ctx context.Context, id uint) error
 }
@@ -94,22 +97,21 @@ func (s *userWriterService) SoftDelete(ctx context.Context, id uint64) error {
 			return err
 		}
 
-		// 1️⃣ Eliminar relaciones
-		if err := tx.Model(&user).Association("Roles").Clear(); err != nil {
-			return err
-		}
-		if err := tx.Model(&user).Association("Menus").Clear(); err != nil {
-			return err
-		}
+		// ❌ ANTES (esto te rompía todo)
+		// tx.Model(&user).Association("Roles").Clear()
+		// tx.Model(&user).Association("Menus").Clear()
+		// tx.Delete(&user)
 
-		// 2️⃣ Soft delete del usuario
-		if err := tx.Delete(&user).Error; err != nil {
+		// ✅ AHORA: solo soft lógico
+		if err := tx.Model(&user).
+			Update("is_active", false).Error; err != nil {
 			return err
 		}
 
 		return nil
 	})
 }
+
 
 
 func (s *userWriterService) HardDelete(
@@ -430,4 +432,41 @@ func (s *userWriterService) AssignRolesToUsers(ctx context.Context, userIDs []ui
 
 		return nil
 	})
+}
+
+func (s *userWriterService) Activate(ctx context.Context, id uint64, operatorID uint64) error {
+	return s.conn.ConnectGormWrite.
+		WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"is_active":   true,
+			"operator_id": operatorID, // <-- guardamos quién activó
+		}).Error
+}
+
+func (s *userWriterService) Deactivate(ctx context.Context, id uint64, operatorID uint64) error {
+	return s.conn.ConnectGormWrite.
+		WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"is_active":   false,
+			"operator_id": operatorID, // <-- guardamos quién desactivó
+		}).Error
+}
+
+func (s *userWriterService) SetActiveBulk(ctx context.Context, ids []uint64, active bool, operatorID uint64) error {
+	if len(ids) == 0 {
+		return nil // o return error si quieres que sea obligatorio
+	}
+
+	return s.conn.ConnectGormWrite.
+		WithContext(ctx).
+		Model(&models.User{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"is_active":   active,
+			"operator_id": operatorID, // guardamos quién hizo la acción
+		}).Error
 }

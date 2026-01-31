@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/requests"
@@ -9,7 +11,7 @@ import (
 	userService "go-fiber-core/internal/services/user"
 	"log"
 	"strconv"
-	"errors"
+
 	"gorm.io/gorm"
 
 	fiber "github.com/gofiber/fiber/v2"
@@ -27,6 +29,9 @@ type UserHandler interface {
 	RemoveRoles(c *fiber.Ctx) error
 	UpdateUser(c *fiber.Ctx) error
 	SoftDelete(c *fiber.Ctx) error
+	ActivateUser(c *fiber.Ctx) error
+	DeactivateUser(c *fiber.Ctx) error
+	SetActiveBulk(c *fiber.Ctx) error
 	HardDelete(c *fiber.Ctx) error
 	GetAllPaginatedUsers(c *fiber.Ctx) error
 }
@@ -163,24 +168,23 @@ func (h *userHandler) UpdateUser(c *fiber.Ctx) error {
 func (h *userHandler) SoftDelete(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	// AÑADIDO: Obtener el ID de usuario del contexto
 	userID, err := getUserIDUint64FromCtx(ctx)
 	if err != nil {
 		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
 	}
-	// ---
 
-	id, err := getUintID(c) // Asumiendo que getUintID está en helpers.go
+	id, err := getUintID(c)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Usuario %d está borrando lógicamente el banco %d", userID, id)
+	log.Printf("Usuario %d está desactivando lógicamente el usuario %d", userID, id)
 
 	if err := h.userWriter.SoftDelete(ctx, uint64(id)); err != nil {
 		return err
 	}
-	return responses.Success(c, "Banco borrado lógicamente", nil)
+
+	return responses.Success(c, "Usuario desactivado lógicamente", nil)
 }
 
 func (h *userHandler) HardDelete(c *fiber.Ctx) error {
@@ -287,4 +291,83 @@ func (h *userHandler) AssignRolesToUsers(c *fiber.Ctx) error {
 		"status":  "ok",
 		"message": "roles asignados correctamente",
 	})
+}
+
+func (h *userHandler) ActivateUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	operatorID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+
+	id, err := getUintID(c)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Usuario %d está reactivando al usuario %d", operatorID, id)
+
+	if err := h.userWriter.Activate(ctx, uint64(id), operatorID); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Usuario activado correctamente", nil)
+}
+
+func (h *userHandler) DeactivateUser(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	operatorID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+
+	id, err := getUintID(c)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Usuario %d está desactivando al usuario %d", operatorID, id)
+
+	if err := h.userWriter.Deactivate(ctx, uint64(id), operatorID); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Usuario desactivado correctamente", nil)
+}
+
+func (h *userHandler) SetActiveBulk(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var dto requests.BulkSetActiveDTO
+	if err := c.BodyParser(&dto); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "JSON inválido")
+	}
+
+	if len(dto.IDs) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "IDs no pueden estar vacíos")
+	}
+
+	// Convertir a []uint64 explícitamente
+for i, id := range dto.IDs {
+    dto.IDs[i] = uint64(id)
+}
+
+	// Obtener el operatorID desde el contexto
+	operatorID, err := getUserIDUint64FromCtx(ctx)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
+	}
+
+	if err := h.userWriter.SetActiveBulk(ctx, dto.IDs, dto.Active, operatorID); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	action := "activados"
+	if !dto.Active {
+		action = "desactivados"
+	}
+
+	return responses.Success(c, fmt.Sprintf("Usuarios %s correctamente", action), nil)
+
 }

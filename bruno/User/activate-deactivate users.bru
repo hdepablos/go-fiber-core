@@ -1,11 +1,11 @@
 meta {
-  name: post menu_user
+  name: activate-deactivate users
   type: http
-  seq: 6
+  seq: 12
 }
 
 post {
-  url: {{urlBase}}api/v1/menus/users/bulk
+  url: {{urlBase}}api/v1/users/assign-roles
   body: json
   auth: bearer
 }
@@ -20,8 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "user_ids": [1],
-    "menu_ids": [27]
+    "user_ids": [31],
+    "role_ids": [4]
   }
   
 }

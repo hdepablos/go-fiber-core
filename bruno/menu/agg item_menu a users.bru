@@ -1,11 +1,11 @@
 meta {
-  name: crear product
+  name: agg item_menu a users
   type: http
-  seq: 5
+  seq: 6
 }
 
 post {
-  url: {{urlBase}}api/v1/products
+  url: {{urlBase}}api/v1/menus/users/bulk
   body: json
   auth: bearer
 }
@@ -20,7 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "name": "ol",
-    "price": 10
+    "user_ids": [1],
+    "menu_ids": [27]
   }
+  
 }

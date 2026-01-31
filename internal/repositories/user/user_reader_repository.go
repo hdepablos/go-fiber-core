@@ -152,8 +152,13 @@ func (r *UserReaderRepo) GetAll(ctx context.Context, db *gorm.DB) ([]models.User
 
 // Métodos para UserPaginatorRepo
 func (r *UserPaginatorRepo) GetAllPaginated(ctx context.Context, db *gorm.DB, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.User], error) {
-	return r.ps.Execute(db.WithContext(ctx), req, nil, nil)
+	preload := func(tx *gorm.DB) *gorm.DB {
+		return tx.Preload("Roles")
+	}
+
+	return r.ps.Execute(db.WithContext(ctx), req, preload, nil)
 }
+
 
 func (r *UserReaderRepo) GetByEmailWithRoles(ctx context.Context, db *gorm.DB, email string) (*models.User, error) {
 	var user models.User

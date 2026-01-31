@@ -1,0 +1,20 @@
+meta {
+  name: deactivate user
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{urlBase}}api/v1/users/32/deactivate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

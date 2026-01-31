@@ -24,6 +24,9 @@ func RegisterUserRoutes(router fiber.Router, userHandler handlers.UserHandler) {
 	users.Post("/assign-roles", userHandler.AssignRolesToUsers)
 	users.Delete("/:id", userHandler.SoftDelete) // Pendiente: cambiar password
 	users.Delete("/hard/:id", userHandler.HardDelete)
+	users.Patch("/:id/activate", userHandler.ActivateUser)
+	users.Patch("/:id/deactivate", userHandler.DeactivateUser)
+	users.Post("/set-active-bulk", userHandler.SetActiveBulk)
 
 	// Pendiente: cambiar password
 

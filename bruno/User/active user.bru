@@ -1,11 +1,11 @@
 meta {
-  name: get all copy
+  name: active user
   type: http
-  seq: 17
+  seq: 10
 }
 
-get {
-  url: {{urlBase}}api/v1/products/
+patch {
+  url: {{urlBase}}api/v1/users/32/activate
   body: json
   auth: bearer
 }
@@ -16,4 +16,9 @@ headers {
 
 auth:bearer {
   token: {{access_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }

@@ -1,0 +1,20 @@
+meta {
+  name: delete soft user
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{urlBase}}api/v1/users/31
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
