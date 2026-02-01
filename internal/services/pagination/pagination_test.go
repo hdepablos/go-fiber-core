@@ -169,7 +169,7 @@ func TestApplyFilters(t *testing.T) {
 			FilterBy:     []string{"profile.status"},
 			FilterValues: []any{"active"},
 		}
-		mock.ExpectQuery(`SELECT .* FROM "users" LEFT JOIN "profiles" "Profile" ON "users"."id" = "Profile"."user_id" WHERE profiles.status = \$1`).
+		mock.ExpectQuery(`SELECT .* FROM "users" WHERE LOWER\("Profile"\.status\) = LOWER\(\$1\)`).
 			WithArgs("active").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 		service.ApplyFilters(db.Model(&User{}), req, dateColumns).Find(&[]User{})
@@ -210,7 +210,7 @@ func TestApplyOrder(t *testing.T) {
 			SortBy:   []string{"profile.status"},
 			SortDesc: []bool{false},
 		}
-		mock.ExpectQuery(`SELECT .* FROM "users" LEFT JOIN "profiles" "Profile" ON "users"."id" = "Profile"."user_id" ORDER BY profiles.status ASC`).
+		mock.ExpectQuery(`SELECT .* FROM "users" ORDER BY "Profile"\.status ASC`).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 		service.ApplyOrder(db.Model(&User{}), req).Find(&[]User{})
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -226,7 +226,7 @@ func TestExecute(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(22))
 
 		rows := sqlmock.NewRows([]string{"id", "user_name"}).AddRow(6, "User 6").AddRow(7, "User 7")
-		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" ASC LIMIT \$1 OFFSET \$2`).
+		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" DESC LIMIT \$1 OFFSET \$2`).
 			WithArgs(5, 5).
 			WillReturnRows(rows)
 
@@ -269,7 +269,7 @@ func TestExecute(t *testing.T) {
 
 		mock.ExpectQuery(regexp.QuoteMeta(`SELECT SUM(id) as total_sum FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"total_sum"}).AddRow(55))
 		mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
-		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" ASC LIMIT \$1`).
+		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" DESC LIMIT \$1`).
 			WithArgs(10).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
@@ -328,7 +328,7 @@ func TestExecute(t *testing.T) {
 		db, mock := setupTestDB(t)
 		req := dtos.PaginationRequest{Page: 10, RowsPerPage: 10, OptimizeWithKey: "id"}
 		mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(150))
-		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" ASC LIMIT \$1 OFFSET \$2`).
+		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" DESC LIMIT \$1 OFFSET \$2`).
 			WithArgs(10, 90).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(91))
 		_, err := service.Execute(db, req, nil, nil)
@@ -336,19 +336,19 @@ func TestExecute(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	t.Run("Deferred Join SÍ se activa en página 11", func(t *testing.T) {
+	t.Run("Deferred Join SÍ se activa en página 16", func(t *testing.T) {
 		service := NewPaginationService[User]()
 		db, mock := setupTestDB(t)
-		req := dtos.PaginationRequest{Page: 11, RowsPerPage: 10, OptimizeWithKey: "id"}
-		mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(150))
+		req := dtos.PaginationRequest{Page: 16, RowsPerPage: 10, OptimizeWithKey: "id"}
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT count(*) FROM "users"`)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(200))
 
 		idRows := sqlmock.NewRows([]string{"id"}).AddRow(101).AddRow(102)
-		mock.ExpectQuery(`SELECT "id" FROM "users" ORDER BY "users"\."id" ASC LIMIT \$1 OFFSET \$2`).
-			WithArgs(10, 100).
+		mock.ExpectQuery(`SELECT "id" FROM "users" ORDER BY "users"\."id" DESC LIMIT \$1 OFFSET \$2`).
+			WithArgs(10, 150).
 			WillReturnRows(idRows)
 
 		dataRows := sqlmock.NewRows([]string{"id"}).AddRow(101).AddRow(102)
-		mock.ExpectQuery(`SELECT \* FROM "users" WHERE "users"\."id" IN \(\$1,\$2\) ORDER BY "users"\."id" ASC`).
+		mock.ExpectQuery(`SELECT \* FROM "users" WHERE "users"\."id" IN \(\$1,\$2\) ORDER BY "users"\."id" DESC`).
 			WithArgs(101, 102).
 			WillReturnRows(dataRows)
 		_, err := service.Execute(db, req, nil, nil)

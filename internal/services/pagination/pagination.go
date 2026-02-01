@@ -345,7 +345,7 @@ func (p *PaginationService[T]) applySorting(db *gorm.DB, req dtos.PaginationRequ
 
 		// Lógica mejorada para parsear el schema si no existe
 		if stmt.Schema == nil {
-			if err := stmt.Parse(db.Model(model)); err != nil {
+			if err := stmt.Parse(model); err != nil {
 				log.Printf("Advertencia: Falló el parseo del modelo para ordenamiento por defecto: %v", err)
 				return db
 			}
