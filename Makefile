@@ -233,6 +233,48 @@ test-aws-all: ## 🧪🧬 Realiza pruebas integrales sobre API y SQS.
 		--attribute-names ApproximateNumberOfMessages \
 		--output table
 
+.PHONY: coverage
+coverage: ## 📊 Genera reporte de cobertura COMPLETO (unitarios + integración).
+	@chmod +x ./scripts/generate_coverage_report.sh
+	@echo "📊 Generando reporte de cobertura COMPLETO..."
+	@$(DC_RUN) go test -tags=integration -coverprofile=coverage.out ./...
+	@$(DC_RUN) bash ./scripts/generate_coverage_report.sh
+
+.PHONY: coverage-unit
+coverage-unit: ## 📊 Genera reporte de cobertura RÁPIDO (solo unitarios).
+	@chmod +x ./scripts/generate_coverage_report.sh
+	@echo "📊 Generando reporte de cobertura para tests UNITARIOS..."
+	@$(DC_RUN) go test -coverprofile=coverage.out ./...
+	@$(DC_RUN) bash ./scripts/generate_coverage_report.sh
+
+
+.PHONY: lint
+lint: ##  lint: 🎨 Analiza el código en busca de errores y malas prácticas con golangci-lint.
+	@echo "🧹 Limpiando la caché de golangci-lint..."
+	@docker compose -f docker-compose-local-lint.yml run --rm lint cache clean
+	@echo "Limpiando contenedores huérfanos..."
+	@docker compose -f docker-compose-local-lint.yml down --remove-orphans
+	@echo "Ejecutando linter..."
+	@docker compose -f docker-compose-local-lint.yml build --no-cache lint && docker compose -f docker-compose-local-lint.yml run --rm lint run --timeout=2m
+
+.PHONY: lint-check-config
+lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint
+	@echo "🔍 Verificando configuración de golangci-lint..."
+	@docker compose -f docker-compose-local-lint.yml run --rm lint config path
+	@echo ""
+	@echo "📄 Mostrando configuración cargada:"
+	@docker compose -f docker-compose-local-lint.yml run --rm lint config dump
+
+.PHONY: lint-verbose
+lint-verbose: ## 🔍 Ejecuta el linter en modo verbose para ver qué archivos analiza
+	@echo "🔍 Ejecutando linter en modo verbose..."
+	@docker compose -f docker-compose-local-lint.yml run --rm lint run -v --timeout=2m
+
+.PHONY: lint-test
+lint-test: ## 🧪 Prueba si wire_gen.go está siendo ignorado
+	@echo "🧪 Listando archivos que el linter va a analizar..."
+	@docker compose -f docker-compose-local-lint.yml run --rm lint run --issues-exit-code=0 2>&1 | grep -i "wire_gen" || echo "✅ wire_gen.go NO aparece en la salida (está siendo ignorado)"
+
 .PHONY: localstack-up
 localstack-up: ## 🛠️ Levanta LocalStack en segundo plano.
 	@echo "$(SUCCESS)🛠️ Iniciando LocalStack...$(RESET)"

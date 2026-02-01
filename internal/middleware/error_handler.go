@@ -5,7 +5,7 @@ import (
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos/responses"
 
-	"github.com/gofiber/fiber/v2"
+	fiber "github.com/gofiber/fiber/v2"
 )
 
 // GlobalErrorHandler es el middleware para manejar errores centralizadamente.

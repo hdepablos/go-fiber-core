@@ -5,7 +5,7 @@ import (
 	"go-fiber-core/internal/dtos/responses"
 	"log"
 
-	"github.com/gofiber/fiber/v2"
+	fiber "github.com/gofiber/fiber/v2"
 
 	menuService "go-fiber-core/internal/services/menu"
 )

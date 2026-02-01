@@ -7,7 +7,7 @@ import (
 
 	"go-fiber-core/internal/models"
 
-	"github.com/redis/go-redis/v9"
+	redis "github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
