@@ -50,9 +50,6 @@ INSERT INTO public.menus
 VALUES(24, 'line', 'Línea de Configuración', NULL, NULL, NULL, 200, true, '2026-01-12 12:30:58.424', '2026-01-12 12:30:58.424', NULL);
 INSERT INTO public.menus
 (id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
-VALUES(25, 'link', 'Menu y Usuarios', '/menu-users', 'mdi-account-group', NULL, 210, true, '2026-01-12 12:34:28.047', '2026-01-12 12:34:28.047', NULL);
-INSERT INTO public.menus
-(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
 VALUES(17, 'link', 'Notificaciones', '/notificaciones', 'mdi-notification-clear-all', NULL, 160, true, '2026-01-07 12:19:22.814', '2026-01-07 12:19:22.814', NULL);
 INSERT INTO public.menus
 (id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
@@ -71,195 +68,126 @@ INSERT INTO public.menus
 VALUES(21, 'link', 'Contabilidades', '/contabilidades', 'mdi-calculator-variant', 18, 190, true, '2026-01-07 12:27:22.786', '2026-01-07 12:27:22.786', NULL);
 INSERT INTO public.menus
 (id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
-VALUES(26, 'separator', 'Gestion menu-usuarios', NULL, NULL, NULL, 205, true, '2026-01-12 12:37:20.560', '2026-01-12 12:37:20.560', NULL);
-INSERT INTO public.menus
-(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
-VALUES(27, 'group', 'Campos', NULL, 'mdi-alpha-c-circle', NULL, 220, true, '2026-01-22 11:35:51.510', '2026-01-22 11:35:51.510', NULL);
-INSERT INTO public.menus
-(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
 VALUES(11, 'link', 'Bancos V5', '/banks-v5', 'mdi-alpha-v-box-outline', 6, 110, true, '2025-12-09 21:10:48.716', '2025-12-09 21:10:48.716', NULL);
 INSERT INTO public.menus
 (id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
-VALUES(28, 'link', 'Usuarios', '/users', 'mdi-account-group', 27, 230, true, '2026-01-23 17:14:10.489', '2026-01-23 17:14:10.489', NULL);
-
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(1, 1, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(2, 2, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(3, 3, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(4, 4, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(5, 5, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(6, 6, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(7, 7, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(8, 8, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(9, 9, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(10, 10, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(11, 12, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(12, 13, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(13, 14, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(14, 15, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(15, 16, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(16, 24, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(17, 25, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(18, 17, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(19, 23, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(20, 22, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(21, 18, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(22, 19, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(23, 21, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(24, 26, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(25, 27, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(26, 11, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(27, 28, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(28, 1, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(29, 3, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(30, 14, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(31, 15, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(32, 17, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL);
-INSERT INTO public.menu_role
-(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at)
-VALUES(33, 28, 4, true, '2026-01-28 19:30:15.707', '2026-01-28 19:30:15.707', NULL);
+VALUES(26, 'separator', 'Configuraciones', NULL, NULL, NULL, 205, true, '2026-01-12 12:37:20.560', '2026-01-12 12:37:20.560', NULL);
+INSERT INTO public.menus
+(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
+VALUES(28, 'link', 'AllUsuarios', '/users', 'mdi-account-plus-outline', 27, 220, true, '2026-01-23 17:14:10.489', '2026-01-23 17:14:10.489', NULL);
+INSERT INTO public.menus
+(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
+VALUES(27, 'group', 'Usuarios', NULL, 'mdi-card-account-details-outline', NULL, 210, true, '2026-01-22 11:35:51.510', '2026-01-22 11:35:51.510', NULL);
+INSERT INTO public.menus
+(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
+VALUES(25, 'link', 'Menu y Usuarios', '/menu-users', 'mdi-account-group', 27, 240, true, '2026-01-12 12:34:28.047', '2026-01-12 12:34:28.047', NULL);
+INSERT INTO public.menus
+(id, item_type, item_name, to_path, icon, parent_id, order_index, is_active, created_at, updated_at, deleted_at)
+VALUES(29, 'link', 'Menus y Roles', '/menu-roles', 'mdi-account-cog', 27, 230, true, '2026-01-30 15:11:03.203', '2026-01-30 15:11:03.203', NULL);
 
 INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(2, 2, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(3, 3, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(5, 5, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(6, 6, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(7, 7, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(8, 8, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(9, 9, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(10, 10, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(11, 11, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(12, 12, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(13, 13, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(14, 14, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(15, 15, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(40, 16, 1, true, '2026-01-05 15:59:51.159', '2026-01-05 15:59:51.159', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(41, 17, 1, true, '2026-01-07 12:42:32.663', '2026-01-07 12:42:32.663', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(45, 18, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(46, 21, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(47, 22, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(48, 23, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(49, 19, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(50, 24, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(51, 25, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(52, 26, 1, true, '2026-01-07 12:43:28.945', '2026-01-07 12:43:28.945', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(1, 1, 1, false, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(4, 4, 1, false, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(53, 27, 1, true, '2026-01-22 11:42:13.435', '2026-01-22 11:42:13.435', NULL);
-INSERT INTO public.menu_user
-(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at)
-VALUES(54, 28, 1, true, '2026-01-23 17:16:08.129', '2026-01-23 17:16:08.129', NULL);
+(id, menu_id, user_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(2, 2, 1, true, '2025-12-09 18:10:48.935', '2025-12-09 18:10:48.935', NULL, NULL);
+
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(1, 1, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(2, 2, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(3, 3, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(4, 4, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(5, 5, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(6, 6, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(7, 7, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(8, 8, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(9, 9, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(10, 10, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(11, 12, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(12, 13, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(13, 14, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(14, 15, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(15, 16, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(16, 24, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(17, 25, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(18, 17, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(19, 23, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(20, 22, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(21, 18, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(22, 19, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(23, 21, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(24, 26, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(25, 27, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(26, 11, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(27, 28, 1, true, '2026-01-28 19:17:55.897', '2026-01-28 19:17:55.897', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(28, 1, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(29, 3, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(30, 14, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(31, 15, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(32, 17, 4, true, '2026-01-28 19:30:13.439', '2026-01-28 19:30:13.439', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(33, 28, 4, true, '2026-01-28 19:30:15.707', '2026-01-28 19:30:15.707', NULL, NULL);
+INSERT INTO public.menu_role
+(id, menu_id, role_id, is_active, created_at, updated_at, deleted_at, operator_id)
+VALUES(61, 29, 1, true, '2026-01-30 15:13:18.198', '2026-01-30 15:13:18.198', NULL, NULL);
