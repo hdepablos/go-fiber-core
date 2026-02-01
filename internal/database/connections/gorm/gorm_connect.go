@@ -60,8 +60,11 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 	// Logger GORM (imprime SQL fuera de producción)
 	// --------------------------------------------------
 	logLevel := logger.Silent
-	APP_ENV := "local"
-	if APP_ENV != "production" {
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "" {
+		appEnv = "local"
+	}
+	if appEnv != "production" {
 		logLevel = logger.Info
 	}
 

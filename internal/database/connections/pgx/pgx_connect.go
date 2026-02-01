@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"go-fiber-core/internal/dtos/config"
@@ -32,8 +33,11 @@ func NewPgxConnection(cfg config.PgxConnectionConfig) (*pgxpool.Pool, func(), er
 	// Logger PGX (pgx v5)
 	// --------------------------------------------------
 	logLevel := tracelog.LogLevelNone
-	APP_ENV := "local"
-	if APP_ENV != "production" {
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "" {
+		appEnv = "local"
+	}
+	if appEnv != "production" {
 		logLevel = tracelog.LogLevelInfo
 	}
 
