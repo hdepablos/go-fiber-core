@@ -10,6 +10,9 @@ import (
 // DatabaseHandler define la interfaz para el manejador de la base de datos.
 type DatabaseHandler interface {
 	HealthCheck(c *fiber.Ctx) error
+	HealthRedis(c *fiber.Ctx) error
+	HealthGorm(c *fiber.Ctx) error
+	HealthPgx(c *fiber.Ctx) error
 }
 
 // databaseHandler es la implementación.
@@ -45,4 +48,27 @@ func (h *databaseHandler) HealthCheck(c *fiber.Ctx) error {
 
 	// Devuelve una respuesta estandarizada usando el helper 'Success'.
 	return responses.Success(c, "Estado de las conexiones del sistema", fullStatus)
+}
+
+func (h *databaseHandler) HealthRedis(c *fiber.Ctx) error {
+	status := h.dbService.HealthRedis()
+	return responses.Success(c, "Estado de Redis", status)
+}
+
+func (h *databaseHandler) HealthGorm(c *fiber.Ctx) error {
+	write := h.dbService.HealthGormWrite()
+	read := h.dbService.HealthGormRead()
+	return responses.Success(c, "Estado de GORM", map[string]any{
+		"write": write,
+		"read":  read,
+	})
+}
+
+func (h *databaseHandler) HealthPgx(c *fiber.Ctx) error {
+	write := h.dbService.HealthPgxWrite()
+	read := h.dbService.HealthPgxRead()
+	return responses.Success(c, "Estado de PGX", map[string]any{
+		"write": write,
+		"read":  read,
+	})
 }

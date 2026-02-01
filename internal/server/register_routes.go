@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"time"
 
 	"go-fiber-core/internal/handlers"
 	"go-fiber-core/internal/middleware"
@@ -37,6 +38,7 @@ func (s *FiberServer) RegisterRoutes(
 
 	// --- Rutas Públicas ---
 	// No requieren token de autenticación.
+	api.Get("/health", s.HealthCheckHandler)      // Healthcheck de la aplicación
 	routes.RegisterAuthRoutes(api, authHandler)   // Registra /login y /refresh
 	routes.RegisterDatabaseRoutes(api, dbHandler) // Registra /health
 
@@ -60,6 +62,14 @@ func (s *FiberServer) HelloWorldHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Hello World!",
 		"IP":      getLocalIP(),
+	})
+}
+
+func (s *FiberServer) HealthCheckHandler(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
+		"status":    "UP",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"service":   "go-fiber-core",
 	})
 }
 
