@@ -63,3 +63,8 @@ output "invoke_arn" {
   description = "ARN de invocación para API Gateway"
   value       = aws_lambda_function.this.invoke_arn
 }
+
+output "role_name" {
+  description = "Nombre del rol IAM de la función"
+  value       = aws_iam_role.lambda_exec.name
+}
