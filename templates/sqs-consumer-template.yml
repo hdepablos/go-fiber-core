@@ -32,6 +32,7 @@ Resources:
               - sqs:ReceiveMessage
               - sqs:DeleteMessage
               - sqs:GetQueueAttributes
+              - sqs:SendMessage
             Resource: !Ref SqsQueueArn
         - Statement:
             Effect: Allow
