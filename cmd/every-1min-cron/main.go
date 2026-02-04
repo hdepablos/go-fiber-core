@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"go-fiber-core/cmd/api/di"
@@ -14,77 +12,36 @@ import (
 )
 
 var (
-	container  *di.AppContainer
-	appCleanup func()
-	configPath string
+	container *di.AppContainer
 )
 
-// initializeApp carga el grafo de dependencias completo (Servicios, Repos, Config)
-func initializeApp() {
-	if container != nil {
-		return
-	}
-
-	// Inicializamos el Contenedor que definimos en wire.go
-	res, cleanup, err := di.InitializeAppContainer(configPath)
+func init() {
+	// Inicialización Warm Start para Cron
+	res, _, err := di.InitializeAppContainer("config.yml")
 	if err != nil {
-		log.Fatalf("💀 Error crítico inicializando AppContainer: %v", err)
+		slog.Error("💀 Fallo crítico inicializando Cron 1min", "error", err)
+		os.Exit(1)
 	}
-
 	container = res
-	appCleanup = cleanup
-	log.Println("🚀 AppContainer: Infraestructura y servicios inyectados correctamente")
-
-	log.Println("######")
-	log.Println("mostrar variables config cron every 1min")
-	log.Printf("%+v\n", res.Config)
-	log.Println("######")
-
+	slog.Info("🚀 Cron 1min: Infraestructura lista")
 }
 
 func handleRequest(ctx context.Context, event events.CloudWatchEvent) error {
-	initializeApp()
+	slog.Info("⏰ Ejecutando Cron (Cada 1 Minuto)",
+		"env", container.Config.App.AppEnv,
+		"event_id", event.ID,
+		"source", event.Source,
+	)
 
-	fmt.Printf("go-fiber-core ===> Cron Every 1min ejecutándose en entorno: %s\n", container.Config.App.AppEnv)
+	// Lógica del Cron
+	// Ejemplo: Enviar heartbeat a SQS o limpiar caché
+	// msg := queue.Message{ID: uuid.New(), Type: "heartbeat"}
+	// err := container.QueueService.SendMessage(ctx, &msg)
 
-	// --- EJEMPLO DE USO DE SERVICIOS ---
-	// Aquí puedes usar cualquier servicio inyectado en el contenedor
-	// userService := container.UserReaderService
-	// data, err := userService.FindAll(ctx)
-
-	var BuildMarker = "lambda0every01min0cron"
-	_ = BuildMarker
-
-	log.Println("🔥 Iniciando en modo AWS lambda0every01min0cron")
+	slog.Info("✅ Tarea programada completada exitosamente")
 	return nil
 }
 
 func main() {
-	// Definir ruta de configuración
-	flagPath := flag.String("config", "internal/appconfig/config.yml", "Ruta al archivo YAML")
-	flag.Parse()
-	configPath = *flagPath
-
-	// Ejecución según el entorno
-	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" || os.Getenv("APP_ENV") == "lambda" {
-		log.Println("🔥 Iniciando modo AWS Lambda new v3 ...")
-		lambda.Start(handleRequest)
-	} else {
-		log.Println("🏠 Modo local detectado - Simulando evento...")
-
-		err := handleRequest(context.Background(), events.CloudWatchEvent{
-			DetailType: "Scheduled Event",
-			Source:     "aws.events",
-		})
-
-		if err != nil {
-			log.Fatalf("❌ Error en ejecución local: %v", err)
-		}
-
-		// En local cerramos las conexiones manualmente al terminar
-		if appCleanup != nil {
-			appCleanup()
-		}
-		log.Println("✅ Procesamiento local terminado.")
-	}
+	lambda.Start(handleRequest)
 }

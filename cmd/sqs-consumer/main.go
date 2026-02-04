@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"log"
-	"net/http"
+	"log/slog" // Uso de logger estructurado (Go 1.21+)
+	"os"
 
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/services/queue"
@@ -18,142 +17,73 @@ import (
 
 var (
 	appContainer *di.AppContainer
-	appCleanup   func()
-	configPath   string
 )
 
-// SNSMessage representa la estructura de notificaciones de AWS
-type SNSMessage struct {
-	Type         string `json:"Type"`
-	MessageId    string `json:"MessageId"`
-	TopicArn     string `json:"TopicArn"`
-	Subject      string `json:"Subject"`
-	Message      string `json:"Message"`
-	SubscribeURL string `json:"SubscribeURL"`
-	Token        string `json:"Token,omitempty"`
-}
-
-func initializeApp() {
-	if appContainer != nil {
-		return
-	}
-	res, cleanup, err := di.InitializeAppContainer(configPath)
+func init() {
+	// Inicializamos una sola vez al levantar el microcontenedor
+	res, _, err := di.InitializeAppContainer("config.yml")
 	if err != nil {
-		log.Fatalf("💀 Error en DI (sqs-consumer): %v", err)
+		slog.Error("Fallo crítico en DI", "error", err)
+		os.Exit(1)
 	}
 	appContainer = res
-	appCleanup = cleanup
-	log.Println("🚀 SQS Consumer: Infraestructura inyectada correctamente")
 }
 
-// Handler procesa el evento de SQS
-func Handler(ctx context.Context, event events.SQSEvent) (interface{}, error) {
-	initializeApp()
-
-	log.Printf("🔄 Recibidos %d registros para procesar", len(event.Records))
+// Handler usa SQSEventResponse para evitar re-procesar mensajes exitosos
+func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
+	batchItemFailures := []events.SQSBatchItemFailure{}
 
 	for _, record := range event.Records {
-		// Determinar si es un mensaje directo de SQS o viene envuelto en SNS
-		if isSNSMessage(record.Body) {
-			if err := handleSNS(ctx, record.Body); err != nil {
-				return nil, err // Provoca reintento en SQS
-			}
-		} else {
-			if err := handleStandardSQS(ctx, record); err != nil {
-				return nil, err // Provoca reintento en SQS -> Eventualmente DLQ
-			}
+		if err := processMessage(ctx, record); err != nil {
+			slog.Error("Error procesando mensaje", "id", record.MessageId, "error", err)
+			// Agregamos el ID fallido para que SQS solo reintente este
+			batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{
+				ItemIdentifier: record.MessageId,
+			})
 		}
 	}
 
-	return map[string]string{"status": "ok"}, nil
+	return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, nil
 }
 
-func isSNSMessage(body string) bool {
-	var m struct{ Type string }
-	_ = json.Unmarshal([]byte(body), &m)
-	return m.Type == "Notification" || m.Type == "SubscriptionConfirmation"
-}
-
-func handleSNS(ctx context.Context, body string) error {
-	var snsMsg SNSMessage
-	if err := json.Unmarshal([]byte(body), &snsMsg); err != nil {
-		return err
+func processMessage(ctx context.Context, record events.SQSMessage) error {
+	// 1. Unmarshal inicial para detectar origen
+	var wrapper struct {
+		Type    string `json:"Type"`
+		Message string `json:"Message"`
 	}
 
-	if snsMsg.Type == "SubscriptionConfirmation" && snsMsg.SubscribeURL != "" {
-		log.Printf("🔐 Confirmando suscripción SNS: %s", snsMsg.TopicArn)
-		resp, err := http.Get(snsMsg.SubscribeURL)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
+	bodyBytes := []byte(record.Body)
+	_ = json.Unmarshal(bodyBytes, &wrapper)
+
+	// 2. Lógica de Unwrapping de SNS
+	var finalPayload string
+	if wrapper.Type == "Notification" {
+		finalPayload = wrapper.Message
+	} else {
+		finalPayload = record.Body
+	}
+
+	// 3. Lógica de negocio
+	return handleBusinessLogic(ctx, finalPayload)
+}
+
+func handleBusinessLogic(ctx context.Context, rawData string) error {
+	var msg queue.Message
+	if err := json.Unmarshal([]byte(rawData), &msg); err != nil {
+		// Error de formato: No reintentar (mensaje venenoso)
+		slog.Warn("Mensaje malformado omitido", "body", rawData)
 		return nil
 	}
 
-	log.Printf("📢 SNS Notification recibida: %s", snsMsg.Subject)
-	return nil
-}
-
-func handleStandardSQS(ctx context.Context, record events.SQSMessage) error {
-	log.Printf("📦 Procesando mensaje: %s", record.MessageId)
-
-	// --- LÓGICA DE NEGOCIO Y PRUEBA DE DLQ ---
-	var msg queue.Message
-	if err := json.Unmarshal([]byte(record.Body), &msg); err != nil {
-		log.Printf("⚠️ Error unmarshaling: %v", err)
-		return nil // No reintentamos si el formato es inválido (venenoso)
-	}
-
-	// Lógica de fallo solicitada: Si el ID es 999, lanzamos error para que SQS reintente
-	// y tras N intentos (Redrive Policy) pase a la DLQ.
 	if msg.ID == "999" {
-		log.Printf("❌ ERROR SIMULADO: ID 999 detectado. Forzando reintento para activar DLQ.")
-		return fmt.Errorf("fallo intencional: mensaje con ID 999 enviado a reintento")
+		return fmt.Errorf("simulated failure for DLQ: %s", msg.ID)
 	}
 
-	// Aquí usarías tus servicios inyectados
-	// appContainer.Connect.ConnectGormWrite.Create(&SomeModel{...})
-
-	var BuildMarker = "lambda0sqs0consumer"
-	_ = BuildMarker
-
-	log.Println("🔥 Iniciando en modo AWS lambda0sqs0consumer")
-	log.Printf("✅ Mensaje %s procesado exitosamente", msg.ID)
-
+	slog.Info("Mensaje procesado con éxito", "msgID", msg.ID)
 	return nil
 }
 
 func main() {
-	fPath := flag.String("config", "internal/appconfig/config.yml", "Ruta al config")
-	flag.Parse()
-	configPath = *fPath
-
-	// if os.Getenv("APP_ENV") == "lambda" {
 	lambda.Start(Handler)
-	// } else {
-	// 	runLocal()
-	// }
-}
-
-func runLocal() {
-	log.Println("🏠 Ejecución Local (Simulación)")
-
-	// Caso que debe FALLAR para ir a DLQ
-	mockEvent := events.SQSEvent{
-		Records: []events.SQSMessage{
-			{
-				MessageId: "sqs-test-id-999",
-				Body:      `{"ID":"999", "Source":"CLI", "Body":"Este mensaje debe ir a la DLQ"}`,
-			},
-		},
-	}
-
-	_, err := Handler(context.Background(), mockEvent)
-	if err != nil {
-		log.Printf("🔴 Resultado esperado del test local: %v", err)
-	}
-
-	if appCleanup != nil {
-		appCleanup()
-	}
 }

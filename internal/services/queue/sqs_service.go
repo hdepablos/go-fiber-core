@@ -36,15 +36,20 @@ func NewSQSService(client *sqs.Client, queueURL string) *SQSService {
 	}
 }
 
-// SendMessage envía un mensaje a la cola SQS
+// SendMessage envía un mensaje a la cola SQS configurada por defecto
 func (s *SQSService) SendMessage(ctx context.Context, message *Message) error {
+	return s.SendMessageToUrl(ctx, s.queueURL, message)
+}
+
+// SendMessageToUrl envía un mensaje a una URL de cola específica
+func (s *SQSService) SendMessageToUrl(ctx context.Context, queueURL string, message *Message) error {
 	messageBody, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("error marshaling message: %w", err)
 	}
 
 	input := &sqs.SendMessageInput{
-		QueueUrl:    aws.String(s.queueURL),
+		QueueUrl:    aws.String(queueURL),
 		MessageBody: aws.String(string(messageBody)),
 		MessageAttributes: map[string]types.MessageAttributeValue{
 			"Source": {

@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	"go-fiber-core/cmd/api/di"
 
@@ -15,103 +15,66 @@ import (
 
 var (
 	appContainer *di.AppContainer
-	appCleanup   func()
-	configPath   string
 )
 
-// initializeApp se encarga de la Inyección de Dependencias (DI) usando Wire.
-func initializeApp() {
-	log.Println("****************************************************")
-	log.Println("****************************************************")
-	var BuildMarker = "lambda0dlq0consumer"
-	_ = BuildMarker
-
-	log.Println("🔥 Iniciando en modo AWS lambda0dlq0consumer")
-	log.Println("🚀 Inicializando aplicación DLQ Consumer...")
-	log.Println("****************************************************")
-	log.Println("****************************************************")
-
-	if appContainer != nil {
-		return
-	}
-
-	res, cleanup, err := di.InitializeAppContainer(configPath)
+func init() {
+	// Inicialización optimizada para Lambda (Warm Start)
+	// Se ejecuta una sola vez cuando el contenedor se levanta
+	res, _, err := di.InitializeAppContainer("config.yml")
 	if err != nil {
-		log.Fatalf("💀 Error fatal al inicializar dependencias (Wire): %v", err)
+		slog.Error("Fallo crítico inicializando dependencias (DLQ Consumer)", "error", err)
+		os.Exit(1)
 	}
-
 	appContainer = res
-	appCleanup = cleanup
-
-	log.Println("🚀 DLQ Consumer: Dependencias e infraestructura cargadas correctamente.")
+	slog.Info("🚀 DLQ Consumer: Infraestructura lista")
 }
 
-// Handler es el punto de entrada que AWS Lambda invoca ante un evento de SQS.
-func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
-	initializeApp()
+// Handler procesa mensajes de la DLQ usando SQSEventResponse para manejo parcial de fallos
+func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
+	batchItemFailures := []events.SQSBatchItemFailure{}
 
-	log.Printf("🌍 Evento recibido: %d mensajes a procesar.", len(sqsEvent.Records))
+	slog.Info("🌍 Evento DLQ recibido", "num_records", len(event.Records))
 
-	for _, message := range sqsEvent.Records {
-		log.Printf("📥 Procesando mensaje ID: %s", message.MessageId)
-
-		if err := processMessage(ctx, message); err != nil {
-			log.Printf("❌ Error al procesar mensaje %s: %v", message.MessageId, err)
-			return err
+	for _, record := range event.Records {
+		if err := processMessage(ctx, record); err != nil {
+			slog.Error("❌ Error procesando mensaje de DLQ", "msgID", record.MessageId, "error", err)
+			// Marcamos el mensaje para reintento (aunque en DLQ a veces se prefiere borrar y alertar)
+			// Dependiendo de la estrategia, podrías NO devolver el fallo para "drenar" la DLQ
+			// Pero por seguridad, mantenemos el patrón de no perder datos.
+			batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{
+				ItemIdentifier: record.MessageId,
+			})
 		}
 	}
 
-	log.Println("✅ Batch procesado exitosamente.")
+	return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, nil
+}
+
+func processMessage(ctx context.Context, record events.SQSMessage) error {
+	// Aquí normalmente implementarías lógica de:
+	// 1. Almacenar el mensaje fallido en una DB para auditoría
+	// 2. Enviar una alerta a Slack/Email
+	// 3. Intentar un reprocesamiento manual si aplica
+
+	slog.Info("📥 Analizando mensaje de DLQ", "msgID", record.MessageId, "body_preview", record.Body[:min(len(record.Body), 50)])
+
+	// Simulación de error si el cuerpo es "fail"
+	if record.Body == "fail" {
+		return fmt.Errorf("error simulado persistente en DLQ")
+	}
+
+	// Lógica de "Limpieza" o "Rescate" exitosa
+	slog.Info("✔️ Mensaje de DLQ procesado/auditado correctamente", "msgID", record.MessageId)
 	return nil
 }
 
-func processMessage(ctx context.Context, message events.SQSMessage) error {
-	// Ahora puedes usar appContainer.Connect.ConnectGormWrite para persistir datos
-	fmt.Printf("--- Cuerpo del Mensaje ---\n%s\n------------------------\n", message.Body)
-
-	if message.Body == "fail" {
-		return fmt.Errorf("error de negocio simulado para mensaje: %s", message.MessageId)
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
-
-	log.Printf("✔️ Mensaje %s procesado con éxito. Este es del DLQ !!!", message.MessageId)
-	return nil
+	return b
 }
 
 func main() {
-	// 1. Configuración de flags
-	// Es importante que configPath se asigne antes de llamar a initializeApp()
-	fPath := flag.String("config", "internal/appconfig/config.yml", "Ruta al archivo de configuración YAML")
-	flag.Parse()
-	configPath = *fPath
-
-	// if os.Getenv("APP_ENV") == "lambda" {
-	log.Println("🔥 Iniciando Lambda DLQ Consumer...")
 	lambda.Start(Handler)
-	// } else {
-	// 	runLocal()
-	// }
-}
-
-func runLocal() {
-	log.Println("🏠 Modo desarrollo local activado.")
-
-	event := events.SQSEvent{
-		Records: []events.SQSMessage{
-			{
-				MessageId: "local-dev-001",
-				Body:      "Mensaje de prueba local",
-			},
-		},
-	}
-
-	err := Handler(context.Background(), event)
-	if err != nil {
-		log.Printf("❌ Error en ejecución local: %v", err)
-	}
-
-	if appCleanup != nil {
-		log.Println("♻️ Ejecutando limpieza de conexiones...")
-		appCleanup()
-	}
-	log.Println("👋 Ejecución local terminada.")
 }

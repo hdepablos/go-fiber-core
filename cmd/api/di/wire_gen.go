@@ -7,6 +7,8 @@
 package di
 
 import (
+	"context"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -34,6 +36,7 @@ import (
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
+	"go-fiber-core/internal/services/queue"
 	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
 	"log"
@@ -189,6 +192,15 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
 	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
+	awsService, err := provideAWSService()
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	sqsService := provideSQSService(awsService)
 	appContainer := &AppContainer{
 		Config:            appConfig,
 		Connect:           connectDTO,
@@ -198,6 +210,7 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 		BankReaderService: bankReaderService,
 		AuthService:       authService,
 		DatabaseService:   databaseService,
+		QueueService:      sqsService,
 	}
 	return appContainer, func() {
 		cleanup4()
@@ -264,6 +277,7 @@ type AppContainer struct {
 	BankReaderService bank2.BankReaderService
 	AuthService       auth.AuthService
 	DatabaseService   *services.DatabaseService
+	QueueService      *queue.SQSService
 }
 
 // AWSConfigResponse se mantiene para compatibilidad si lo usas en otros lados
@@ -344,6 +358,17 @@ func provideSessionPaginationService() *pagination.PaginationService[models.Sess
 	return pagination.NewPaginationService[models.Session]()
 }
 
+func provideAWSService() (*queue.AWSService, error) {
+	return queue.NewAWSService(context.Background())
+}
+
+func provideSQSService(awsService *queue.AWSService) *queue.SQSService {
+	cfg := awsService.GetConfig()
+	client := sqs.NewFromConfig(cfg)
+	url := os.Getenv("SQS_QUEUE_URL")
+	return queue.NewSQSService(client, url)
+}
+
 var connectionSet = wire.NewSet(
 	provideGormService,
 	provideRedisClient,
@@ -359,7 +384,7 @@ var serviceSet = wire.NewSet(
 	provideBankPaginationService,
 	provideMenuUserPaginationService,
 	provideRolPaginationService,
-	provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService,
+	provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService, provideAWSService, provideSQSService,
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler, handlers.NewRolHandler, handlers.NewCatalogHandler)

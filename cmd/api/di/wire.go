@@ -4,6 +4,7 @@
 package di
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -30,9 +31,11 @@ import (
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
+	"go-fiber-core/internal/services/queue"
 	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
 
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -52,6 +55,7 @@ type AppContainer struct {
 	BankReaderService bank2.BankReaderService
 	AuthService       auth.AuthService
 	DatabaseService   *services.DatabaseService
+	QueueService      *queue.SQSService
 }
 
 // AWSConfigResponse se mantiene para compatibilidad si lo usas en otros lados
@@ -182,6 +186,17 @@ func provideSessionPaginationService() *pagination.PaginationService[models.Sess
 	return pagination.NewPaginationService[models.Session]()
 }
 
+func provideAWSService() (*queue.AWSService, error) {
+	return queue.NewAWSService(context.Background())
+}
+
+func provideSQSService(awsService *queue.AWSService) *queue.SQSService {
+	cfg := awsService.GetConfig()
+	client := sqs.NewFromConfig(cfg)
+	url := os.Getenv("SQS_QUEUE_URL")
+	return queue.NewSQSService(client, url)
+}
+
 // ──────────────────────────────
 // SETS
 // ──────────────────────────────
@@ -233,8 +248,8 @@ var serviceSet = wire.NewSet(
 	rol2.NewRolWriterService,
 	rol2.NewRolPaginationService,
 
-	menu_user2.NewMenuUserPaginationService,
-	catalog2.NewCatalogService,
+	menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService,
+	provideAWSService, provideSQSService,
 )
 
 var handlerSet = wire.NewSet(

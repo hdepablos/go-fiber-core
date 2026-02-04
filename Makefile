@@ -373,8 +373,17 @@ update-url-all: ## ✏️✏️ Sincroniza la URL en .env y Bruno.
 	@$(MAKE) update-env-url-base
 	@$(MAKE) update-bruno-url-base
 
+.PHONY: check-localstack
+check-localstack: ## 🩺 Verifica que LocalStack esté corriendo antes de ejecutar comandos.
+	@echo "$(INFO)🩺 Verificando estado de LocalStack...$(RESET)"
+	@if ! docker ps --format '{{.Names}}' | grep -q "^localstack$$"; then \
+		echo "$(ERROR)❌ LocalStack no está corriendo. Ejecuta 'make localstack-up' primero.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(SUCCESS)✅ LocalStack está operativo.$(RESET)"
+
 .PHONY: watch-lambda
-watch-lambda: ## 📊 Despliega infra, captura URL y sincroniza con Bruno.
+watch-lambda: check-localstack compile-all ## 📊 Compila, despliega infra, captura URL y sincroniza con Bruno.
 	@echo "$(INFO)🚀 Iniciando despliegue rápido de infraestructura...$(RESET)"
 	@$(MAKE) set-env ENV=lambda
 	@# Ejecutamos Terraform dentro de su carpeta

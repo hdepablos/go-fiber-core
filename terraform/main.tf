@@ -6,14 +6,18 @@ module "lambda_api" {
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-api"
   zip_path              = "${local.zip_path}/api.zip"
-  environment_variables = var.lambda_env_vars # Inyecta las variables de tu .tfvars
+  environment_variables = merge(var.lambda_env_vars, {
+    SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
+  })
 }
 
 module "lambda_sqs_consumer" {
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-sqs-consumer"
   zip_path              = "${local.zip_path}/sqs-consumer.zip"
-  environment_variables = var.lambda_env_vars
+  environment_variables = merge(var.lambda_env_vars, {
+    SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
+  })
 }
 
 module "lambda_dlq_consumer" {
@@ -27,14 +31,18 @@ module "lambda_daily_cron" {
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-daily-cron"
   zip_path              = "${local.zip_path}/daily-24-cron.zip"
-  environment_variables = var.lambda_env_vars
+  environment_variables = merge(var.lambda_env_vars, {
+    SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
+  })
 }
 
 module "lambda_every_1min_cron" {
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-1min-cron"
   zip_path              = "${local.zip_path}/every-1min-cron.zip"
-  environment_variables = var.lambda_env_vars
+  environment_variables = merge(var.lambda_env_vars, {
+    SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
+  })
 }
 
 # ==============================================================================
