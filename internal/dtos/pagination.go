@@ -18,6 +18,7 @@ type PaginationRequest struct {
 	RowsPerPage     int      `json:"rowsPerPage" mapstructure:"rowsPerPage"`
 	Page            int      `json:"page" mapstructure:"page"`
 	OptimizeWithKey string   `json:"optimize_with_key,omitempty" mapstructure:"optimize_with_key,omitempty"`
+	UserID uint `json:"user_id,omitempty"`
 }
 
 type PaginationResponse[T any] struct {

@@ -13,16 +13,18 @@ type MenuUser struct {
 	UserID uint `json:"user_id"`
 
 	Menu Menu `gorm:"foreignKey:MenuID"`
-	User User `gorm:"foreignKey:UserID"`
+	User User `gorm:"foreignKey:UserID;references:ID"`
 
 	OperatorID *uint `json:"operator_id"`
-	Operator   *User `gorm:"foreignKey:OperatorID"`
+	Operator   *User `gorm:"foreignKey:OperatorID;references:ID"`
+
 
 	IsActive  bool           `json:"is_active"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
+
 
 
 

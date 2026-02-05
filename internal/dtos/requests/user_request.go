@@ -24,6 +24,7 @@ type AssignRolesRequest struct {
 type UpdateUserRequest struct {
 	Name  string `json:"name" validate:"required"`
 	Email string `json:"email" validate:"required,email"`
+	RoleIDs  *[]uint64 `json:"role_ids,omitempty"`
 	// Podrías añadir más campos opcionales aquí si lo necesitas
 	// Password string `json:"password,omitempty" validate:"omitempty,min=8"`
 }

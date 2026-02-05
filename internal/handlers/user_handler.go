@@ -128,42 +128,50 @@ func (h *userHandler) GetUserByID(c *fiber.Ctx) error {
 func (h *userHandler) UpdateUser(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	// AÑADIDO: Obtener el ID de usuario del contexto
-	requestingUserID, err := getUserIDUint64FromCtx(ctx)
+	// 1️⃣ Obtenemos el operatorID del contexto
+	operatorID, err := getUserIDUint64FromCtx(ctx)
 	if err != nil {
 		return responses.Error(c, fiber.StatusUnauthorized, "Error de autenticación", err)
 	}
-	// ---
 
+	// 2️⃣ Obtenemos el ID del usuario a actualizar desde la URL
 	id, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
 		return domain.ErrInvalidArgument
 	}
 
-	log.Printf("Usuario %d está intentando actualizar al usuario %d", requestingUserID, id)
-
-	// LÓGICA DE NEGOCIO: Aquí podrías verificar permisos
-	// ej: if requestingUserID != id && !esAdmin(requestingUserID) {
-	// 	   return responses.Error(c, fiber.StatusForbidden, "No tiene permisos", nil)
-	// }
-
+	// 3️⃣ Parseamos la request
 	var req requests.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return domain.ErrInvalidArgument
 	}
 
-	updateDTO := userService.UpdateUserDTO{
-		Name:  &req.Name,
-		Email: &req.Email,
+	// 4️⃣ Preparamos los roles
+	var roleIDs []uint64
+	if req.RoleIDs != nil {
+		roleIDs = *req.RoleIDs
 	}
 
-	updatedUser, err := h.userWriter.Update(ctx, id, updateDTO)
+	// 5️⃣ Llamamos al service para actualizar usuario + roles
+	user, err := h.userWriter.UpdateUserWithRoles(
+		ctx,
+		id,
+		userService.UpdateUserDTO{
+			Name:  &req.Name,
+			Email: &req.Email,
+			// No hay Password ni IsActive, solo Name y Email
+		},
+		roleIDs,     // roles separados
+		operatorID,  // operador que hace el cambio
+	)
 	if err != nil {
-		return err
+		return responses.Error(c, fiber.StatusInternalServerError, "No se pudo actualizar el usuario", err)
 	}
 
-	return responses.Success(c, "Usuario actualizado exitosamente", updatedUser)
+	// 6️⃣ Respondemos con el usuario actualizado
+	return responses.Success(c, "Usuario actualizado exitosamente", user)
 }
+
 
 func (h *userHandler) SoftDelete(c *fiber.Ctx) error {
 	ctx := c.UserContext()

@@ -14,7 +14,7 @@ type User struct {
 	IsActive bool   `gorm:"not null;default:true" json:"is_active"`
 
 	OperatorID *uint64 `json:"operator_id,omitempty" gorm:"column:operator_id"`
-	Operator   *User   `gorm:"foreignKey:OperatorID"`
+	Operator   *User   `gorm:"foreignKey:OperatorID;references:ID"`
 	// Relación con roles (many-to-many a través de role_user)
 	Roles []Role `gorm:"many2many:role_user;joinForeignKey:UserID;joinReferences:RoleID" json:"roles,omitempty"`
 

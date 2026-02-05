@@ -1,11 +1,11 @@
 meta {
-  name: agg item_menu a users
+  name: update
   type: http
-  seq: 6
+  seq: 13
 }
 
-post {
-  url: {{urlBase}}api/v1/menus/users/bulk
+put {
+  url: {{urlBase}}api/v1/users/6
   body: json
   auth: bearer
 }
@@ -20,8 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "user_ids": [1],
-    "menu_ids": [29]
+    "name": "Juan Pérez",
+    "email": "juan.perez@email.com",
+    "role_ids": [4]
   }
-  
 }
