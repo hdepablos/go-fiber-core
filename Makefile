@@ -383,7 +383,8 @@ check-localstack: ## 🩺 Verifica que LocalStack esté corriendo antes de ejecu
 	@echo "$(SUCCESS)✅ LocalStack está operativo.$(RESET)"
 
 .PHONY: watch-lambda
-watch-lambda: check-localstack fast-deploy-all infra-deploy update-bruno logs-all ## 🚀👀 Actualiza código, infraestructura, bruno y muestra logs.
+watch-lambda: check-localstack fast-deploy-all infra-deploy update-bruno ## 🚀👀 Actualiza código, infraestructura y bruno (sin bloquear).
+	@echo "$(INFO)📺 Ejecuta 'make logs-all' si quieres Observar los logs de las funciones$(RESET)"
 
 .PHONY: update-bruno
 update-bruno: ## 🦁 Actualiza la URL de la API en Bruno
@@ -512,6 +513,7 @@ logs-all: ## 📊 Muestra logs de TODAS las lambdas (Sintaxis corregida)
 	@awslocal logs tail /aws/lambda/gofibercore-local-api --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-sqs-consumer --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-1min-cron --follow & \
+		awslocal logs tail /aws/lambda/gofibercore-local-daily-cron --follow & \
 		wait
 
 
@@ -560,8 +562,12 @@ fast-deploy: ## ⚡🚀 Compilación nativa + actualización directa (Sin Terraf
 	if [ "$(FOLDER)" = "every-1min-cron" ]; then FUNC_NAME="gofibercore-local-1min-cron"; fi; \
 	if [ "$(FOLDER)" = "daily-24-cron" ]; then FUNC_NAME="gofibercore-local-daily-cron"; fi; \
 	echo "🎯 Función destino: $$FUNC_NAME"; \
-	awslocal lambda update-function-code --function-name $$FUNC_NAME --zip-file fileb://sam-compile/$(FOLDER).zip >/dev/null; \
-	echo "$(SUCCESS)✅ Función actualizada exitosamente.$(RESET)"
+	if awslocal lambda get-function --function-name $$FUNC_NAME >/dev/null 2>&1; then \
+		awslocal lambda update-function-code --function-name $$FUNC_NAME --zip-file fileb://sam-compile/$(FOLDER).zip >/dev/null; \
+		echo "$(SUCCESS)✅ Función actualizada exitosamente.$(RESET)"; \
+	else \
+		echo "$(WARNING)⚠️  Función $$FUNC_NAME no encontrada. Se omitirá actualización directa (Terraform la creará).$(RESET)"; \
+	fi
 
 .PHONY: fast-deploy-all
 fast-deploy-all: ## ⚡🚀⚡ Actualiza TODAS las funciones rápidamente (Ideal si cambiaste internal/...).
@@ -648,10 +654,6 @@ watch: ## 🏎️ Inicia API con live-reload (Air).
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
 	$(DC_BASE) -p $(PROJECT_SLUG)-local up --remove-orphans --force-recreate
 
-.PHONY: watch-lambda
-watch-lambda: ## 🏎️🚀 Actualiza TODO el código y luego sigue los logs de todas las lambdas.
-	@$(MAKE) fast-deploy-all
-	@$(MAKE) logs-all
 
 
 
