@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"os"
+	"runtime"
 
 	"go-fiber-core/cmd/api/di"
 
@@ -33,6 +35,15 @@ func init() {
 }
 
 func handleRequest(ctx context.Context, event events.CloudWatchEvent) error {
+	// --- LOGS DE RENDIMIENTO ---
+	numCPU := runtime.NumCPU()
+	numGoroutines := runtime.NumGoroutine()
+	log.Printf("🚀 --- LOGS DE RENDIMIENTO ---\n")
+	log.Printf("💻 CPUs disponibles: %d\n", numCPU)
+	log.Printf("🔄 Goroutines iniciales: %d\n", numGoroutines)
+	log.Printf("🏗️ Arquitectura: %s\n", runtime.GOARCH)
+	// ---------------------------
+
 	slog.Info("🗓️ Ejecutando Cron Diario (Daily)",
 		"env", container.Config.App.AppEnv,
 		"event_id", event.ID,

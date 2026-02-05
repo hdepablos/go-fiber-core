@@ -52,7 +52,7 @@ func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventRespons
 
 	for _, record := range event.Records {
 		if err := processMessage(ctx, record); err != nil {
-			slog.Error("Error procesando mensaje", "id", record.MessageId, "error", err)
+			slog.Error("❌ Error procesando mensaje", "id", record.MessageId, "error", err)
 			// Retornamos el error globalmente para que Lambda marque todo el lote como fallido.
 			// Esto fuerza el reintento gestionado por la política de SQS (VisibilityTimeout + maxReceiveCount).
 			// Si usamos BatchItemFailures, SQS borra los exitosos y reencola los fallidos,
