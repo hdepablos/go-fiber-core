@@ -4,18 +4,18 @@ import "time"
 
 // MenuUserResponse representa la respuesta para un elemento de MenuUser.
 type MenuUserResponse struct {
-	ID         uint          `json:"id"`
-	MenuID     uint          `json:"menu_id"`
-	UserID     uint64        `json:"user_id"`
-	OperatorID *uint64       `json:"operator_id"`
-	IsActive   bool          `json:"is_active"`
-	CreatedAt  time.Time     `json:"created_at"`
-	UpdatedAt  time.Time     `json:"updated_at"`
-	
+	ID         uint      `json:"id"`
+	MenuID     uint      `json:"menu_id"`
+	UserID     uint64    `json:"user_id"`
+	OperatorID *uint64   `json:"operator_id"`
+	IsActive   bool      `json:"is_active"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+
 	// Objetos anidados simplificados o completos según necesidad
-	Menu       *MenuSimpleResponse `json:"Menu"`
-	User       *UserSimpleResponse `json:"User"`
-	Operator   *UserSimpleResponse `json:"Operator"`
+	Menu     *MenuSimpleResponse `json:"Menu"`
+	User     *UserSimpleResponse `json:"User"`
+	Operator *UserSimpleResponse `json:"Operator"`
 }
 
 type MenuSimpleResponse struct {
