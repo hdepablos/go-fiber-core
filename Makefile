@@ -550,6 +550,28 @@ update-fn: ## 🔄 Actualización rápida de código en LocalStack.
 
 	@echo "$(SUCCESS)🚀 ZIP listo y verificado.$(RESET)"
 
+.PHONY: fast-deploy
+fast-deploy: ## ⚡🚀 Compilación nativa + actualización directa (Sin Terraform/Docker). Uso: make fast-deploy FOLDER=api
+	@if [ -z "$(FOLDER)" ]; then echo "$(ERROR)❌ Debes especificar FOLDER (ej: api, sqs-consumer)$(RESET)"; exit 1; fi
+	@$(MAKE) update-fn FOLDER=$(FOLDER)
+	@echo "$(INFO)🔄 Actualizando código en LocalStack...$(RESET)"
+	@# Mapeo de nombres de carpeta a nombres de función en LocalStack
+	@FUNC_NAME="gofibercore-local-$(FOLDER)"; \
+	if [ "$(FOLDER)" = "every-1min-cron" ]; then FUNC_NAME="gofibercore-local-1min-cron"; fi; \
+	if [ "$(FOLDER)" = "daily-24-cron" ]; then FUNC_NAME="gofibercore-local-daily-cron"; fi; \
+	echo "🎯 Función destino: $$FUNC_NAME"; \
+	awslocal lambda update-function-code --function-name $$FUNC_NAME --zip-file fileb://sam-compile/$(FOLDER).zip >/dev/null; \
+	echo "$(SUCCESS)✅ Función actualizada exitosamente.$(RESET)"
+
+.PHONY: fast-deploy-all
+fast-deploy-all: ## ⚡🚀⚡ Actualiza TODAS las funciones rápidamente (Ideal si cambiaste internal/...).
+	@echo "$(INFO)🚀 Iniciando actualización masiva rápida...$(RESET)"
+	@for folder in $(FOLDERS); do \
+		echo "$(INFO)⏩ Procesando $$folder...$(RESET)"; \
+		$(MAKE) fast-deploy FOLDER=$$folder; \
+	done
+	@echo "$(SUCCESS)🔥 Todo el stack (código) ha sido actualizado.$(RESET)"
+
 .PHONY: compile-all
 compile-all: ## 🏗️🏗️ Compila todas las funciones del proyecto.
 	@for folder in $(FOLDERS); do $(MAKE) compile-fn FOLDER=$$folder || exit 1; done
@@ -625,6 +647,12 @@ watch: ## 🏎️ Inicia API con live-reload (Air).
 	@$(MAKE) update-bruno-url-base ENV=local
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
 	$(DC_BASE) -p $(PROJECT_SLUG)-local up --remove-orphans --force-recreate
+
+.PHONY: watch-lambda
+watch-lambda: ## 🏎️🚀 Actualiza TODO el código y luego sigue los logs de todas las lambdas.
+	@$(MAKE) fast-deploy-all
+	@$(MAKE) logs-all
+
 
 
 .PHONY: aws-down

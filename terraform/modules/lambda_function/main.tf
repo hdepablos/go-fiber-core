@@ -2,6 +2,11 @@ variable "function_name" {}
 variable "zip_path" {}
 variable "handler" { default = "bootstrap" }
 variable "runtime" { default = "provided.al2023" }
+variable "memory_size" { default = 128 }
+variable "architectures" {
+  type    = list(string)
+  default = ["x86_64"]
+}
 variable "environment_variables" {
   type    = map(string)
   default = {}
@@ -13,9 +18,10 @@ resource "aws_lambda_function" "this" {
   source_code_hash = filebase64sha256(var.zip_path)
   handler          = var.handler
   runtime          = var.runtime
+  architectures    = var.architectures
   role             = aws_iam_role.lambda_exec.arn
   timeout          = 30 # Aumentado a 30s para conexiones a DB/Redis
-  memory_size      = 128
+  memory_size      = var.memory_size
 
   environment {
     variables = var.environment_variables

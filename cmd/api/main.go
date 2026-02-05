@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"time"
 
 	"go-fiber-core/cmd/api/di"
@@ -30,6 +32,15 @@ func initializeLambdaApp() {
 
 // Handler is the Lambda entry point
 func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// --- LOGS DE RENDIMIENTO ---
+	numCPU := runtime.NumCPU()
+	numGoroutines := runtime.NumGoroutine()
+	fmt.Printf("--- LOGS DE RENDIMIENTO ---\n")
+	fmt.Printf("CPUs disponibles: %d\n", numCPU)
+	fmt.Printf("Goroutines iniciales: %d\n", numGoroutines)
+	fmt.Printf("Arquitectura: %s\n", runtime.GOARCH)
+	// ---------------------------
+
 	if fiberLambda == nil {
 		initializeLambdaApp()
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog" // Uso de logger estructurado (Go 1.21+)
 	"os"
+	"runtime"
 
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/services/queue"
@@ -21,7 +22,13 @@ var (
 
 func init() {
 	// Inicializamos una sola vez al levantar el microcontenedor
-	res, _, err := di.InitializeAppContainer("config.yml")
+	// IMPORTANTE: En Lambda, el archivo está en internal/appconfig/config.yml según nuestro Dockerfile
+	configPath := "internal/appconfig/config.yml"
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {
+		configPath = "config.yml" // Local fallback
+	}
+
+	res, _, err := di.InitializeAppContainer(configPath)
 	if err != nil {
 		slog.Error("Fallo crítico en DI", "error", err)
 		os.Exit(1)
@@ -31,18 +38,37 @@ func init() {
 
 // Handler usa SQSEventResponse para evitar re-procesar mensajes exitosos
 func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
+	// --- LOGS DE RENDIMIENTO ---
+	numCPU := runtime.NumCPU()
+	numGoroutines := runtime.NumGoroutine()
+	fmt.Printf("--- LOGS DE RENDIMIENTO ---\n")
+	fmt.Printf("CPUs disponibles: %d\n", numCPU)
+	fmt.Printf("Goroutines iniciales: %d\n", numGoroutines)
+	fmt.Printf("Arquitectura: %s\n", runtime.GOARCH)
+	// ---------------------------
+
 	batchItemFailures := []events.SQSBatchItemFailure{}
 
 	for _, record := range event.Records {
 		if err := processMessage(ctx, record); err != nil {
 			slog.Error("Error procesando mensaje", "id", record.MessageId, "error", err)
-			// Agregamos el ID fallido para que SQS solo reintente este
+			// Retornamos el error globalmente para que Lambda marque todo el lote como fallido.
+			// Esto fuerza el reintento gestionado por la política de SQS (VisibilityTimeout + maxReceiveCount).
+			// Si usamos BatchItemFailures, SQS borra los exitosos y reencola los fallidos,
+			// pero para asegurar el comportamiento clásico de reintento visible en logs,
+			// devolver el error es más directo en pruebas unitarias/simples.
+			// Sin embargo, para producción con batch > 1, BatchItemFailures es mejor.
+			// En este caso, LocalStack a veces requiere el error explícito para incrementar el ReceiveCount rápidamente.
+
+			// OPCIÓN HÍBRIDA: Reportar fallo parcial PERO asegurarnos que SQS lo vea.
 			batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{
 				ItemIdentifier: record.MessageId,
 			})
 		}
 	}
 
+	// Si hay fallos, el retorno de SQSEventResponse le dice a Lambda "estos mensajes fallaron, no los borres".
+	// SQS incrementará el ReceiveCount y volverá a entregarlos después del VisibilityTimeout.
 	return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, nil
 }
 

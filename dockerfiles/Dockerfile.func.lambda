@@ -13,7 +13,7 @@ COPY . .
 RUN go mod tidy && go mod vendor
 
 # Compila
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
 	go build -mod=vendor -ldflags="-s -w" \
 	-o bootstrap ./cmd/${FOLDER}
 
@@ -30,3 +30,6 @@ COPY --from=builder /app/.env ./.env
 # Creamos la carpeta interna para que Go la encuentre en la misma ruta relativa
 RUN mkdir -p internal/appconfig
 COPY --from=builder /app/internal/appconfig/config.yml ./internal/appconfig/config.yml
+
+# Ajustamos permisos por si acaso
+RUN chmod 644 internal/appconfig/config.yml

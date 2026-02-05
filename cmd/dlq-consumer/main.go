@@ -20,7 +20,13 @@ var (
 func init() {
 	// Inicialización optimizada para Lambda (Warm Start)
 	// Se ejecuta una sola vez cuando el contenedor se levanta
-	res, _, err := di.InitializeAppContainer("config.yml")
+	// IMPORTANTE: En Lambda, el archivo está en internal/appconfig/config.yml según nuestro Dockerfile
+	configPath := "internal/appconfig/config.yml"
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {
+		configPath = "config.yml" // Local fallback
+	}
+
+	res, _, err := di.InitializeAppContainer(configPath)
 	if err != nil {
 		slog.Error("Fallo crítico inicializando dependencias (DLQ Consumer)", "error", err)
 		os.Exit(1)

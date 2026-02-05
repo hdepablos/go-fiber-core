@@ -5,20 +5,21 @@ resource "aws_sqs_queue" "dlq" {
 
 # --- COLA PRINCIPAL CON REDRIVE POLICY ---
 resource "aws_sqs_queue" "main_queue" {
-  name                       = "gofibercorequeue" # El nombre que esperas
+  name                       = "gofibercorequeue"
   visibility_timeout_seconds = 30
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq.arn
-    maxReceiveCount     = 3 # Al 4to intento fallido, salta a la DLQ
+    maxReceiveCount     = 3
   })
 }
 
 # --- TRIGGER: SQS PRINCIPAL -> SQS CONSUMER ---
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = aws_sqs_queue.main_queue.arn
-  function_name    = module.lambda_sqs_consumer.function_name
-  batch_size       = 1
+  event_source_arn        = aws_sqs_queue.main_queue.arn
+  function_name           = module.lambda_sqs_consumer.function_name
+  batch_size              = 1
+  function_response_types = ["ReportBatchItemFailures"]
 }
 
 # --- TRIGGER: DLQ -> DLQ CONSUMER ---

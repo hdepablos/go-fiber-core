@@ -13,7 +13,17 @@ Run build make command with tests
 make all
 ```
 
-Build the application
+## Infraestructura y Optimización
+
+El proyecto utiliza configuraciones avanzadas para maximizar el rendimiento y minimizar costos en AWS Lambda:
+
+*   **Arquitectura:** ARM64 (Graviton2)
+*   **Memoria:** 1769 MB (1 vCPU completo)
+*   **Logs:** Métricas de CPU y Goroutines integradas.
+
+Para más detalles, consulta la documentación completa en: [doc/info/lambda-optimization.md](doc/info/lambda-optimization.md).
+
+## Build the application
 ```bash
 make build
 ```

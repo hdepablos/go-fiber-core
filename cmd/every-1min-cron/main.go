@@ -17,7 +17,13 @@ var (
 
 func init() {
 	// Inicialización Warm Start para Cron
-	res, _, err := di.InitializeAppContainer("config.yml")
+	// IMPORTANTE: En Lambda, el archivo está en internal/appconfig/config.yml según nuestro Dockerfile
+	configPath := "internal/appconfig/config.yml"
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") == "" {
+		configPath = "config.yml" // Local fallback
+	}
+
+	res, _, err := di.InitializeAppContainer(configPath)
 	if err != nil {
 		slog.Error("💀 Fallo crítico inicializando Cron 1min", "error", err)
 		os.Exit(1)
