@@ -28,6 +28,11 @@ resource "aws_lambda_function" "this" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "this" {
+  name              = "/aws/lambda/${var.function_name}"
+  retention_in_days = 1
+}
+
 # --- IAM ROLE ---
 resource "aws_iam_role" "lambda_exec" {
   name = "${var.function_name}_role"

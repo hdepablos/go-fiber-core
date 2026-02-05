@@ -19,11 +19,29 @@ resource "aws_api_gateway_method" "proxy_method" {
   authorization = "NONE"
 }
 
-# 4. Integración con la Lambda
+# 3.1 Método Raíz (para GET /)
+resource "aws_api_gateway_method" "root_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_rest_api.api.root_resource_id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+# 4. Integración con la Lambda (Proxy)
 resource "aws_api_gateway_integration" "lambda_integration" {
   rest_api_id             = aws_api_gateway_rest_api.api.id
   resource_id             = aws_api_gateway_resource.proxy.id
   http_method             = aws_api_gateway_method.proxy_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${module.lambda_api.function_arn}/invocations"
+}
+
+# 4.1 Integración con la Lambda (Raíz)
+resource "aws_api_gateway_integration" "root_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_rest_api.api.root_resource_id
+  http_method             = aws_api_gateway_method.root_method.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${module.lambda_api.function_arn}/invocations"
@@ -40,7 +58,10 @@ resource "aws_lambda_permission" "apigw_lambda" {
 
 # 6. Deployment
 resource "aws_api_gateway_deployment" "deployment" {
-  depends_on  = [aws_api_gateway_integration.lambda_integration]
+  depends_on  = [
+    aws_api_gateway_integration.lambda_integration,
+    aws_api_gateway_integration.root_integration
+  ]
   rest_api_id = aws_api_gateway_rest_api.api.id
 
   # Este bloque asegura que si cambias recursos o métodos, el despliegue se actualice
@@ -48,7 +69,9 @@ resource "aws_api_gateway_deployment" "deployment" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.proxy,
       aws_api_gateway_method.proxy_method,
+      aws_api_gateway_method.root_method,
       aws_api_gateway_integration.lambda_integration,
+      aws_api_gateway_integration.root_integration,
     ]))
   }
 

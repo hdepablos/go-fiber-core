@@ -1,1 +1,1 @@
-null
+{"statusCode":200,"headers":null,"multiValueHeaders":{"Content-Type":["application/json"],"Vary":["Origin"]},"body":"{\"IP\":\"172.17.0.12\",\"message\":\"Hello World!\"}"}

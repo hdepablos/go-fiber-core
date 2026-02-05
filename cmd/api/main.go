@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -35,10 +34,10 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	// --- LOGS DE RENDIMIENTO ---
 	numCPU := runtime.NumCPU()
 	numGoroutines := runtime.NumGoroutine()
-	fmt.Printf("--- LOGS DE RENDIMIENTO ---\n")
-	fmt.Printf("CPUs disponibles: %d\n", numCPU)
-	fmt.Printf("Goroutines iniciales: %d\n", numGoroutines)
-	fmt.Printf("Arquitectura: %s\n", runtime.GOARCH)
+	log.Printf("🚀 --- LOGS DE RENDIMIENTO ---\n")
+	log.Printf("💻 CPUs disponibles: %d\n", numCPU)
+	log.Printf("🔄 Goroutines iniciales: %d\n", numGoroutines)
+	log.Printf("🏗️ Arquitectura: %s\n", runtime.GOARCH)
 	// ---------------------------
 
 	if fiberLambda == nil {

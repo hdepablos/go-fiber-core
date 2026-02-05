@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"log/slog" // Uso de logger estructurado (Go 1.21+)
 	"os"
 	"runtime"
@@ -41,10 +42,10 @@ func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventRespons
 	// --- LOGS DE RENDIMIENTO ---
 	numCPU := runtime.NumCPU()
 	numGoroutines := runtime.NumGoroutine()
-	fmt.Printf("--- LOGS DE RENDIMIENTO ---\n")
-	fmt.Printf("CPUs disponibles: %d\n", numCPU)
-	fmt.Printf("Goroutines iniciales: %d\n", numGoroutines)
-	fmt.Printf("Arquitectura: %s\n", runtime.GOARCH)
+	log.Printf("🚀 --- LOGS DE RENDIMIENTO ---\n")
+	log.Printf("💻 CPUs disponibles: %d\n", numCPU)
+	log.Printf("🔄 Goroutines iniciales: %d\n", numGoroutines)
+	log.Printf("🏗️ Arquitectura: %s\n", runtime.GOARCH)
 	// ---------------------------
 
 	batchItemFailures := []events.SQSBatchItemFailure{}

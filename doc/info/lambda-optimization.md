@@ -15,10 +15,10 @@ numCPU := runtime.NumCPU()
 // Esto te dice cuántas Goroutines están vivas ahora mismo
 numGoroutines := runtime.NumGoroutine()
 
-fmt.Printf("--- LOGS DE RENDIMIENTO ---\n")
-fmt.Printf("CPUs disponibles: %d\n", numCPU)
-fmt.Printf("Goroutines iniciales: %d\n", numGoroutines)
-fmt.Printf("Arquitectura: %s\n", runtime.GOARCH)
+log.Printf("🚀 --- LOGS DE RENDIMIENTO ---\n")
+log.Printf("💻 CPUs disponibles: %d\n", numCPU)
+log.Printf("🔄 Goroutines iniciales: %d\n", numGoroutines)
+log.Printf("🏗️ Arquitectura: %s\n", runtime.GOARCH)
 ```
 
 ## 2. Arquitectura ARM64 (Graviton2)

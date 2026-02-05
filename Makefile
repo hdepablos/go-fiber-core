@@ -383,18 +383,18 @@ check-localstack: ## 🩺 Verifica que LocalStack esté corriendo antes de ejecu
 	@echo "$(SUCCESS)✅ LocalStack está operativo.$(RESET)"
 
 .PHONY: watch-lambda
-watch-lambda: check-localstack compile-all ## 📊 Compila, despliega infra, captura URL y sincroniza con Bruno.
-	@echo "$(INFO)🚀 Iniciando despliegue rápido de infraestructura...$(RESET)"
-	@$(MAKE) set-env ENV=lambda
-	@# Ejecutamos Terraform dentro de su carpeta
-	@cd terraform && tflocal apply \
-		-var-file="local.tfvars" \
-		-auto-approve \
-		-refresh=true \
-		-parallelism=10
-	@$(MAKE) write-api-base
-	@$(MAKE) update-bruno-url-base ENV=lambda
-	@echo "$(SUCCESS)🔥 Entorno Lambda actualizado y sincronizado con Bruno.$(RESET)"
+watch-lambda: check-localstack fast-deploy-all infra-deploy update-bruno logs-all ## 🚀👀 Actualiza código, infraestructura, bruno y muestra logs.
+
+.PHONY: update-bruno
+update-bruno: ## 🦁 Actualiza la URL de la API en Bruno
+	@echo "$(INFO)🔄 Actualizando URL en Bruno...$(RESET)"
+	@API_ID=$$(awslocal apigateway get-rest-apis --query "items[0].id" --output text); \
+	if [ -z "$$API_ID" ] || [ "$$API_ID" = "None" ]; then \
+		echo "$(ERROR)❌ No se encontró API Gateway ID.$(RESET)"; \
+	else \
+		sed -i '' "s|urlBase: http://localhost:4566/restapis/[a-z0-9]*/Prod/_user_request_/|urlBase: http://localhost:4566/restapis/$$API_ID/Prod/_user_request_/|g" bruno/environments/lambda.bru; \
+		echo "$(SUCCESS)✅ Bruno actualizado con API ID: $$API_ID$(RESET)"; \
+	fi
 
 
 .PHONY: write-api-base
