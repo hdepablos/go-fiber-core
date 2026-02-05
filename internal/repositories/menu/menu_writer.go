@@ -30,7 +30,7 @@ func (r *menuWriterRepository) AddBulkUsers(
 		for _, uid := range userIDs {
 			relations = append(relations, models.MenuUser{
 				MenuID:   uint(mid),
-				UserID:   uint(uid),
+				UserID:   uid,
 				IsActive: true,
 			})
 		}
