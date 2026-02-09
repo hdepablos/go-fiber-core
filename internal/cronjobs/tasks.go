@@ -18,7 +18,7 @@ func InitCronJobs() {
 		performDataCleanup()
 	})
 	if err != nil {
-		log.Fatalf("Error al agregar tarea cron: %v", err)
+		log.Printf("Error al agregar tarea cron (limpieza): %v", err)
 	}
 
 	// Agregar otra tarea que se ejecute cada 1 minuto
@@ -28,7 +28,7 @@ func InitCronJobs() {
 		sendNotifications()
 	})
 	if err != nil {
-		log.Fatalf("Error al agregar tarea cron: %v", err)
+		log.Printf("Error al agregar tarea cron (notificaciones): %v", err)
 	}
 
 	// Iniciar el cron

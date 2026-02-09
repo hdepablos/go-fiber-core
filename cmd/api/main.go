@@ -22,7 +22,8 @@ func initializeLambdaApp() {
 	// In Lambda, we use the config file copied to the internal directory
 	server, _, err := di.InitializeServer("internal/appconfig/config.yml")
 	if err != nil {
-		log.Fatalf("❌ Error initializing server: %v", err)
+		log.Printf("❌ Error initializing server: %v", err)
+		return
 	}
 
 	fiberLambda = fiberadapter.New(server.App)
@@ -63,7 +64,8 @@ func main() {
 		// Use the same config path as local development usually runs from root
 		server, cleanup, err := di.InitializeServer("internal/appconfig/config.yml")
 		if err != nil {
-			log.Fatalf("❌ Error initializing server: %v", err)
+			log.Printf("❌ Error initializing server: %v", err)
+			return
 		}
 		defer cleanup()
 
@@ -74,7 +76,7 @@ func main() {
 
 		log.Printf("✅ Server listening on port %s", port)
 		if err := server.Listen(":" + port); err != nil {
-			log.Fatalf("❌ Error starting server: %v", err)
+			log.Printf("❌ Error starting server: %v", err)
 		}
 	}
 }
