@@ -55,17 +55,17 @@ func createLogger(name string) *zap.Logger {
 
 	// Configuración de Encoder (JSON Estructurado)
 	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:      "timestamp",
-		LevelKey:     "level",
-		NameKey:      "logger",
-		CallerKey:    "caller",
-		MessageKey:   "message",
-		StacktraceKey: "stacktrace",
-		LineEnding:   zapcore.DefaultLineEnding,
-		EncodeLevel:  zapcore.CapitalLevelEncoder,
-		EncodeTime:   zapcore.ISO8601TimeEncoder, // 2006-01-02T15:04:05.000Z
+		TimeKey:        "timestamp",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "message",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder, // 2006-01-02T15:04:05.000Z
 		EncodeDuration: zapcore.MillisDurationEncoder,
-		EncodeCaller: zapcore.ShortCallerEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
 	// Lógica de Salida según Entorno
@@ -73,13 +73,13 @@ func createLogger(name string) *zap.Logger {
 		// --- MODO LOCAL: Archivos (Lumberjack) ---
 		now := time.Now().Format("2006-01-02")
 		logDir := "pkg/logs"
-		
+
 		// Asegurar que el directorio padre existe
-		// Si 'name' contiene slashes (ej: "auth/login"), filepath.Join lo manejará, 
+		// Si 'name' contiene slashes (ej: "auth/login"), filepath.Join lo manejará,
 		// pero debemos asegurar que el directorio exista.
 		logPath := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", name, now))
 		dir := filepath.Dir(logPath)
-		
+
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			// Fallback a Stdout si falla el FS
 			fmt.Fprintf(os.Stderr, "Error creating log directory %s: %v. Falling back to Stdout.\n", dir, err)
@@ -102,7 +102,7 @@ func createLogger(name string) *zap.Logger {
 	// Determinar nivel de log
 	logLevelStr := os.Getenv("LOG_LEVEL")
 	var logLevel zapcore.Level
-	
+
 	if logLevelStr != "" {
 		// Intentar parsear el nivel configurado explícitamente
 		if err := logLevel.UnmarshalText([]byte(logLevelStr)); err != nil {
@@ -113,7 +113,7 @@ func createLogger(name string) *zap.Logger {
 		if strings.ToLower(appEnv) == "local" {
 			logLevel = zapcore.DebugLevel // Local: Ver todo (Debug)
 		} else {
-			logLevel = zapcore.InfoLevel  // Prod: Solo Info y superior (Ignora Debug)
+			logLevel = zapcore.InfoLevel // Prod: Solo Info y superior (Ignora Debug)
 		}
 	}
 
@@ -137,7 +137,7 @@ func createLogger(name string) *zap.Logger {
 	// Simplemente re-leemos o usamos la variable appEnv definida arriba si estuviera en scope.
 	// Como appEnv se definió al principio de la función, podemos reusarla si no hay shadowing,
 	// pero para evitar líos de scope en este bloque, simplemente verificamos os.Getenv directo o reutilizamos sin :=
-	
+
 	// La variable appEnv ya existe en la función createLogger (línea 48).
 	if Developer != "" && (strings.ToLower(os.Getenv("APP_ENV")) == "local" || os.Getenv("APP_ENV") == "") {
 		initialFields = append(initialFields, zap.String("developer", Developer))
