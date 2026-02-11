@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,23 +60,7 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 	// --------------------------------------------------
 	// Logger GORM (imprime SQL fuera de producción)
 	// --------------------------------------------------
-	logLevel := logger.Silent
-	appEnv := os.Getenv("APP_ENV")
-	if appEnv == "" {
-		appEnv = "local"
-	}
-	if appEnv != "production" {
-		logLevel = logger.Info
-	}
-
-	gormLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold: time.Second,
-			LogLevel:      logLevel,
-			Colorful:      true,
-		},
-	)
+	gormLogger := getGormLogger(log.New(os.Stdout, "\r\n", log.LstdFlags))
 
 	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: gormLogger,
@@ -99,6 +84,52 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 
 	log.Printf("✅ Conexión GORM exitosa a %s", cfg.Host)
 	return db, sqlDB, nil
+}
+
+func getGormLogger(writer logger.Writer) logger.Interface {
+	logLevel := logger.Silent
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "" {
+		appEnv = "local"
+	}
+
+	// Default behavior based on APP_ENV
+	if appEnv != "production" {
+		logLevel = logger.Info
+	}
+
+	// Override with DB_LOG_LEVEL if set
+	// Values: silent, error, warn, info
+	if envLogLevel := os.Getenv("DB_LOG_LEVEL"); envLogLevel != "" {
+		switch strings.ToLower(envLogLevel) {
+		case "silent":
+			logLevel = logger.Silent
+		case "error":
+			logLevel = logger.Error
+		case "warn":
+			logLevel = logger.Warn
+		case "info":
+			logLevel = logger.Info
+		}
+	}
+
+	// Configurar Slow Threshold (Default: 1s)
+	// Se puede sobrescribir con DB_SLOW_THRESHOLD_MS (en milisegundos)
+	slowThreshold := time.Second
+	if envSlowThreshold := os.Getenv("DB_SLOW_THRESHOLD_MS"); envSlowThreshold != "" {
+		if ms, err := strconv.Atoi(envSlowThreshold); err == nil && ms > 0 {
+			slowThreshold = time.Duration(ms) * time.Millisecond
+		}
+	}
+
+	return logger.New(
+		writer,
+		logger.Config{
+			SlowThreshold: slowThreshold,
+			LogLevel:      logLevel,
+			Colorful:      true,
+		},
+	)
 }
 
 // NewGormConnectService ahora retorna una función de cleanup.
