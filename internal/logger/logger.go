@@ -51,7 +51,7 @@ func createLogger(name string) *zap.Logger {
 		appEnv = "local" // Default to local for safety if not set, or change to production if preferred
 	}
 
-	var writer zapcore.WriteSyncer
+	var writers []zapcore.WriteSyncer
 
 	// Configuración de Encoder (JSON Estructurado)
 	encoderConfig := zapcore.EncoderConfig{
@@ -68,35 +68,33 @@ func createLogger(name string) *zap.Logger {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	// Lógica de Salida según Entorno
-	if strings.ToLower(appEnv) == "local" {
-		// --- MODO LOCAL: Archivos (Lumberjack) ---
+	mode := strings.ToLower(os.Getenv("LOG_OUTPUT"))
+	fileNeeded := mode == "file" || mode == "both" || (mode == "" && strings.ToLower(appEnv) == "local")
+	stdoutNeeded := mode == "stdout" || mode == "both" || (mode == "" && strings.ToLower(appEnv) != "local")
+
+	if fileNeeded {
 		now := time.Now().Format("2006-01-02")
 		logDir := "pkg/logs"
-
-		// Asegurar que el directorio padre existe
-		// Si 'name' contiene slashes (ej: "auth/login"), filepath.Join lo manejará,
-		// pero debemos asegurar que el directorio exista.
 		logPath := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", name, now))
 		dir := filepath.Dir(logPath)
-
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			// Fallback a Stdout si falla el FS
 			fmt.Fprintf(os.Stderr, "Error creating log directory %s: %v. Falling back to Stdout.\n", dir, err)
-			writer = zapcore.AddSync(os.Stdout)
+			writers = append(writers, zapcore.AddSync(os.Stdout))
 		} else {
-			writer = zapcore.AddSync(&lumberjack.Logger{
+			writers = append(writers, zapcore.AddSync(&lumberjack.Logger{
 				Filename:   logPath,
-				MaxSize:    50, // MB
+				MaxSize:    50,
 				MaxBackups: 7,
-				MaxAge:     30,   // días
-				Compress:   true, // gzip
-			})
+				MaxAge:     30,
+				Compress:   true,
+			}))
 		}
-	} else {
-		// --- MODO NUBE/PROD: Stdout (CloudWatch) ---
-		// En Lambda/Docker, escribir a stdout es la mejor práctica.
-		writer = zapcore.Lock(os.Stdout)
+	}
+	if stdoutNeeded {
+		writers = append(writers, zapcore.Lock(os.Stdout))
+	}
+	if len(writers) == 0 {
+		writers = append(writers, zapcore.Lock(os.Stdout))
 	}
 
 	// Determinar nivel de log
@@ -119,7 +117,7 @@ func createLogger(name string) *zap.Logger {
 
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderConfig),
-		writer,
+		zapcore.NewMultiWriteSyncer(writers...),
 		logLevel,
 	)
 

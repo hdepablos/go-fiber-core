@@ -173,6 +173,20 @@ wire-sync: ## 🧬📦 Genera código de Wire y actualiza vendor.
 ###############################################################################
 ## AWS
 ###############################################################################
+.PHONY: logs-tail
+logs-tail: ## 📜 Sigue los logs de un servicio en CloudWatch. Uso: make logs-tail service=api since=1h
+	@if [ -z "$(service)" ]; then echo "$(ERROR)❌ Debes pasar el parámetro 'service', ej: make logs-tail service=api$(RESET)"; exit 1; fi
+	@GROUP="/app/$(PROJECT_SLUG)/$(service)"; \
+	SINCE=$${since:-1h}; \
+	echo "$(INFO)📜 Tail del log group: $$GROUP (desde $$SINCE)$(RESET)"; \
+	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE"
+
+.PHONY: logs-groups
+logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch.
+	@PREFIX="/app/$(PROJECT_SLUG)"; \
+	echo "$(INFO)📚 Listando log groups con prefijo $$PREFIX$(RESET)"; \
+	aws logs describe-log-groups $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --log-group-name-prefix "$$PREFIX" --query 'logGroups[].logGroupName' --output table
+
 .PHONY: send-message
 send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS.
 	@echo "$(INFO)✉️ Enviando mensaje a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"

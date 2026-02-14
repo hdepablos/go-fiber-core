@@ -3,6 +3,10 @@ variable "zip_path" {}
 variable "handler" { default = "bootstrap" }
 variable "runtime" { default = "provided.al2023" }
 variable "memory_size" { default = 128 }
+variable "project_name" { type = string, default = "GoFiberCore" }
+variable "environment" { type = string, default = "local" }
+variable "retention_in_days" { type = number, default = 7 }
+variable "enable_cw_in_local" { type = bool, default = false }
 variable "architectures" {
   type    = list(string)
   default = ["x86_64"]
@@ -29,8 +33,11 @@ resource "aws_lambda_function" "this" {
 }
 
 resource "aws_cloudwatch_log_group" "this" {
+  # Para Lambda, el grupo de logs oficial es /aws/lambda/<function_name>.
+  # Esto garantiza compatibilidad total con el runtime de AWS Lambda,
+  # CloudWatch y herramientas como aws logs tail.
   name              = "/aws/lambda/${var.function_name}"
-  retention_in_days = 1
+  retention_in_days = var.retention_in_days
 }
 
 # --- IAM ROLE ---
@@ -78,4 +85,14 @@ output "invoke_arn" {
 output "role_name" {
   description = "Nombre del rol IAM de la función"
   value       = aws_iam_role.lambda_exec.name
+}
+
+output "log_group_name" {
+  description = "Nombre del Log Group asociado al servicio"
+  value       = aws_cloudwatch_log_group.this.name
+}
+
+output "log_group_arn" {
+  description = "ARN del Log Group (puede ser null en local si está deshabilitado)"
+  value       = aws_cloudwatch_log_group.this.arn
 }
