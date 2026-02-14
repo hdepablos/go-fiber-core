@@ -145,6 +145,14 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 		return nil, nil, err
 	}
 
+	// Permite forzar que las lecturas vayan al writer mediante variable de entorno.
+	// Útil como interruptor de emergencia o en entornos sin réplica disponible.
+	if v := strings.ToLower(os.Getenv("DB_FORCE_READS_TO_WRITE")); v == "1" || v == "true" || v == "yes" {
+		log.Printf("⚠️  DB_FORCE_READS_TO_WRITE=%s habilitado: las lecturas usarán la conexión de escritura", os.Getenv("DB_FORCE_READS_TO_WRITE"))
+		dbRead = dbWrite
+		sqlDBRead = sqlDBWrite
+	}
+
 	service := &GormConnectService{
 		dbWrite:    dbWrite,
 		sqlDBWrite: sqlDBWrite,
@@ -158,8 +166,11 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 		if err := sqlDBWrite.Close(); err != nil {
 			log.Printf("❌ Error cerrando la conexión de escritura GORM: %v", err)
 		}
-		if err := sqlDBRead.Close(); err != nil {
-			log.Printf("❌ Error cerrando la conexión de lectura GORM: %v", err)
+		// Evita double-close si ambas referencias apuntan al mismo pool.
+		if sqlDBRead != sqlDBWrite {
+			if err := sqlDBRead.Close(); err != nil {
+				log.Printf("❌ Error cerrando la conexión de lectura GORM: %v", err)
+			}
 		}
 	}
 
