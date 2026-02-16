@@ -81,7 +81,7 @@ func TestLoggerBehavior(t *testing.T) {
 			begin := time.Now()
 			sql := "SELECT * FROM users"
 			rows := int64(1)
-			
+
 			// Llamar a Trace (que es lo que hace GORM después de una query)
 			// Simulamos que tardó 10ms
 			gormLogger.Trace(ctx, begin, func() (string, int64) {

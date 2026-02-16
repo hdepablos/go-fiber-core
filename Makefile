@@ -181,6 +181,22 @@ logs-tail: ## 📜 Sigue los logs de un servicio en CloudWatch. Uso: make logs-t
 	echo "$(INFO)📜 Tail del log group: $$GROUP (desde $$SINCE)$(RESET)"; \
 	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE"
 
+.PHONY: logs-tail-slow-sql
+logs-tail-slow-sql: ## 🐢📜 Sigue solo las queries lentas locales (archivo DB_SLOW_LOG_FILE). Uso: make logs-tail-slow-sql
+	@LOG_FILE="$${DB_SLOW_LOG_FILE:-pkg/logs/db-slow.log}"; \
+	echo "$(INFO)🐢📜 Tail de slow SQL local: $$LOG_FILE$(RESET)"; \
+	mkdir -p "$$(dirname "$$LOG_FILE")"; \
+	touch "$$LOG_FILE"; \
+	tail -n 200 -f "$$LOG_FILE"
+
+.PHONY: logs-tail-slow-sql-cloudwatch
+logs-tail-slow-sql-cloudwatch: ## 🐢☁️ Sigue slow SQL en CloudWatch filtrando por 'SLOW SQL'. Uso: make logs-tail-slow-sql-cloudwatch service=api since=1h
+	@if [ -z "$(service)" ]; then echo "$(ERROR)❌ Debes pasar 'service', ej: make logs-tail-slow-sql-cloudwatch service=api$(RESET)"; exit 1; fi
+	@GROUP="/app/$(PROJECT_SLUG)/$(service)"; \
+	SINCE=$${since:-1h}; \
+	echo "$(INFO)🐢☁️ Tail de SLOW SQL en: $$GROUP (desde $$SINCE)$(RESET)"; \
+	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE" --filter-pattern "SLOW SQL"
+
 .PHONY: logs-groups
 logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch.
 	@PREFIX="/app/$(PROJECT_SLUG)"; \

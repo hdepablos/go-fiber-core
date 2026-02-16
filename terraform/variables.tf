@@ -42,3 +42,27 @@ locals {
   # Ruta de los zips (relativa a la carpeta terraform/)
   zip_path = "../sam-compile"
 }
+
+variable "slow_sql_alarm_enabled" {
+  description = "Habilita creación de Metric Filters y Alarms para 'SLOW SQL' en CloudWatch"
+  type        = bool
+  default     = true
+}
+
+variable "slow_sql_alarm_threshold" {
+  description = "Umbral de sumatoria de eventos 'SLOW SQL' para disparar la alarma"
+  type        = number
+  default     = 1
+}
+
+variable "slow_sql_alarm_period" {
+  description = "Periodo de evaluación (segundos) para la alarma de 'SLOW SQL'"
+  type        = number
+  default     = 300
+}
+
+variable "slow_sql_metric_namespace" {
+  description = "Namespace de la métrica en CloudWatch para SLOW SQL"
+  type        = string
+  default     = "DB/SlowQueries"
+}

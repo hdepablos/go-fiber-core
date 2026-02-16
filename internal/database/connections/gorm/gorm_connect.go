@@ -113,8 +113,6 @@ func getGormLogger(writer logger.Writer) logger.Interface {
 		}
 	}
 
-	// Configurar Slow Threshold (Default: 1s)
-	// Se puede sobrescribir con DB_SLOW_THRESHOLD_MS (en milisegundos)
 	slowThreshold := time.Second
 	if envSlowThreshold := os.Getenv("DB_SLOW_THRESHOLD_MS"); envSlowThreshold != "" {
 		if ms, err := strconv.Atoi(envSlowThreshold); err == nil && ms > 0 {
@@ -122,14 +120,45 @@ func getGormLogger(writer logger.Writer) logger.Interface {
 		}
 	}
 
+	if v := strings.ToLower(os.Getenv("DB_SLOW_SQL_ENABLED")); v == "" || v == "0" || v == "false" || v == "no" {
+		slowThreshold = 24 * time.Hour
+	}
+
+	finalWriter := writer
+	if strings.ToLower(appEnv) == "local" {
+		if slowFilePath := os.Getenv("DB_SLOW_LOG_FILE"); slowFilePath != "" {
+			if f, err := os.OpenFile(slowFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+				fileLogger := log.New(f, "\r\n", log.LstdFlags)
+				finalWriter = &multiLoggerWriter{
+					primary:   writer,
+					secondary: fileLogger,
+				}
+			} else {
+				log.Printf("error abriendo DB_SLOW_LOG_FILE=%s: %v", slowFilePath, err)
+			}
+		}
+	}
+
 	return logger.New(
-		writer,
+		finalWriter,
 		logger.Config{
 			SlowThreshold: slowThreshold,
 			LogLevel:      logLevel,
 			Colorful:      true,
 		},
 	)
+}
+
+type multiLoggerWriter struct {
+	primary   logger.Writer
+	secondary *log.Logger
+}
+
+func (m *multiLoggerWriter) Printf(format string, args ...interface{}) {
+	m.primary.Printf(format, args...)
+	if m.secondary != nil {
+		m.secondary.Printf(format, args...)
+	}
 }
 
 // NewGormConnectService ahora retorna una función de cleanup.
