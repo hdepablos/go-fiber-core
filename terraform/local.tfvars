@@ -70,4 +70,7 @@ lambda_env_vars = {
   MYSQL_MAX_CONN_LIFE_TIME_IN_SECONDS = "3"
 
   FUNCTIONS = "api,sqs-consumer,dlq-consumer,every-1min-cron,daily-24-cron"
+
+  S3_PREFIX      = "sam"
+  S3_BUCKET_NAME = "go-fiber-core-bucket"
 }

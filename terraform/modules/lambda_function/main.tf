@@ -1,12 +1,37 @@
 variable "function_name" {}
 variable "zip_path" {}
-variable "handler" { default = "bootstrap" }
-variable "runtime" { default = "provided.al2023" }
-variable "memory_size" { default = 128 }
-variable "project_name" { type = string, default = "GoFiberCore" }
-variable "environment" { type = string, default = "local" }
-variable "retention_in_days" { type = number, default = 7 }
-variable "enable_cw_in_local" { type = bool, default = false }
+
+variable "handler" {
+  default = "bootstrap"
+}
+
+variable "runtime" {
+  default = "provided.al2023"
+}
+
+variable "memory_size" {
+  default = 128
+}
+
+variable "project_name" {
+  type    = string
+  default = "GoFiberCore"
+}
+
+variable "environment" {
+  type    = string
+  default = "local"
+}
+
+variable "retention_in_days" {
+  type    = number
+  default = 7
+}
+
+variable "enable_cw_in_local" {
+  type    = bool
+  default = false
+}
 variable "architectures" {
   type    = list(string)
   default = ["x86_64"]

@@ -110,7 +110,7 @@ lambda_env_vars = {
 	AWS_DEFAULT_REGION=us-east-1
 	LOCALSTACK_ENDPOINT_BASE=http://localhost:4566
 	S3_PREFIX=sam
-	S3_BUCKET_NAME="${PROJECT_SLUG}-bucket"
+	S3_BUCKET_NAME="go-fiber-core-bucket"
 	# API_URL=http://localhost
 
 

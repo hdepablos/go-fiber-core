@@ -76,8 +76,8 @@ show-all-variables: ## 🔍 Muestra las variables principales del proyecto.
 	@echo "DC_RUN: $(DC_RUN)"
 	@echo "FUNCTION_NAME_SQS_CONSUMER: $(FUNCTION_NAME_SQS_CONSUMER)"
 
-.PHONY: show-all-variables
-color-messages: ## 🎨 Ejemplos de los diferentes colores de mensajes.
+.PHONY: color-messages
+color-messages: ## 🎨 Ejemplos de los diferentes colores de mensajes. Uso: make color-messages
 	@echo "$(RESET) RESET  🚀 Color del mensaje$(RESET)"
 	@echo "$(INFO)      INFO  🚀 Color del mensaje$(RESET)"
 	@echo "$(SUCCESS)       SUCCESS  🚀 Color del mensaje$(RESET)"
@@ -118,7 +118,7 @@ vendor: ## 📦 Actualiza el archivo go.mod y la carpeta vendor.
 	@$(DC_RUN) go mod vendor
 
 .PHONY: install-pkg
-install-pkg: ## 📥 Instala un paquete Go específico. Uso: make install-pkg pkg=...
+install-pkg: ## 📥 Instala un paquete Go específico. Uso: make install-pkg pkg=github.com/ejemplo/modulo
 	@echo "$(SUCCESS)📥 Instalando/actualizando paquete: $(pkg)...$(RESET)"
 	@$(DC_RUN) go get -u $(pkg)
 	@$(MAKE) vendor
@@ -218,7 +218,7 @@ test-api-aws: ## 🧪 Realiza pruebas sobre la API Gateway de LocalStack.
 	echo "$(INFO)🌐 Endpoint detectado: $$API_ENDPOINT$(RESET)"
 
 .PHONY: test-loop
-test-loop: ## 🔄 Ejecuta 'make send-message' 6 veces seguidas.
+test-loop: ## 🔄 Ejecuta 'make send-message' varias veces. Uso: make test-loop
 	@echo "$(INFO)🔄 Iniciando ráfaga secuencial de 6 mensajes...$(RESET)"
 	@for i in $$(seq 1 25); do \
 		echo "$(INFO)📦 Mensaje iteración $$i:$(RESET)"; \
@@ -228,7 +228,8 @@ test-loop: ## 🔄 Ejecuta 'make send-message' 6 veces seguidas.
 	@echo "$(SUCCESS)✅ Ráfaga completada.$(RESET)"
 
 .PHONY: test-aws
-test-aws-all: ## 🧪🧬 Realiza pruebas integrales sobre API y SQS.
+.PHONY: test-aws-all
+test-aws-all: ## 🧪🧬 Realiza pruebas integrales sobre API y SQS. Uso: make test-aws-all
 	@echo "$(INFO)🧪 Iniciando pruebas integrales...$(RESET)"
 	@export RAW_URL=$$(aws --profile $(AWS_PROFILE_NAME) cloudformation describe-stacks \
 		--stack-name $(STACK_NAME) \
@@ -248,14 +249,14 @@ test-aws-all: ## 🧪🧬 Realiza pruebas integrales sobre API y SQS.
 		--output table
 
 .PHONY: coverage
-coverage: ## 📊 Genera reporte de cobertura COMPLETO (unitarios + integración).
+coverage: ## 📊 Genera reporte de cobertura COMPLETO (unitarios + integración). Uso: make coverage
 	@chmod +x ./scripts/generate_coverage_report.sh
 	@echo "📊 Generando reporte de cobertura COMPLETO..."
 	@$(DC_RUN) go test -tags=integration -coverprofile=coverage.out ./...
 	@$(DC_RUN) bash ./scripts/generate_coverage_report.sh
 
 .PHONY: coverage-unit
-coverage-unit: ## 📊 Genera reporte de cobertura RÁPIDO (solo unitarios).
+coverage-unit: ## 📊 Genera reporte de cobertura RÁPIDO (solo unitarios). Uso: make coverage-unit
 	@chmod +x ./scripts/generate_coverage_report.sh
 	@echo "📊 Generando reporte de cobertura para tests UNITARIOS..."
 	@$(DC_RUN) go test -coverprofile=coverage.out ./...
@@ -263,7 +264,7 @@ coverage-unit: ## 📊 Genera reporte de cobertura RÁPIDO (solo unitarios).
 
 
 .PHONY: lint
-lint: ##  lint: 🎨 Analiza el código en busca de errores y malas prácticas con golangci-lint.
+lint: ## 🎨 Analiza el código en busca de errores y malas prácticas con golangci-lint. Uso: make lint
 	@echo "🧹 Limpiando la caché de golangci-lint..."
 	@docker compose -f docker-compose-local-lint.yml run --rm lint cache clean
 	@echo "Limpiando contenedores huérfanos..."
@@ -272,7 +273,7 @@ lint: ##  lint: 🎨 Analiza el código en busca de errores y malas prácticas c
 	@docker compose -f docker-compose-local-lint.yml build --no-cache lint && docker compose -f docker-compose-local-lint.yml run --rm lint run --timeout=2m
 
 .PHONY: lint-check-config
-lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint
+lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint. Uso: make lint-check-config
 	@echo "🔍 Verificando configuración de golangci-lint..."
 	@docker compose -f docker-compose-local-lint.yml run --rm lint config path
 	@echo ""
@@ -280,24 +281,24 @@ lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint
 	@docker compose -f docker-compose-local-lint.yml run --rm lint config dump
 
 .PHONY: lint-verbose
-lint-verbose: ## 🔍 Ejecuta el linter en modo verbose para ver qué archivos analiza
+lint-verbose: ## 🔍 Ejecuta el linter en modo verbose para ver qué archivos analiza. Uso: make lint-verbose
 	@echo "🔍 Ejecutando linter en modo verbose..."
 	@docker compose -f docker-compose-local-lint.yml run --rm lint run -v --timeout=2m
 
 .PHONY: lint-test
-lint-test: ## 🧪 Prueba si wire_gen.go está siendo ignorado
+lint-test: ## 🧪 Prueba si wire_gen.go está siendo ignorado. Uso: make lint-test
 	@echo "🧪 Listando archivos que el linter va a analizar..."
 	@docker compose -f docker-compose-local-lint.yml run --rm lint run --issues-exit-code=0 2>&1 | grep -i "wire_gen" || echo "✅ wire_gen.go NO aparece en la salida (está siendo ignorado)"
 
 .PHONY: localstack-up
-localstack-up: ## 🛠️ Levanta LocalStack en segundo plano.
+localstack-up: ## 🛠️ Levanta LocalStack en segundo plano. Uso: make localstack-up
 	@echo "$(SUCCESS)🛠️ Iniciando LocalStack...$(RESET)"
 	@docker-compose -p localstack -f docker-composes/docker-compose.localstack.yml up -d --build --force-recreate
 	@sleep 10
 	@echo "$(SUCCESS)✅ LocalStack listo.$(RESET)"
 
 .PHONY: render-template
-render-template: ## 📄 Genera un template SAM basado en stubs.
+render-template: ## 📄 Genera un template SAM basado en stubs. Uso: make render-template folder=api
 	@service_name=$$(echo "$(PROJECT_NAME_PASCAL)-$(folder)" | tr "-" " " | awk '{ for (i=1; i<=NF; i++) printf toupper(substr($$i,1,1)) substr($$i,2) }'); \
 	if [ "$(folder)" = "api" ]; then stub="stubs/api-lambda.stub"; \
 	elif echo "$(folder)" | grep -q -- "-cron$$"; then stub="stubs/cron-lambda.stub"; \
@@ -308,18 +309,18 @@ render-template: ## 📄 Genera un template SAM basado en stubs.
 
 
 .PHONY: render-templates
-render-templates: ## 📄📄 Genera todos los templates del proyecto.
+render-templates: ## 📄📄 Genera todos los templates del proyecto. Uso: make render-templates
 	@for folder in $(FOLDERS); do $(MAKE) render-template folder=$$folder; done
 	@$(MAKE) render-template folder=sqs-queues
 
 
 .PHONY: delete-templates
-delete-templates: ## 🗑️ Elimina los templates generados.
+delete-templates: ## 🗑️ Elimina los templates generados. Uso: make delete-templates
 	@rm -f templates/*.yml
 	@echo "$(SUCCESS)🗑️ Templates eliminados.$(RESET)"
 
 .PHONY: update-api-base
-update-api-base:
+update-api-base: ## 🔗 Obtiene la URL de API Gateway en LocalStack y la guarda en .api_base_tmp. Uso: make update-api-base
 	@echo "🔗 Obteniendo API Gateway URL (LocalStack)..."
 	@API_ID=$$(aws --profile $(AWS_PROFILE_NAME) apigateway get-rest-apis \
 		--endpoint-url=$(LOCALSTACK_ENDPOINT_BASE) \
@@ -329,7 +330,7 @@ update-api-base:
 	echo "✔ API URL: http://localhost:4566/restapis/$$API_ID/Prod/_user_request_/"
 
 .PHONY: update-env-url-base
-update-env-url-base: ## ✏️ Actualiza la URL_BASE en el archivo .env.
+update-env-url-base: ## ✏️ Actualiza la URL_BASE en el archivo .env. Uso: make update-env-url-base
 	@$(MAKE) update-api-base
 	@API_BASE=$$(cat .api_base_tmp); \
 	if [ "$$(uname)" = "Darwin" ]; then sed -i '' -E "s|^URL_BASE=.*|URL_BASE=$$API_BASE|" .env; \
@@ -341,7 +342,7 @@ update-env-url-base: ## ✏️ Actualiza la URL_BASE en el archivo .env.
 
 
 .PHONY: set-env
-set-env: ## ✏️ Setea APP_ENV (ej: make set-env ENV=local | ENV=lambda)
+set-env: ## ✏️ Setea APP_ENV. Uso: make set-env ENV=local | ENV=lambda
 	@if [ -z "$(ENV)" ]; then \
 		echo "❌ Debes pasar ENV=local | ENV=lambda"; \
 		exit 1; \
@@ -358,7 +359,7 @@ set-env: ## ✏️ Setea APP_ENV (ej: make set-env ENV=local | ENV=lambda)
 	@echo "$(SUCCESS)✅ APP_ENV=$(ENV)$(RESET)"
 
 .PHONY: update-bruno-url-base
-update-bruno-url-base: ## ✏️ Actualiza urlBase en Bruno según ENV (local | lambda)
+update-bruno-url-base: ## ✏️ Actualiza urlBase en Bruno según ENV (local | lambda). Uso: make update-bruno-url-base ENV=local
 	@if [ -z "$(ENV)" ]; then \
 		echo "$(ERROR)❌ Debes pasar ENV=local o ENV=lambda$(RESET)"; \
 		exit 1; \
@@ -383,25 +384,16 @@ update-bruno-url-base: ## ✏️ Actualiza urlBase en Bruno según ENV (local | 
 
 
 .PHONY: update-url-all
-update-url-all: ## ✏️✏️ Sincroniza la URL en .env y Bruno.
+update-url-all: ## ✏️✏️ Sincroniza la URL en .env y Bruno. Uso: make update-url-all ENV=lambda
 	@$(MAKE) update-env-url-base
 	@$(MAKE) update-bruno-url-base
 
-.PHONY: check-localstack
-check-localstack: ## 🩺 Verifica que LocalStack esté corriendo antes de ejecutar comandos.
-	@echo "$(INFO)🩺 Verificando estado de LocalStack...$(RESET)"
-	@if ! docker ps --format '{{.Names}}' | grep -q "^localstack$$"; then \
-		echo "$(ERROR)❌ LocalStack no está corriendo. Ejecuta 'make localstack-up' primero.$(RESET)"; \
-		exit 1; \
-	fi
-	@echo "$(SUCCESS)✅ LocalStack está operativo.$(RESET)"
-
 .PHONY: watch-lambda
-watch-lambda: check-localstack fast-deploy-all infra-deploy update-bruno ## 🚀👀 Actualiza código, infraestructura y bruno (sin bloquear).
+watch-lambda: fast-deploy-all infra-deploy update-bruno ## 🚀👀 Actualiza código, infraestructura y bruno (sin bloquear). Uso: make watch-lambda
 	@echo "$(INFO)📺 Ejecuta 'make logs-all' si quieres Observar los logs de las funciones$(RESET)"
 
 .PHONY: update-bruno
-update-bruno: ## 🦁 Actualiza la URL de la API en Bruno
+update-bruno: ## 🦁 Actualiza la URL de la API en Bruno. Uso: make update-bruno
 	@echo "$(INFO)🔄 Actualizando URL en Bruno...$(RESET)"
 	@API_ID=$$(awslocal apigateway get-rest-apis --query "items[0].id" --output text); \
 	if [ -z "$$API_ID" ] || [ "$$API_ID" = "None" ]; then \
@@ -413,7 +405,7 @@ update-bruno: ## 🦁 Actualiza la URL de la API en Bruno
 
 
 .PHONY: write-api-base
-write-api-base: ## 📝 Extrae la URL desde el output de Terraform
+write-api-base: ## 📝 Extrae la URL desde el output de Terraform y la guarda en .api_base_tmp. Uso: make write-api-base
 	@echo "$(INFO)🔗 Obteniendo URL desde Terraform...$(RESET)"
 	@API_BASE=$$(cd terraform && tflocal output -raw api_base_url 2>/dev/null); \
 	if [ -z "$$API_BASE" ] || [ "$$API_BASE" = "None" ]; then \
@@ -425,7 +417,7 @@ write-api-base: ## 📝 Extrae la URL desde el output de Terraform
 
 
 .PHONY: update-function
-update-function: ## ⚙️ Recompila, construye con SAM y DESPLIEGA automáticamente.
+update-function: ## ⚙️ Recompila, construye con SAM y DESPLIEGA automáticamente. Uso: make update-function FOLDER=api
 	@if [ -z "$(FOLDER)" ]; then \
 		echo "$(ERROR)❌ Debes indicar la función: make update-function FOLDER=nombre-carpeta$(RESET)"; \
 		exit 1; \
@@ -442,7 +434,7 @@ update-function: ## ⚙️ Recompila, construye con SAM y DESPLIEGA automáticam
 
 
 .PHONY: compile-fn
-compile-fn: ## 🏗️ Compila el binario y genera el ZIP para Terraform.
+compile-fn: ## 🏗️ Compila el binario y genera el ZIP para Terraform. Uso: make compile-fn FOLDER=api
 	@echo "$(INFO)🏗️ Compilando [$(FOLDER)]...$(RESET)"
 	$(eval OUT_DIR := $(shell pwd)/sam-compile/$(FOLDER))
 	$(eval IMAGE_TAG := lambda-$(FOLDER):latest)
@@ -483,7 +475,7 @@ compile-fn: ## 🏗️ Compila el binario y genera el ZIP para Terraform.
 
 # 1. Compilar y Desplegar TODO el stack (Infrastructure + All Functions)
 .PHONY: deploy-all
-deploy-all: ## 🌎 Compila todas las funciones y despliega toda la infraestructura
+deploy-all: ## 🌎 Compila todas las funciones y despliega toda la infraestructura. Uso: make deploy-all
 	@echo "$(INFO)🚀 Desplegando stack completo...$(RESET)"
 	@$(MAKE) compile-fn FOLDER=api
 	@$(MAKE) compile-fn FOLDER=sqs-consumer
@@ -500,29 +492,29 @@ deploy: infra-init ## ⚡ Compila y actualiza una sola función (Uso: make deplo
 	@$(MAKE) infra-deploy
 
 .PHONY: infra-init
-infra-init: ## 🏁 Inicializa Terraform/LocalStack
+infra-init: ## 🏁 Inicializa Terraform/LocalStack. Uso: make infra-init
 	@cd $(TF_DIR) && tflocal init
 
 .PHONY: infra-deploy
-infra-deploy: ## 🚀 Despliega toda la infraestructura en LocalStack
+infra-deploy: ## 🚀 Despliega toda la infraestructura en LocalStack. Uso: make infra-deploy
 	@cd $(TF_DIR) && tflocal apply -var-file=$(TF_VARS) -auto-approve
 
 .PHONY: infra-destroy
-infra-destroy: ## 💣 Destruye la infraestructura en LocalStack
+infra-destroy: ## 💣 Destruye la infraestructura en LocalStack. Uso: make infra-destroy
 	@cd $(TF_DIR) && tflocal destroy -var-file=$(TF_VARS) -auto-approve
 
 .PHONY: deploy-full
-deploy-full: compile-all infra-deploy ## ⚡ Compila y despliega en un solo paso
+deploy-full: compile-all infra-deploy ## ⚡ Compila y despliega en un solo paso. Uso: make deploy-full
 	@echo "$(SUCCESS)🔥 Todo el stack ha sido actualizado en LocalStack$(RESET)"
 
 .PHONY: infra-logs
-infra-logs: ## 📜 Muestra logs de una función específica (Uso: make infra-logs FOLDER=api)
+infra-logs: ## 📜 Muestra logs de una función específica. Uso: make infra-logs FOLDER=api
 	@$(eval FUNC_NAME := $(shell echo $(FOLDER) | sed 's/every-1min-cron/1min-cron/' | sed 's/daily-24-cron/daily-cron/'))
 	@echo "🔍 Siguiendo logs de: gofibercore-local-$(FUNC_NAME)..."
 	@awslocal logs tail /aws/lambda/gofibercore-local-$(FUNC_NAME) --follow
 
 .PHONY: logs-all
-logs-all: ## 📊 Muestra logs de TODAS las lambdas (Sintaxis corregida)
+logs-all: ## 📊 Muestra logs de TODAS las lambdas. Uso: make logs-all
 	@echo "📺 Observando logs de las funciones... (Ctrl+C para detener)"
 	@awslocal logs tail /aws/lambda/gofibercore-local-api --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-sqs-consumer --follow & \
@@ -532,7 +524,7 @@ logs-all: ## 📊 Muestra logs de TODAS las lambdas (Sintaxis corregida)
 
 
 .PHONY: update-fn
-update-fn: ## 🔄 Actualización rápida de código en LocalStack.
+update-fn: ## 🔄 Actualización rápida de código en LocalStack. Uso: make update-fn FOLDER=api
 	@echo "$(INFO)🏗️ Compilando [$(FOLDER)] de forma nativa...$(RESET)"
 	@# 1. Definir rutas
 	$(eval OUT_DIR := sam-compile/$(FOLDER))
@@ -584,7 +576,7 @@ fast-deploy: ## ⚡🚀 Compilación nativa + actualización directa (Sin Terraf
 	fi
 
 .PHONY: fast-deploy-all
-fast-deploy-all: ## ⚡🚀⚡ Actualiza TODAS las funciones rápidamente (Ideal si cambiaste internal/...).
+fast-deploy-all: ## ⚡🚀⚡ Actualiza TODAS las funciones rápidamente (Ideal si cambiaste internal/...). Uso: make fast-deploy-all
 	@echo "$(INFO)🚀 Iniciando actualización masiva rápida...$(RESET)"
 	@for folder in $(FOLDERS); do \
 		echo "$(INFO)⏩ Procesando $$folder...$(RESET)"; \
@@ -593,76 +585,27 @@ fast-deploy-all: ## ⚡🚀⚡ Actualiza TODAS las funciones rápidamente (Ideal
 	@echo "$(SUCCESS)🔥 Todo el stack (código) ha sido actualizado.$(RESET)"
 
 .PHONY: compile-all
-compile-all: ## 🏗️🏗️ Compila todas las funciones del proyecto.
+compile-all: ## 🏗️🏗️ Compila todas las funciones del proyecto. Uso: make compile-all
 	@for folder in $(FOLDERS); do $(MAKE) compile-fn FOLDER=$$folder || exit 1; done
 	@echo "$(SUCCESS)✅ Todas las funciones compiladas.$(RESET)"
 
 
 .PHONY: sam-deploy
-sam-deploy: ## 🚀 Despliega el stack SAM en LocalStack.
+sam-deploy: ## 🚀 Despliega el stack SAM en LocalStack. Uso: make sam-deploy
 	@echo "$(INFO)🚀 Desplegando stack con SAM...$(RESET)"
 	@sam deploy --profile $(AWS_PROFILE_NAME) --template master-template.yml --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET_NAME) --region $(AWS_DEFAULT_REGION) --no-confirm-changeset --capabilities CAPABILITY_IAM --disable-rollback --force-upload
 
 
-.PHONY: localstack-bucket
-localstack-bucket: ## 📦 Crea los buckets necesarios en LocalStack.
-	@echo "$(INFO)📦 Creando buckets en LocalStack...$(RESET)"
-	@aws --endpoint-url $(LOCALSTACK_ENDPOINT_BASE) s3api head-bucket --bucket $(S3_BUCKET_NAME) >/dev/null 2>&1 || aws --endpoint-url $(LOCALSTACK_ENDPOINT_BASE) s3 mb s3://$(S3_BUCKET_NAME)
-	@aws --endpoint-url $(LOCALSTACK_ENDPOINT_BASE) s3api head-bucket --bucket $(S3_BUCKET) >/dev/null 2>&1 || aws --endpoint-url $(LOCALSTACK_ENDPOINT_BASE) s3 mb s3://$(S3_BUCKET)
-
-
-.PHONY: deploy-localstack
-deploy-localstack: ## 🚀🛠️ Flujo completo de despliegue local.
-	@rm -rf sam-compile/ .aws-sam/
-	@$(MAKE) compile-all
-	@$(MAKE) localstack-up
-	@$(MAKE) localstack-bucket
-	@sam build -t master-template.yml
-	@$(MAKE) sam-deploy
-
-.PHONY: aws-up
-aws-up: ## ☁️🚀 Levanta todo el entorno AWS y sincroniza URLs.
-## remplazar APP_ENV=lambda
-	@$(MAKE) deploy-localstack
-	@$(MAKE) update-url-all
-	@echo "$(SUCCESS)✅ Entorno AWS Local arriba.$(RESET)"
-
-
 .PHONY: deploy-prod
-deploy-prod: ## 🚀🌍 Despliegue REAL en AWS Producción.
+deploy-prod: ## 🚀🌍 Despliegue REAL en AWS Producción. Uso: make deploy-prod
 	@echo "$(WARNING)🚀 Iniciando despliegue en PRODUCCIÓN...$(RESET)"
 	@$(MAKE) compile-all
 	@sam build -t master-template.yml
 	@sam deploy --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET) --region $(AWS_DEFAULT_REGION) --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --parameter-overrides S3BucketName=$(S3_BUCKET_NAME) ProjectName=$(PROJECT_NAME_LOWERCASE)
 
 
-.PHONY: localstack-up
-localstack-down: ## 🗑️ Apaga y limpia profundamente LocalStack (requiere confirmación)
-	@echo "$(WARNING)⚠️  ADVERTENCIA: Se eliminarán contenedores, volúmenes y las imágenes temporales de las Lambdas.$(RESET)"
-	@read -p "¿Estás seguro de que quieres continuar? [y/N]: " confirm; \
-	if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ] && [ "$$confirm" != "yes" ]; then \
-		echo "$(INFO)❌ Operación cancelada.$(RESET)"; \
-		exit 1; \
-	fi
-	@echo "$(INFO)🧹 Iniciando limpieza de LocalStack...$(RESET)"
-	@# 1. Baja el compose, elimina volúmenes (-v) e imágenes locales creadas (--rmi local)
-	@docker-compose -f docker-compose.localstack.yaml down --v --rmi local 2>/dev/null || true
-	@# 2. Borra el contenedor por nombre por si quedó colgado
-	@docker rm -f localstack 2>/dev/null || true
-	@# 3. Elimina las imágenes dinámicas que LocalStack genera para cada función Lambda
-	@echo "$(INFO)🔍 Buscando imágenes de Lambdas temporales...$(RESET)"
-	@IMAGES=$$(docker images --filter "reference=localstack-lambda-*" -q); \
-	if [ -n "$$IMAGES" ]; then \
-		echo "🗑️  Eliminando imágenes: $$IMAGES"; \
-		docker rmi -f $$IMAGES; \
-	fi
-	@# 4. Limpia volúmenes huérfanos para evitar saturación de disco
-	@docker volume prune -f
-	@echo "$(SUCCESS)✅ LocalStack ha sido completamente eliminado y el sistema está limpio.$(RESET)"
-
-
 .PHONY: watch
-watch: ## 🏎️ Inicia API con live-reload (Air).
+watch: ## 🏎️ Inicia API con live-reload (Air). Uso: make watch
 	@$(MAKE) set-env ENV=local
 	@$(MAKE) update-bruno-url-base ENV=local
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
@@ -672,7 +615,7 @@ watch: ## 🏎️ Inicia API con live-reload (Air).
 
 
 .PHONY: aws-down
-aws-down: ## 💥🧹 Elimina contenedores e imágenes Docker (requiere confirmación explícita)
+aws-down: ## 💥🧹 Elimina contenedores e imágenes Docker (requiere confirmación explícita). Uso: make aws-down
 	@sh -c ' \
 		project_lower=$(PROJECT_NAME_LOWERCASE); \
 		CONTAINERS=$$(docker ps -a --format "{{.Names}}" | grep "$$project_lower" || true); \
@@ -718,7 +661,7 @@ run-cli: ## ▶️ Ejecuta un comando CLI personalizado. Uso: make run-cli c="co
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go $(c)
 
 .PHONY: create-command
-create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command name=...
+create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command name=nuevoComando
 	@if [ -z "$(name)" ]; then \
         echo "❌ Por favor, especifique el nombre del comando."; \
         exit 1; \
@@ -737,9 +680,8 @@ create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command nam
 ## Gestión de Base de Datos
 ## --------------------------------------------------------------------------
 
-# Crea un nuevo archivo de migración SQL.
-# Uso: make create-migration name=nombre_descriptivo_de_la_migracion
-create-migration:
+.PHONY: create-migration
+create-migration: ## 🧱 Crea un nuevo archivo de migración SQL. Uso: make create-migration name=create_users_table
 	@if [ -z "$(name)" ]; then \
 		echo "❌ Por favor, especifique el nombre. Uso: make create-migration name=create_users_table"; \
 		exit 1; \
@@ -747,22 +689,22 @@ create-migration:
 	@echo "🌱 Creando migración: $(name)..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations create $(name)
 
-# Aplica todas las migraciones pendientes.
-migrate-up:
+.PHONY: migrate-up
+migrate-up: ## 🚀 Aplica todas las migraciones pendientes. Uso: make migrate-up
 	@echo "🚀 Aplicando migraciones..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations up
 
-# Revierte la última migración aplicada.
-migrate-down:
+.PHONY: migrate-down
+migrate-down: ## ⏪ Revierte la última migración aplicada. Uso: make migrate-down
 	@echo "⏪ Revertiendo la última migración..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations down
 
-# Muestra el estado de todas las migraciones.
-migrate-status:
+.PHONY: migrate-status
+migrate-status: ## ℹ️ Muestra el estado de todas las migraciones. Uso: make migrate-status
 	@echo "ℹ️  Estado de las migraciones:"
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations status
 
-# Muestra el estado de todas las migraciones.
-migrate-reset:
+.PHONY: migrate-reset
+migrate-reset: ## ♻️ Revierte y reaplica todas las migraciones (reset completo). Uso: make migrate-reset
 	@echo "ℹ️  Reviendo todas las migraciones..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations reset
