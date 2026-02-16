@@ -108,6 +108,14 @@ comando sql para bank_id a productos:
 -- Listo Pendiente
 -- Transacciones en productos y en otros cuando se apliquen 2 sentencias
 
+-- Listo
+tablas de tablas
+Luego de loguearse debe cargar en memoria todos los filtros
+controller por vistas de tablas de tablas como backoffice todas por get
+
+-- Listo
+-- Combinar los proyectos go-fiber-core y el del aws
+
 -- ==================================================
 -- ==================================================
 -- ==================================================
@@ -125,10 +133,6 @@ Recrear en el entorno aws el s3 con la configuración del MultipartUpload
 recrear el download file de backoffice y collections con un código único para la descarga del archivo con expirations tal cual como está en collection/backoffice con la ruta desde el s3
 
 -- Subir archivos al s3
-
-
--- Pendiente
--- Combinar los proyectos go-fiber-core y el del aws
 
 -- Pendiente
 -- Simular las queue y los process
@@ -161,11 +165,6 @@ go rutinas (wg, chanels)
 -- Pendiente
 csv (exportar/importar)
     Esto debe funcionar como el mattwebsite, mantener la funcionalidad de poder ejecutar los filtros de paginate
-
--- Pendiente
-tablas de tablas
-Luego de loguearse debe cargar en memoria todos los filtros
-controller por vistas de tablas de tablas como backoffice todas por get
 
 
 

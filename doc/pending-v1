@@ -1,7 +1,17 @@
+-- Listos
 -- Quitar de los orm la configuración de local para que muestre las sql de las peticiones
-
 -- crear en el frontend el catalago-all y almacenarlo en el localstore
-
 -- Que los filtros funcionen con el cuadro de texto que se almacenan con el localstore
-
 -- el rango de fecha para el componente y que se pueda limpiar
+
+
+-- Pendiente
+Actualizar sqs-consumer para:
+    - Normal
+    - auto-invoke
+
+
+    Verificar primero que puedas crear un s3 local y que puedas utilizar en varios proyectos
+
+    Recrear en el entorno aws el s3 con la configuración del MultipartUpload
+
