@@ -530,13 +530,16 @@ infra-logs: ## 📜 Muestra logs de una función específica. Uso: make infra-lo
 	@awslocal logs tail /aws/lambda/gofibercore-local-$(FUNC_NAME) --follow
 
 .PHONY: logs-all
-logs-all: ## 📊 Muestra logs de TODAS las lambdas. Uso: make logs-all
+logs-all: ## 📊 Sigue logs de TODAS las lambdas en vivo (Ctrl+C para salir). Uso: make logs-all
 	@echo "📺 Observando logs de las funciones... (Ctrl+C para detener)"
-	@awslocal logs tail /aws/lambda/gofibercore-local-api --follow & \
+	@sh -c '\
+		trap "kill 0 2>/dev/null || true; exit 0" INT TERM; \
+		awslocal logs tail /aws/lambda/gofibercore-local-api --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-sqs-consumer --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-1min-cron --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-daily-cron --follow & \
-		wait
+		wait \
+	'
 
 
 .PHONY: update-fn
