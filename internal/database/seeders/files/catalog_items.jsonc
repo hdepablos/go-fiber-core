@@ -1,0 +1,48 @@
+[
+    /* ==========================
+    BLOQUE: Tablas base
+    ========================== */
+    {
+        "id": 1,
+        "name": "table",
+        "code": 1,
+        "parent_id": 0,
+        "sort_order": 1,
+        "is_active": 1,
+        "created_at": null,
+        "updated_at": null
+    },
+    {
+        "id": 2,
+        "name": "table_filter",
+        "code": 2,
+        "parent_id": 0,
+        "sort_order": 2,
+        "is_active": 1,
+        "created_at": null,
+        "updated_at": null
+    },
+    /* ==========================
+        BLOQUE: Catálogos jerárquicos
+        ========================== */
+    {
+        "id": 3,
+        "name": "Concepts",
+        "code": 100,
+        "parent_id": 1,
+        "sort_order": 1,
+        "is_active": 1,
+        "created_at": null,
+        "updated_at": null
+    },
+    {
+        "id": 4,
+        "name": "Term",
+        "code": 101,
+        "parent_id": 3,
+        "sort_order": 2,
+        "is_active": 1,
+        "created_at": null,
+        "updated_at": null
+    }
+]

@@ -19,6 +19,12 @@ La documentación completa sobre logs (CloudWatch, niveles de log, buenas práct
 
 - [doc/info/logs.md](doc/info/logs.md)
 
+## Seeders
+
+La documentación detallada sobre los seeders (incluyendo `catalog_items` y el uso de `seed --only`) se encuentra en:
+
+- [doc/info/seeders-catalog-items.md](doc/info/seeders-catalog-items.md)
+
 ## Infraestructura y Optimización
 
 El proyecto utiliza configuraciones avanzadas para maximizar el rendimiento y minimizar costos en AWS Lambda:

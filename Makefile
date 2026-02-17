@@ -727,3 +727,17 @@ migrate-status: ## ℹ️ Muestra el estado de todas las migraciones. Uso: make 
 migrate-reset: ## ♻️ Revierte y reaplica todas las migraciones (reset completo). Uso: make migrate-reset
 	@echo "ℹ️  Reviendo todas las migraciones..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations reset
+
+.PHONY: seed
+seed:
+	@echo "Ejecutando todos los seeders..."
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go seed
+
+.PHONY: seed-one
+seed-one:
+	@if [ -z "$(name)" ]; then \
+		echo "Debes pasar name=nombre_seeder, por ejemplo name=catalog_items"; \
+		exit 1; \
+	fi; \
+	echo "Ejecutando seeder: $(name)"; \
+	$(DC_RUN) go run ./cmd/cmd-cli/main.go seed --only $(name)

@@ -14,28 +14,23 @@ import (
 	"go-fiber-core/internal/dtos/config"
 )
 
-// Service-level constants
 const (
 	defaultConfigPath = "internal/appconfig/config.yml"
 	seedTimeout       = 5 * time.Minute
 )
 
-// Seeder represents a function that seeds data into the database.
 type Seeder func() error
 
-// SeederService manages and executes database seeders.
 type SeederService struct {
 	seeders []SeederConfig
 	logger  *slog.Logger
 }
 
-// SeederConfig holds metadata for a seeder.
 type SeederConfig struct {
 	Name   string
 	Seeder Seeder
 }
 
-// NewSeederService creates a new seeder service instance.
 func NewSeederService(logger *slog.Logger) *SeederService {
 	if logger == nil {
 		logger = slog.Default()
@@ -47,7 +42,6 @@ func NewSeederService(logger *slog.Logger) *SeederService {
 	}
 }
 
-// AddSeeder registers a seeder with the service.
 func (s *SeederService) AddSeeder(name string, seeder Seeder) {
 	s.seeders = append(s.seeders, SeederConfig{
 		Name:   name,
@@ -55,8 +49,6 @@ func (s *SeederService) AddSeeder(name string, seeder Seeder) {
 	})
 }
 
-// Run executes all registered seeders in sequence.
-// Stops on first error and returns it.
 func (s *SeederService) Run(ctx context.Context) error {
 	if len(s.seeders) == 0 {
 		s.logger.Warn("no hay seeders registrados")
@@ -86,8 +78,54 @@ func (s *SeederService) Run(ctx context.Context) error {
 	return nil
 }
 
-// SeedDatabase initializes database connections and executes all seeders.
-func SeedDatabase() error {
+func (s *SeederService) RunSelected(ctx context.Context, names []string) error {
+	if len(names) == 0 {
+		return s.Run(ctx)
+	}
+
+	selected := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		selected[n] = struct{}{}
+	}
+
+	filtered := make([]SeederConfig, 0, len(names))
+	for _, sc := range s.seeders {
+		if _, ok := selected[sc.Name]; ok {
+			filtered = append(filtered, sc)
+		}
+	}
+
+	if len(filtered) == 0 {
+		s.logger.Warn("no se encontraron seeders para los nombres solicitados", "requested", names)
+		return nil
+	}
+
+	s.logger.Info("iniciando ejecución de seeders filtrados",
+		"total", len(filtered),
+		"requested", names)
+	startTime := time.Now()
+
+	for i, sc := range filtered {
+		seederLogger := s.logger.With("seeder", sc.Name, "index", i+1)
+		seederLogger.Info("ejecutando seeder")
+
+		seederStart := time.Now()
+		if err := sc.Seeder(); err != nil {
+			seederLogger.Error("seeder falló", "error", err, "duration", time.Since(seederStart))
+			return fmt.Errorf("seeder '%s' falló: %w", sc.Name, err)
+		}
+
+		seederLogger.Info("seeder completado", "duration", time.Since(seederStart))
+	}
+
+	s.logger.Info("seeders filtrados completados exitosamente",
+		"total", len(filtered),
+		"duration", time.Since(startTime))
+
+	return nil
+}
+
+func SeedDatabase(only ...string) error {
 	// Setup structured logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -118,14 +156,11 @@ func SeedDatabase() error {
 
 	logger.Info("conexión a base de datos establecida")
 
-	// Initialize seeder service
 	service := NewSeederService(logger)
 
-	// Register all seeders in desired execution order
 	registerSeeders(service, dbPool, *configPath)
 
-	// Execute all registered seeders
-	if err := service.Run(ctx); err != nil {
+	if err := service.RunSelected(ctx, only); err != nil {
 		logger.Error("error ejecutando seeders", "error", err)
 		return err
 	}
@@ -162,6 +197,10 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 
 	service.AddSeeder("menus", func() error {
 		return MenuSeeder(pool)
+	})
+
+	service.AddSeeder("catalog_items", func() error {
+		return CatalogItemsSeeder(pool)
 	})
 
 	// ═══════════════════════════════════════════════════════════════
