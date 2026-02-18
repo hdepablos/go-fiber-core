@@ -23,10 +23,11 @@ type UserWriterService interface {
 	CreateWithRole(ctx context.Context, user *models.User, roleIDs []uint64) error
 	RemoveRolesFromUsers(ctx context.Context, userIDs []uint64, roleIDs []uint64) error
 	AssignRolesToUsers(ctx context.Context, userIDs []uint64, roleIDs []uint64) error
+	UpdateUserWithRoles(ctx context.Context,id uint64,data UpdateUserDTO,roleIDs []uint64,operatorID uint64) (*models.User, error)
 	Update(ctx context.Context, id uint64, data UpdateUserDTO) (*models.User, error)
 	Activate(ctx context.Context, id uint64, operatorID uint64) error
 	Deactivate(ctx context.Context, id uint64, operatorID uint64) error
-	SetActiveBulk(ctx context.Context, ids []uint64, active bool, operatorID uint64) error 
+	SetActiveBulk(ctx context.Context, ids []uint64, active bool, operatorID uint64) error
 	SoftDelete(ctx context.Context, id uint64) error
 	HardDelete(ctx context.Context, id uint) error
 }
@@ -469,4 +470,91 @@ func (s *userWriterService) SetActiveBulk(ctx context.Context, ids []uint64, act
 			"is_active":   active,
 			"operator_id": operatorID, // guardamos quién hizo la acción
 		}).Error
+}
+
+func (s *userWriterService) UpdateUserWithRoles(ctx context.Context,id uint64,data UpdateUserDTO,roleIDs []uint64,operatorID uint64) (*models.User, error) {
+
+	var updatedUser *models.User
+
+	err := s.conn.ConnectGormWrite.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+
+		// 1️⃣ Obtener usuario existente
+		var user models.User
+		if err := tx.First(&user, id).Error; err != nil {
+			return err
+		}
+
+		// 2️⃣ Actualizar campos del usuario
+		if data.Name != nil {
+			user.Name = *data.Name
+		}
+		if data.Email != nil {
+			user.Email = *data.Email
+		}
+		if data.Password != nil && *data.Password != "" {
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*data.Password), bcrypt.DefaultCost)
+			if err != nil {
+				return err
+			}
+			user.Password = string(hashedPassword)
+		}
+		if data.IsActive != nil {
+			user.IsActive = *data.IsActive
+		}
+			user.OperatorID = &operatorID
+
+
+		if err := s.userWriter.Update(ctx, tx, &user); err != nil {
+			return err
+		}
+
+		// 3️⃣ Actualizar roles si vienen
+		if roleIDs != nil {
+			var roles []models.Role
+			if err := tx.Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {
+				return err
+			}
+			if len(roles) != len(roleIDs) {
+				return gorm.ErrRecordNotFound
+			}
+
+			if err := tx.Model(&user).Association("Roles").Replace(&roles); err != nil {
+				return err
+			}
+
+			// Recalcular menús desde menu_roles
+			var menuRoles []models.MenuRole
+			if err := tx.
+				Where("role_id IN ? AND is_active = true", roleIDs).
+				Find(&menuRoles).Error; err != nil {
+				return err
+			}
+
+			menuIDMap := make(map[uint]struct{})
+			for _, mr := range menuRoles {
+				menuIDMap[mr.MenuID] = struct{}{}
+			}
+			menuIDs := make([]uint, 0, len(menuIDMap))
+			for id := range menuIDMap {
+				menuIDs = append(menuIDs, id)
+			}
+
+			var menus []models.Menu
+			if len(menuIDs) > 0 {
+				if err := tx.Where("id IN ?", menuIDs).Find(&menus).Error; err != nil {
+					return err
+				}
+			}
+
+			if err := tx.Model(&user).Association("Menus").Replace(&menus); err != nil {
+				return err
+			}
+		}
+
+		// 🔹 Guardamos referencia para devolverla
+		updatedUser = &user
+		return nil
+	})
+
+	return updatedUser, err
 }

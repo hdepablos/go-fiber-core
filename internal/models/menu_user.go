@@ -13,10 +13,11 @@ type MenuUser struct {
 	UserID uint64 `json:"user_id"`
 
 	Menu Menu `gorm:"foreignKey:MenuID"`
-	User User `gorm:"foreignKey:UserID"`
+	User User `gorm:"foreignKey:UserID;references:ID"`
 
-	OperatorID *uint64 `json:"operator_id"`
-	Operator   *User   `json:"operator"`
+	OperatorID *uint `json:"operator_id"`
+	Operator   *User `gorm:"foreignKey:OperatorID;references:ID"`
+
 
 	IsActive  bool           `json:"is_active"`
 	CreatedAt time.Time      `json:"created_at"`

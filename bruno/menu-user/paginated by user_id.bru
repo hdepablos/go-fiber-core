@@ -1,17 +1,13 @@
 meta {
-  name: getAll
+  name: paginated by user_id
   type: http
-  seq: 3
+  seq: 2
 }
 
 post {
-  url: {{urlBase}}api/v1/users/paginated
+  url: {{urlBase}}api/v1/menu-users/by-user/32
   body: json
   auth: bearer
-}
-
-headers {
-  X-Client-Code: 12345678
 }
 
 auth:bearer {
@@ -20,11 +16,11 @@ auth:bearer {
 
 body:json {
   {
-      "sortBy": ["id"],
+      "sortBy": ["menu_user.menus.item_name"],
       "sortDesc": [true],
       "filterBy": [],
       "filterValues": [],
-      "rowsPerPage": 15,
-      "page": 1
+      "rowsPerPage": 15
   }
+  
 }

@@ -7,7 +7,7 @@ type MenuUserResponse struct {
 	ID         uint      `json:"id"`
 	MenuID     uint      `json:"menu_id"`
 	UserID     uint64    `json:"user_id"`
-	OperatorID *uint64   `json:"operator_id"`
+	OperatorID *uint   `json:"operator_id"`
 	IsActive   bool      `json:"is_active"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`

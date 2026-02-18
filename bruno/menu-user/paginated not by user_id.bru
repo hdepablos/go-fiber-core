@@ -1,11 +1,11 @@
 meta {
-  name: paginated copy
+  name: paginated not by user_id
   type: http
-  seq: 21
+  seq: 3
 }
 
 post {
-  url: {{urlBase}}api/v1/menu-users/paginated
+  url: {{urlBase}}api/v1/menu-users/not-by-user/32
   body: json
   auth: bearer
 }
@@ -23,4 +23,5 @@ body:json {
       "rowsPerPage": 15,
       "page": 1
   }
+  
 }
