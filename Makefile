@@ -61,11 +61,11 @@ DC_RUN  = $(DC_BASE) run --rm $(SERVICE_NAME)
 # Comandos disponibles
 ###############################################################################
 .PHONY: help
-help: ## ℹ️ Muestra todos los comandos disponibles con su descripción.
+help: ## ℹ️ Muestra todos los comandos disponibles con su descripción. Uso: make help
 	@awk -F ':|##' '/^[a-zA-Z0-9_-]+:.*?##/ {printf "\033[36m%-20s\033[0m %s\n", $$1, $$NF}' $(MAKEFILE_LIST)
 
 .PHONY: show-all-variables
-show-all-variables: ## 🔍 Muestra las variables principales del proyecto.
+show-all-variables: ## 🔍 Muestra las variables principales del proyecto. Uso: make show-all-variables
 	@echo "$(INFO)🔍 Visualizando variables del sistema:$(RESET)"
 	@echo "PROJECT_SLUG: $(PROJECT_SLUG)"
 	@echo "PROJECT_NAME_LOWERCASE: $(PROJECT_NAME_LOWERCASE)"
@@ -88,7 +88,7 @@ color-messages: ## 🎨 Ejemplos de los diferentes colores de mensajes. Uso: mak
 	@echo "$(HIGHLIGHT)     HIGHLIGHT  🚀 Color del mensaje$(RESET)"
 
 .PHONY: check-env
-check-env: ## ⚖️ Verifica que existan las variables de entorno indispensables.
+check-env: ## ⚖️ Verifica que existan las variables de entorno indispensables. Uso: make check-env
 	@echo "$(INFO)Verificando variables de entorno en el .env indispensables para el Makefile$(RESET)"
 	@if [ -z "$(APP_ENV)" ]; then echo "❌ APP_ENV no está definido en .env"; exit 1; fi
 	@if [ -z "$(PROJECT_SLUG)" ]; then echo "❌ PROJECT_SLUGS no está definido en .env"; exit 1; fi
@@ -112,7 +112,7 @@ check-env: ## ⚖️ Verifica que existan las variables de entorno indispensable
 ## Golang
 ###############################################################################
 .PHONY: vendor
-vendor: ## 📦 Actualiza el archivo go.mod y la carpeta vendor.
+vendor: ## 📦 Actualiza el archivo go.mod y la carpeta vendor. Uso: make vendor
 	@echo "$(SUCCESS)📦 Ordenando y vendoring dependencias...$(RESET)"
 	@$(DC_RUN) go mod tidy
 	@$(DC_RUN) go mod vendor
@@ -124,7 +124,7 @@ install-pkg: ## 📥 Instala un paquete Go específico. Uso: make install-pkg pk
 	@$(MAKE) vendor
 
 .PHONY: install-all-pkg
-install-all-pkg: ## 🗂️ Instala todas las dependencias Go necesarias del proyecto.
+install-all-pkg: ## 🗂️ Instala todas las dependencias Go necesarias del proyecto. Uso: make install-all-pkg
 	@echo "$(INFO)🗂️ Instalando todas las dependencias...$(RESET)"
 	@$(MAKE) install-pkg pkg=github.com/golang-jwt/jwt/v5
 	@$(MAKE) install-pkg pkg=golang.org/x/crypto/bcrypt
@@ -160,12 +160,12 @@ install-all-pkg: ## 🗂️ Instala todas las dependencias Go necesarias del pro
 	@$(MAKE) vendor
 
 .PHONY: wire
-wire: ## 🧬 Genera el código de inyección de dependencias con Google Wire.
+wire: ## 🧬 Genera el código de inyección de dependencias con Google Wire. Uso: make wire
 	@echo "$(SUCCESS)🧬 Generando inyección de dependencias con Wire...$(RESET)"
 	@$(DC_RUN) wire gen -tags wireinject ./cmd/api/di
 
 .PHONY: wire-sync
-wire-sync: ## 🧬📦 Genera código de Wire y actualiza vendor.
+wire-sync: ## 🧬📦 Genera código de Wire y actualiza vendor. Uso: make wire-sync
 	@$(MAKE) wire
 	@$(MAKE) vendor
 	@echo "$(SUCCESS)✅ Proceso de Wire y vendor completado.$(RESET)"
@@ -198,13 +198,13 @@ logs-tail-slow-sql-cloudwatch: ## 🐢☁️ Sigue slow SQL en CloudWatch filtra
 	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE" --filter-pattern "SLOW SQL"
 
 .PHONY: logs-groups
-logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch.
+logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch. Uso: make logs-groups
 	@PREFIX="/app/$(PROJECT_SLUG)"; \
 	echo "$(INFO)📚 Listando log groups con prefijo $$PREFIX$(RESET)"; \
 	aws logs describe-log-groups $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --log-group-name-prefix "$$PREFIX" --query 'logGroups[].logGroupName' --output table
 
 .PHONY: send-message
-send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS.
+send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS. Uso: make send-message
 	@echo "$(INFO)✉️ Enviando mensaje a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
 	awslocal sqs send-message \
 		--queue-url $(SQS_QUEUE_URL) \
@@ -212,7 +212,7 @@ send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS.
 	@echo "$(SUCCESS)✅ Mensaje enviado correctamente.$(RESET)"
 
 .PHONY: send-message-error
-send-message-error: ## ✉️⚠️ Envía un mensaje de error a la cola SQS.
+send-message-error: ## ✉️⚠️ Envía un mensaje de error a la cola SQS. Uso: make send-message-error
 	@echo "$(INFO)✉️ Enviando mensaje de error a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
 	awslocal sqs send-message \
 		--queue-url $(SQS_QUEUE_URL) \
@@ -220,7 +220,7 @@ send-message-error: ## ✉️⚠️ Envía un mensaje de error a la cola SQS.
 	@echo "$(SUCCESS)✅ Mensaje de error enviado.$(RESET)"
 
 .PHONY: test-api-aws
-test-api-aws: ## 🧪 Realiza pruebas sobre la API Gateway de LocalStack.
+test-api-aws: ## 🧪 Realiza pruebas sobre la API Gateway de LocalStack. Uso: make test-api-aws
 	@echo "$(INFO)🧪 Obteniendo endpoint de la API...$(RESET)"
 	@API_ENDPOINT=$$(aws --profile $(AWS_PROFILE_NAME) cloudformation describe-stacks \
 		--stack-name $(STACK_NAME) \
@@ -729,12 +729,12 @@ migrate-reset: ## ♻️ Revierte y reaplica todas las migraciones (reset comple
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go migrations reset
 
 .PHONY: seed
-seed:
+seed: ## 🌱 Ejecuta todos los seeders registrados. Uso: make seed
 	@echo "Ejecutando todos los seeders..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go seed
 
 .PHONY: seed-one
-seed-one:
+seed-one: ## 🎯 Ejecuta un seeder específico. Uso: make seed-one name=catalog_items
 	@if [ -z "$(name)" ]; then \
 		echo "Debes pasar name=nombre_seeder, por ejemplo name=catalog_items"; \
 		exit 1; \
