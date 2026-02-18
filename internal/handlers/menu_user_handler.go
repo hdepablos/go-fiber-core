@@ -96,7 +96,7 @@ func (h *menuUserHandler) GetMenusNotByUser(c *fiber.Ctx) error {
 		return err
 	}
 
-	return responses.Success(c, "Menus no no asociados obtenidos exitosamente", response)
+	return responses.Success(c, "Menus no asociados obtenidos exitosamente", response)
 }
 
 func (h *menuUserHandler) GetMenuAssignmentStatus(c *fiber.Ctx) error {
