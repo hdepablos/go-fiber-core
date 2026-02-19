@@ -235,29 +235,147 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 
 
 // Menus NO asociados al usuario (SIN duplicados, 1 fila = 1 menú)
-func (r *MenuUserPaginationRepository) GetMenusNotByUser(
-	ctx context.Context,
-	db *gorm.DB,
-	userID uint,
-	req dtos.PaginationRequest,
-) (*dtos.PaginationResponse[models.MenuUser], error) {
+func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db *gorm.DB, userID uint, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.MenuUserResponse], error) {
 
-	return r.ps.Execute(
-		db.WithContext(ctx).
-			Model(&models.MenuUser{}).
-			Joins("JOIN menus ON menus.id = menu_user.menu_id").
-			Where("menus.item_type = ?", "link").
-			Where(`
-				menus.id NOT IN (
-					SELECT menu_id 
-					FROM menu_user 
-					WHERE user_id = ?
-				)
-			`, userID),
-		req,
-		func(q *gorm.DB) *gorm.DB {
-			return q.Preload("Menu")
-		},
-		nil,
-	)
+	var raw []models.MenuUserRow
+	var result []models.MenuUserResponse
+	var total int64
+
+	base := db.WithContext(ctx).
+		Table("menus m").
+		Joins(`
+			LEFT JOIN menu_user mu 
+				ON mu.menu_id = m.id AND mu.user_id = ?
+		`, userID).
+		Joins("LEFT JOIN users u ON u.id = mu.user_id").
+		Joins("LEFT JOIN users o ON o.id = mu.operator_id").
+		Where("m.item_type = ?", "link").
+		Where("mu.id IS NULL") // 🔥 SOLO LOS NO ASIGNADOS
+
+	/* =================================================
+	   FILTROS DINÁMICOS (MISMO estilo ByUser)
+	================================================= */
+	for i, f := range req.FilterBy {
+
+		if i >= len(req.FilterValues) {
+			continue
+		}
+
+		val := req.FilterValues[i]
+
+		switch f {
+
+		case "menu_id":
+			base = base.Where("m.id = ?", val)
+
+		case "item_name", "menu.name":
+			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+		case "menus.is_active":
+			base = base.Where("m.is_active = ?", val)
+		}
+	}
+
+	/* =================================================
+	   SORT DINÁMICO (MISMO estilo)
+	================================================= */
+	if len(req.SortBy) > 0 {
+
+		for i, col := range req.SortBy {
+
+			desc := i < len(req.SortDesc) && req.SortDesc[i]
+
+			dir := "ASC"
+			if desc {
+				dir = "DESC"
+			}
+
+			switch col {
+
+			case "item_name":
+				base = base.Order("m.item_name " + dir)
+
+			case "created_at":
+				base = base.Order("m.created_at " + dir)
+
+			default:
+				base = base.Order("m.id DESC")
+			}
+		}
+	} else {
+		base = base.Order("m.created_at DESC")
+	}
+
+	/* =================================================
+	   COUNT
+	================================================= */
+	if err := base.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	/* =================================================
+	   DATA (SCAN plano igual que ByUser)
+	================================================= */
+	if err := base.
+		Select(`
+			NULL AS id,
+			m.id AS menu_id,
+			NULL AS user_id,
+			NULL AS operator_id,
+			m.is_active,
+			m.created_at,
+			m.updated_at,
+
+			m.id   AS menu_id_ref,
+			m.item_type AS menu_type,
+			m.item_name AS menu_name,
+			m.icon AS menu_icon,
+
+			NULL AS user_id_ref,
+			NULL AS user_name,
+			NULL AS user_email,
+
+			NULL AS operator_id_ref,
+			NULL AS operator_name
+		`).
+		Limit(req.RowsPerPage).
+		Offset((req.Page - 1) * req.RowsPerPage).
+		Scan(&raw).Error; err != nil {
+		return nil, err
+	}
+
+	/* =================================================
+	   MAPEO → MISMO RESPONSE STRUCT
+	================================================= */
+	for _, r := range raw {
+
+		item := models.MenuUserResponse{
+			MenuID:   r.MenuIDRef,
+			IsActive: r.IsActive,
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
+			Menu: models.MenuResponse{
+				ID:   r.MenuIDRef,
+				Type: r.MenuType,
+				Name: r.MenuName,
+				Icon: r.MenuIcon,
+			},
+		}
+
+		result = append(result, item)
+	}
+
+	totalPages := 0
+	if req.RowsPerPage > 0 {
+		totalPages = int((total + int64(req.RowsPerPage) - 1) / int64(req.RowsPerPage))
+	}
+
+	return &dtos.PaginationResponse[models.MenuUserResponse]{
+		Data:        result,
+		TotalRows:   total,
+		TotalPages:  totalPages,
+		Page:        req.Page,
+		RowsPerPage: req.RowsPerPage,
+		Extras:      map[string]any{},
+	}, nil
 }
