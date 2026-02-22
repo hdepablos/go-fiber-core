@@ -70,6 +70,13 @@
 				"to_path": "/banks-v5",
 				"icon": "mdi-alpha-v-box-outline",
 				"order_index": 110
+			},
+			{
+				"item_type": "link",
+				"item_name": "Bancos V6",
+				"to_path": "/banks-v6",
+				"icon": "mdi-alpha-v-box-outline",
+				"order_index": 115
 			}
 		]
 	},
@@ -96,5 +103,83 @@
 		"to_path": "/messages",
 		"icon": "mdi-chat-outline",
 		"order_index": 150
+	},
+	{
+		"item_type": "link",
+		"item_name": "Notificaciones",
+		"to_path": "/notificaciones",
+		"icon": "mdi-notification-clear-all",
+		"order_index": 160
+	},
+	{
+		"item_type": "line",
+		"item_name": "Linea de config",
+		"order_index": 163
+	},
+	{
+		"item_type": "separator",
+		"item_name": "Gestion finanzas",
+		"order_index": 165
+	},
+	{
+		"item_type": "group",
+		"item_name": "Finanzas",
+		"icon": "mdi-finance",
+		"order_index": 170,
+		"children": [
+			{
+				"item_type": "link",
+				"item_name": "Contabilidad",
+				"to_path": "/contabilidad",
+				"icon": "mdi-calculator-variant",
+				"order_index": 180
+			},
+			{
+				"item_type": "link",
+				"item_name": "Contabilidades",
+				"to_path": "/contabilidades",
+				"icon": "mdi-calculator-variant",
+				"order_index": 190
+			}
+		]
+	},
+	{
+		"item_type": "line",
+		"item_name": "Línea de Configuración",
+		"order_index": 200
+	},
+	{
+		"item_type": "separator",
+		"item_name": "Configuraciones",
+		"order_index": 205
+	},
+	{
+		"item_type": "group",
+		"item_name": "Usuarios",
+		"icon": "mdi-card-account-details-outline",
+		"order_index": 210,
+		"children": [
+			{
+				"item_type": "link",
+				"item_name": "AllUsuarios",
+				"to_path": "/users",
+				"icon": "mdi-account-plus-outline",
+				"order_index": 220
+			},
+			{
+				"item_type": "link",
+				"item_name": "Menus y Roles",
+				"to_path": "/menu-roles",
+				"icon": "mdi-account-cog",
+				"order_index": 230
+			},
+			{
+				"item_type": "link",
+				"item_name": "Menu y Usuarios",
+				"to_path": "/menu-users",
+				"icon": "mdi-account-group",
+				"order_index": 240
+			}
+		]
 	}
 ]
