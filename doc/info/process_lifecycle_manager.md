@@ -30,9 +30,16 @@ Catálogo de tipos de proceso, con soporte de archivado lógico.
 - `id BIGSERIAL PK`
 - `name VARCHAR(150) NOT NULL`: nombre del tipo de proceso.
 - `description TEXT`: descripción libre.
+- `is_visible BOOLEAN NOT NULL DEFAULT TRUE`: indica si el tipo de proceso debe ser visible en el frontend (por ejemplo, listado en la datatable para operadores).
 - `archived_at TIMESTAMP NULL`: marca de archivado (soft delete lógico).
 - `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
 - `updated_at TIMESTAMP NOT NULL DEFAULT NOW()`
+
+Uso típico desde backend/frontend:
+
+- Para poblar la datatable de procesos para los operadores, las consultas deberían filtrar por `is_visible = TRUE` y `archived_at IS NULL`, de forma que:
+  - Los procesos internos o técnicos queden ocultos.
+  - Sólo se muestren tipos activos y configurados para ser visibles.
 
 ### `process_versions`
 
@@ -43,6 +50,7 @@ Versiones por tipo de proceso (soporta múltiples sedes).
 - `version_number INTEGER NOT NULL`: número de versión incremental por tipo.
 - `sede_id BIGINT NULL`: sede específica, o `NULL` para versión global.
 - `status process_version_status NOT NULL DEFAULT 'DRAFT'`
+- `operator_id BIGINT NULL`: identificador del usuario que creó la versión.
 - `archived_at TIMESTAMP NULL`: archivado lógico de la versión.
 - `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
 - `updated_at TIMESTAMP NOT NULL DEFAULT NOW()`
@@ -79,7 +87,7 @@ Historial de cambios de estado relevantes (especialmente promociones a `PROD`).
 - `process_version_id BIGINT NOT NULL` → FK a `process_versions(id)`
 - `promoted_from_status process_version_status NOT NULL`: estado previo desde el que se promovió o cambió.
 - `promoted_at TIMESTAMP NOT NULL DEFAULT NOW()`: timestamp de la acción.
-- `operator_id BIGINT NOT NULL`: identificador del usuario/operador.
+- `promoted_by BIGINT NOT NULL`: identificador del usuario que ejecutó la promoción.
 - `comment VARCHAR(300) NOT NULL`: comentario obligatorio de la promoción (máx. 300 caracteres).
 
 Cada ejecución de `promote_process_version` agrega uno o dos registros:
@@ -338,4 +346,4 @@ Reglas de negocio:
 - `process_version_history` registra:
   - De dónde venía la versión que se convierte en `PROD` (`promoted_from_status`).
   - Cambios de estado de versiones que dejan de ser `PROD`.
-  - Operador (`operator_id`) y comentario obligatorio (`comment`).
+  - Quién promovió (`promoted_by`) y comentario obligatorio (`comment`).

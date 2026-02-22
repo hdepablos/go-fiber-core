@@ -31,6 +31,25 @@ La documentación detallada sobre los seeders (incluyendo `catalog_items` y el u
 
 - [doc/info/seeders-catalog-items.md](doc/info/seeders-catalog-items.md)
 
+## Campos `operator_id` (equivalente a `created_by`)
+
+En el proyecto se usa el nombre `operator_id` para representar al usuario que ejecuta una acción relevante de negocio, equivalente al concepto clásico de `created_by` o `updated_by`. Es un campo de auditoría funcional que apunta al usuario operador.
+
+Tablas donde se utiliza actualmente:
+
+- `users.operator_id`: último operador que activó, desactivó o actualizó al usuario.
+- `menu_user.operator_id`: operador que creó o modificó la relación menú-usuario.
+- `menu_role.operator_id`: operador que creó o modificó la relación menú-rol.
+- `process_versions.operator_id`: operador que creó la versión de proceso.
+- `process_version_history.promoted_by`: operador que promovió una versión de proceso entre estados (por ejemplo, a `PROD`).
+
+En los modelos de Go se expone como:
+
+- `OperatorID` (`*uint` o `*uint64`): columna `operator_id` en base de datos.
+- `Operator` (`*User`): relación hacia la tabla `users` para cargar los datos del operador.
+
+En los flujos HTTP, el `operator_id` normalmente se toma del usuario autenticado (ID del `User` extraído del JWT) y se guarda cuando se realizan acciones como activación/desactivación de usuarios, asignación de menús o promoción de escenarios de proceso.
+
 ## Ciclo de vida de procesos (Process Lifecycle Manager)
 
 La base de datos expone las funciones PL/pgSQL:
@@ -46,6 +65,10 @@ La documentación funcional y de modelo de datos está en:
 La explicación funcional del flujo (sin detalles técnicos) está en:
 
 - [doc/info/process_lifecycle_manager_flow.md](doc/info/process_lifecycle_manager_flow.md)
+
+Visibilidad de tipos de proceso en frontend:
+
+- El campo `process_types.is_visible` controla si un tipo de proceso debe ser mostrado en el frontend (por ejemplo, en la datatable donde los operadores seleccionan procesos y crean escenarios). Las consultas que alimentan esa vista deberían filtrar por `is_visible = TRUE` y `archived_at IS NULL`.
 
 ### Endpoints HTTP
 

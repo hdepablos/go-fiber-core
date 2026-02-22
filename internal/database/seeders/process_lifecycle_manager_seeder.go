@@ -32,23 +32,25 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 
 		var processTypeID int64
 		if err := tx.QueryRow(ctx,
-			`INSERT INTO process_types (name, description)
-             VALUES ($1, $2)
+			`INSERT INTO process_types (name, description, is_visible)
+             VALUES ($1, $2, $3)
              RETURNING id`,
 			"Order process lifecycle",
 			"Base process type for order lifecycle testing",
+			true,
 		).Scan(&processTypeID); err != nil {
 			return fmt.Errorf("insert process_types: %w", err)
 		}
 
 		var baseVersionID int64
 		if err := tx.QueryRow(ctx,
-			`INSERT INTO process_versions (process_type_id, version_number, status)
-             VALUES ($1, $2, $3)
+			`INSERT INTO process_versions (process_type_id, version_number, status, operator_id)
+             VALUES ($1, $2, $3, $4)
              RETURNING id`,
 			processTypeID,
 			1,
 			"DRAFT",
+			1,
 		).Scan(&baseVersionID); err != nil {
 			return fmt.Errorf("insert process_versions (TEST): %w", err)
 		}

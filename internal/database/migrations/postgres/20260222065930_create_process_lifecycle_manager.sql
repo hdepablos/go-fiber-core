@@ -20,6 +20,7 @@ CREATE TABLE process_types (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     description TEXT,
+    is_visible BOOLEAN NOT NULL DEFAULT TRUE,
     archived_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -35,6 +36,7 @@ CREATE TABLE process_versions (
     version_number INTEGER NOT NULL,
     sede_id BIGINT NULL,
     status process_version_status NOT NULL DEFAULT 'DRAFT',
+    operator_id BIGINT NULL,
     archived_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -68,7 +70,7 @@ CREATE TABLE process_version_history (
     process_version_id BIGINT NOT NULL REFERENCES process_versions(id),
     promoted_from_status process_version_status NOT NULL,
     promoted_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    operator_id BIGINT NOT NULL,
+    promoted_by BIGINT NOT NULL,
     comment VARCHAR(300) NOT NULL
 );
 
@@ -132,7 +134,7 @@ BEGIN
         INSERT INTO process_version_history(
             process_version_id,
             promoted_from_status,
-            operator_id,
+            promoted_by,
             comment
         )
         VALUES (
@@ -151,7 +153,7 @@ BEGIN
     INSERT INTO process_version_history(
         process_version_id,
         promoted_from_status,
-        operator_id,
+        promoted_by,
         comment
     )
     VALUES (
