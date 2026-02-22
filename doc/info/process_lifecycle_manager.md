@@ -6,7 +6,7 @@ Incluye:
 
 - Tipo ENUM: `process_version_status`
 - Tablas: `process_types`, `process_versions`, `process_steps`, `process_version_history`
-- Funciones: `promote_process_version`, `replicate_process_version`, `resolve_process_version`
+- Funciones: `promote_process_version`, `replicate_process_version`, `resolve_process_version`, `move_process_version_to_test`
 
 ---
 
@@ -295,6 +295,39 @@ Responsabilidad: resolver cuál es la versión efectiva a usar para un proceso d
      - `execution_key`
      - `config`
      - `step_order`
+
+---
+
+## Función `move_process_version_to_test`
+
+```sql
+CREATE OR REPLACE FUNCTION move_process_version_to_test(
+    p_process_version_id BIGINT
+)
+RETURNS VOID
+```
+
+Responsabilidad: mover una versión de proceso desde `DRAFT` a `TEST`.
+
+Reglas de negocio:
+
+- Sólo opera sobre versiones no archivadas (`archived_at IS NULL`).
+- Si la versión no existe o está archivada, lanza:
+
+  ```sql
+  RAISE EXCEPTION 'Process version not found or archived';
+  ```
+
+- Si el estado actual no es `DRAFT`, lanza:
+
+  ```sql
+  RAISE EXCEPTION 'Only DRAFT versions can be moved to TEST';
+  ```
+
+- Si las validaciones pasan, actualiza:
+
+  - `status = 'TEST'`
+  - `updated_at = NOW()`
 
 ---
 

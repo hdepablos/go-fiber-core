@@ -37,11 +37,15 @@ La base de datos expone las funciones PL/pgSQL:
 
 - `promote_process_version(p_process_version_id BIGINT, p_operator_id BIGINT, p_comment VARCHAR)`
 - `replicate_process_version(p_process_version_id BIGINT) RETURNS BIGINT`
-- `resolve_process_version(p_process_type_id BIGINT, p_sede_id BIGINT, p_override_process_version_id BIGINT DEFAULT NULL) RETURNS BIGINT`
+- `resolve_process_version(p_process_type_id BIGINT, p_sede_id BIGINT, p_override_process_version_id BIGINT DEFAULT NULL) RETURNS TABLE (process_version_id BIGINT, process_steps JSONB)`
+- `move_process_version_to_test(p_process_version_id BIGINT) RETURNS VOID`
 
 La documentación funcional y de modelo de datos está en:
 
 - [doc/info/process_lifecycle_manager.md](doc/info/process_lifecycle_manager.md)
+La explicación funcional del flujo (sin detalles técnicos) está en:
+
+- [doc/info/process_lifecycle_manager_flow.md](doc/info/process_lifecycle_manager_flow.md)
 
 ### Endpoints HTTP
 
@@ -71,6 +75,11 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
       - `config` (objeto JSON)
       - `step_order`
 
+- `POST /api/v1/process-lifecycle/to-test`
+  - Body:
+    - `process_version_id` (int64, requerido, > 0)
+  - Acción: invoca `move_process_version_to_test` para mover una versión desde `DRAFT` a `TEST`. Si la versión no existe o está archivada, se traduce a `ErrNotFound`. Si la versión no está en `DRAFT`, se traduce a `ErrInvalidArgument`.
+
 ### Manejo de errores
 
 Las excepciones levantadas por las funciones SQL se traducen a errores de dominio:
@@ -94,6 +103,7 @@ En la carpeta `bruno/process-lifecycle` hay requests de ejemplo que utilizan est
 - `replicate-scenario.bru` → `POST /api/v1/process-lifecycle/replicate`
 - `promote-scenario.bru` → `POST /api/v1/process-lifecycle/promote`
 - `resolve-scenario.bru` → `POST /api/v1/process-lifecycle/resolve`
+- `move-to-test-scenario.bru` → `POST /api/v1/process-lifecycle/to-test`
 
 Todos heredan la configuración de autenticación y base URL (`{{urlBase}}`) definida en `bruno/environments`.
 

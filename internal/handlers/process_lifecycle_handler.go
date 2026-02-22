@@ -13,6 +13,7 @@ type ProcessLifecycleHandler interface {
 	ReplicateScenario(c *fiber.Ctx) error
 	PromoteScenario(c *fiber.Ctx) error
 	ResolveScenario(c *fiber.Ctx) error
+	MoveToTestScenario(c *fiber.Ctx) error
 }
 
 type processLifecycleHandler struct {
@@ -80,4 +81,19 @@ func (h *processLifecycleHandler) ResolveScenario(c *fiber.Ctx) error {
 		"process_version_id": resolvedID,
 		"process_steps":      steps,
 	})
+}
+
+func (h *processLifecycleHandler) MoveToTestScenario(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.MoveToTestScenarioRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	if err := h.service.MoveProcessVersionToTest(ctx, req.ProcessVersionID); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Escenario movido a TEST exitosamente", nil)
 }

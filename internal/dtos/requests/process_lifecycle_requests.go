@@ -14,3 +14,7 @@ type ResolveScenarioRequest struct {
 	SedeID                   int64  `json:"sede_id" validate:"required"`
 	OverrideProcessVersionID *int64 `json:"override_process_version_id,omitempty"`
 }
+
+type MoveToTestScenarioRequest struct {
+	ProcessVersionID int64 `json:"process_version_id" validate:"required,gt=0"`
+}

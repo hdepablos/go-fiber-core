@@ -28,5 +28,10 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 		utils.Validate(new(requests.ResolveScenarioRequest)),
 		handler.ResolveScenario,
 	)
-}
 
+	group.Post(
+		"/to-test",
+		utils.Validate(new(requests.MoveToTestScenarioRequest)),
+		handler.MoveToTestScenario,
+	)
+}

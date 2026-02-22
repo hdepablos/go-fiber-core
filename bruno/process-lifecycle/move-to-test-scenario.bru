@@ -1,0 +1,21 @@
+meta {
+  name: move scenario to test
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/to-test
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_version_id": 1
+  }
+}

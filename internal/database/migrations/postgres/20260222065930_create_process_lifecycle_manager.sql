@@ -100,7 +100,7 @@ BEGIN
     INTO v_process_type_id, v_sede_id, v_old_status
     FROM process_versions
     WHERE id = p_process_version_id
-      AND archived_at IS NULL
+    AND archived_at IS NULL
     FOR UPDATE;
 
     IF NOT FOUND THEN
@@ -118,9 +118,9 @@ BEGIN
     SELECT id INTO v_current_prod_id
     FROM process_versions
     WHERE process_type_id = v_process_type_id
-      AND sede_id IS NOT DISTINCT FROM v_sede_id
-      AND status = 'PROD'
-      AND archived_at IS NULL
+    AND sede_id IS NOT DISTINCT FROM v_sede_id
+    AND status = 'PROD'
+    AND archived_at IS NULL
     FOR UPDATE;
 
     IF v_current_prod_id IS NOT NULL THEN
@@ -185,7 +185,7 @@ BEGIN
     INTO v_process_type_id, v_sede_id
     FROM process_versions
     WHERE id = p_process_version_id
-      AND archived_at IS NULL;
+    AND archived_at IS NULL;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Process version not found or archived';
@@ -253,7 +253,7 @@ BEGIN
     PERFORM 1
     FROM process_types
     WHERE id = p_process_type_id
-      AND archived_at IS NULL;
+    AND archived_at IS NULL;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Process type does not exist or is archived';
@@ -264,8 +264,8 @@ BEGIN
         INTO v_process_version_id
         FROM process_versions
         WHERE id = p_override_process_version_id
-          AND process_type_id = p_process_type_id
-          AND archived_at IS NULL;
+        AND process_type_id = p_process_type_id
+        AND archived_at IS NULL;
 
         IF v_process_version_id IS NULL THEN
             RAISE EXCEPTION 'Override version invalid';
@@ -274,18 +274,18 @@ BEGIN
         SELECT id INTO v_process_version_id
         FROM process_versions
         WHERE process_type_id = p_process_type_id
-          AND status = 'PROD'
-          AND sede_id = p_sede_id
-          AND archived_at IS NULL
+        AND status = 'PROD'
+        AND sede_id = p_sede_id
+        AND archived_at IS NULL
         LIMIT 1;
 
         IF v_process_version_id IS NULL THEN
             SELECT id INTO v_process_version_id
             FROM process_versions
             WHERE process_type_id = p_process_type_id
-              AND status = 'PROD'
-              AND sede_id IS NULL
-              AND archived_at IS NULL
+            AND status = 'PROD'
+            AND sede_id IS NULL
+            AND archived_at IS NULL
             LIMIT 1;
         END IF;
     END IF;
@@ -300,19 +300,52 @@ BEGIN
         COALESCE(
             (
                 SELECT jsonb_agg(
-                           jsonb_build_object(
-                               'name', ps.name,
-                               'execution_key', ps.execution_key,
-                               'config', COALESCE(ps.config, '{}'::jsonb),
-                               'step_order', ps.step_order
-                           )
-                           ORDER BY ps.step_order
-                       )
+                        jsonb_build_object(
+                            'name', ps.name,
+                            'execution_key', ps.execution_key,
+                            'config', COALESCE(ps.config, '{}'::jsonb),
+                            'step_order', ps.step_order
+                        )
+                        ORDER BY ps.step_order
+                    )
                 FROM process_steps ps
                 WHERE ps.process_version_id = v_process_version_id
             ),
             '[]'::jsonb
         ) AS process_steps;
+
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION move_process_version_to_test(
+    p_process_version_id BIGINT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_current_status process_version_status;
+BEGIN
+
+    SELECT status
+    INTO v_current_status
+    FROM process_versions
+    WHERE id = p_process_version_id
+    AND archived_at IS NULL
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Process version not found or archived';
+    END IF;
+
+    IF v_current_status <> 'DRAFT' THEN
+        RAISE EXCEPTION 'Only DRAFT versions can be moved to TEST';
+    END IF;
+
+    UPDATE process_versions
+    SET status = 'TEST',
+        updated_at = NOW()
+    WHERE id = p_process_version_id;
 
 END;
 $$;
@@ -325,6 +358,7 @@ $$;
 DROP FUNCTION IF EXISTS resolve_process_version(BIGINT, BIGINT, BIGINT);
 DROP FUNCTION IF EXISTS replicate_process_version(BIGINT);
 DROP FUNCTION IF EXISTS promote_process_version(BIGINT, BIGINT, VARCHAR);
+DROP FUNCTION IF EXISTS move_process_version_to_test(BIGINT);
 
 DROP TABLE IF EXISTS process_version_history;
 DROP TABLE IF EXISTS process_steps;

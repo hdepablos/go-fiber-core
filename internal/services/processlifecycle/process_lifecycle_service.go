@@ -14,6 +14,7 @@ type Service interface {
 	ReplicateProcessVersion(ctx context.Context, processVersionID int64) (int64, error)
 	PromoteProcessVersion(ctx context.Context, processVersionID int64, operatorID int64, comment string) error
 	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64) (int64, []Step, error)
+	MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error
 }
 
 type Step struct {
@@ -112,6 +113,24 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	return resolvedID, steps, nil
 }
 
+func (s *service) MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error {
+	if processVersionID <= 0 {
+		return domain.ErrInvalidArgument
+	}
+
+	db := s.conn.ConnectPgxWrite
+	if db == nil {
+		return fmt.Errorf("pgx write connection is not initialized")
+	}
+
+	_, err := db.Exec(ctx, `SELECT move_process_version_to_test($1)`, processVersionID)
+	if err != nil {
+		return mapPgxError(err)
+	}
+
+	return nil
+}
+
 func mapPgxError(err error) error {
 	if err == nil {
 		return nil
@@ -127,6 +146,8 @@ func mapPgxError(err error) error {
 	case strings.Contains(msg, "No active version found"):
 		return domain.ErrNotFound
 	case strings.Contains(msg, "Override version invalid"):
+		return domain.ErrInvalidArgument
+	case strings.Contains(msg, "Only DRAFT versions can be moved to TEST"):
 		return domain.ErrInvalidArgument
 	case strings.Contains(msg, "Cannot promote version without steps"),
 		strings.Contains(msg, "Promotion comment exceeds 300 characters"):
