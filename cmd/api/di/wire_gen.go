@@ -8,11 +8,6 @@ package di
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/google/wire"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 	"go-fiber-core/internal/database/connections/gorm"
 	"go-fiber-core/internal/database/connections/pgx"
 	redis2 "go-fiber-core/internal/database/connections/redis"
@@ -36,11 +31,18 @@ import (
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
+	processlifecycle2 "go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/queue"
 	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
 	"log"
 	"os"
+
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/google/wire"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 // Injectors from wire.go:
@@ -122,7 +124,9 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	menuUserHandler := handlers.NewMenuUserHandler(menuUserPaginationService)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
-	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, tokenService, userWriterService)
+	processLifecycleService := processlifecycle2.NewService(connectDTO)
+	processLifecycleHandler := handlers.NewProcessLifecycleHandler(processLifecycleService)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, tokenService, userWriterService)
 	if err != nil {
 		cleanup4()
 		cleanup3()

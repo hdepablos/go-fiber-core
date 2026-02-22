@@ -1,0 +1,23 @@
+meta {
+  name: resolve scenario
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/resolve
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 1,
+    "sede_id": 1,
+    "override_process_version_id": null
+  }
+}

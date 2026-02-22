@@ -1,0 +1,22 @@
+meta {
+  name: promote scenario
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/promote
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_version_id": 1,
+    "comment": "Promoción manual desde Bruno"
+  }
+}

@@ -1,0 +1,49 @@
+En bases de datos:
+
+Performance se diseña con índices.
+Consistencia se diseña con constraints.
+Robustez se diseña con estados explícitos.
+
+“Eso es literalmente ACID”
+
+ACID son las 4 propiedades fundamentales de una base de datos transaccional.
+
+🔵 A — Atomicity (Atomicidad)
+
+Ya lo vimos:
+
+Todo o nada.
+
+Si tu función falla en el medio → ROLLBACK automático.
+
+🔵 C — Consistency (Consistencia)
+
+La base de datos pasa de un estado válido a otro estado válido.
+
+Ejemplo:
+
+No puede haber 2 PROD
+
+No puede promover TEST sin steps
+
+Comentarios tienen límite
+
+Eso es consistencia por reglas + constraints.
+
+🔵 I — Isolation (Aislamiento)
+
+Transacciones concurrentes no se pisan.
+
+FOR UPDATE ayuda a garantizarlo.
+
+🔵 D — Durability (Durabilidad)
+
+Cuando haces COMMIT:
+
+Aunque se apague el servidor
+
+Aunque crashee la app
+
+Los datos quedan persistidos en disco.
+
+PostgreSQL lo garantiza con WAL (Write Ahead Log).

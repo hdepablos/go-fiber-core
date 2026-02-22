@@ -244,6 +244,14 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return MenuUserSeeder(pool)
 	})
 
+	// ═══════════════════════════════════════════════════════════════
+	// PHASE 4: Process lifecycle (versioned workflows)
+	// ═══════════════════════════════════════════════════════════════
+
+	service.AddSeeder("process_lifecycle_manager", func() error {
+		return ProcessLifecycleManagerSeeder(pool)
+	})
+
 	// Example: Seed menus for multiple users at once
 	// Uncomment this if you created multiple users above
 	// service.AddSeeder("menu_user_multiple", func() error {
