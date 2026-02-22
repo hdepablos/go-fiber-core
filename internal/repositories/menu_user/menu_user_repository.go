@@ -235,7 +235,13 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 
 
 // Menus NO asociados al usuario (SIN duplicados, 1 fila = 1 menú)
-func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db *gorm.DB, userID uint, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.MenuUserResponse], error) {
+// Menus NO asociados al usuario (SIN duplicados, 1 fila = 1 menú)
+func (r *MenuUserPaginationRepository) GetMenusNotByUser(
+	ctx context.Context,
+	db *gorm.DB,
+	userID uint,
+	req dtos.PaginationRequest,
+) (*dtos.PaginationResponse[models.MenuUserResponse], error) {
 
 	var raw []models.MenuUserRow
 	var result []models.MenuUserResponse
@@ -252,9 +258,9 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db
 		Where("m.item_type = ?", "link").
 		Where("mu.id IS NULL") // 🔥 SOLO LOS NO ASIGNADOS
 
-	/* =================================================
-	   FILTROS DINÁMICOS (MISMO estilo ByUser)
-	================================================= */
+	/* ==============================
+	   FILTROS
+	============================== */
 	for i, f := range req.FilterBy {
 
 		if i >= len(req.FilterValues) {
@@ -276,9 +282,9 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db
 		}
 	}
 
-	/* =================================================
-	   SORT DINÁMICO (MISMO estilo)
-	================================================= */
+	/* ==============================
+	   SORT
+	============================== */
 	if len(req.SortBy) > 0 {
 
 		for i, col := range req.SortBy {
@@ -306,19 +312,19 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db
 		base = base.Order("m.created_at DESC")
 	}
 
-	/* =================================================
+	/* ==============================
 	   COUNT
-	================================================= */
+	============================== */
 	if err := base.Count(&total).Error; err != nil {
 		return nil, err
 	}
 
-	/* =================================================
-	   DATA (SCAN plano igual que ByUser)
-	================================================= */
+	/* ==============================
+	   DATA
+	============================== */
 	if err := base.
 		Select(`
-			NULL AS id,
+			m.id AS id,               -- 🔥 CRÍTICO (row key)
 			m.id AS menu_id,
 			NULL AS user_id,
 			NULL AS operator_id,
@@ -344,12 +350,13 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(ctx context.Context, db
 		return nil, err
 	}
 
-	/* =================================================
-	   MAPEO → MISMO RESPONSE STRUCT
-	================================================= */
+	/* ==============================
+	   MAPEO FINAL (🔥 FIX REAL)
+	============================== */
 	for _, r := range raw {
 
 		item := models.MenuUserResponse{
+			ID:       r.ID,          // 🔥 ← ESTA LÍNEA SOLUCIONA TODO
 			MenuID:   r.MenuIDRef,
 			IsActive: r.IsActive,
 			CreatedAt: r.CreatedAt,
