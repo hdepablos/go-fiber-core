@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
 	"go-fiber-core/internal/services/processlifecycle"
@@ -14,6 +15,7 @@ type ProcessLifecycleHandler interface {
 	PromoteScenario(c *fiber.Ctx) error
 	ResolveScenario(c *fiber.Ctx) error
 	MoveToTestScenario(c *fiber.Ctx) error
+	ListProcessVersions(c *fiber.Ctx) error
 }
 
 type processLifecycleHandler struct {
@@ -91,4 +93,20 @@ func (h *processLifecycleHandler) MoveToTestScenario(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Escenario movido a TEST exitosamente", nil)
+}
+
+func (h *processLifecycleHandler) ListProcessVersions(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req dtos.PaginationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	result, err := h.service.ListProcessVersions(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Versiones de proceso paginadas obtenidas exitosamente", result)
 }

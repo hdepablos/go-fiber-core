@@ -34,4 +34,9 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 		utils.Validate(new(requests.MoveToTestScenarioRequest)),
 		handler.MoveToTestScenario,
 	)
+
+	group.Post(
+		"/versions/paginated",
+		handler.ListProcessVersions,
+	)
 }

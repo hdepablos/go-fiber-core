@@ -1,0 +1,27 @@
+meta {
+  name: versions paginated
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/versions/paginated
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+      "sortBy": ["id"],
+      "sortDesc": [true],
+      "filterBy": [],
+      "filterValues": [],
+      "rowsPerPage": 15,
+      "page": 1
+  }
+}
+
