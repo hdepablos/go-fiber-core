@@ -34,7 +34,7 @@ func (h *processLifecycleHandler) ReplicateScenario(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	newID, err := h.service.ReplicateProcessVersion(ctx, req.ProcessVersionID)
+	newID, err := h.service.ReplicateProcessVersion(ctx, req.ProcessVersionID, req.OperatorID)
 	if err != nil {
 		return err
 	}
@@ -47,17 +47,12 @@ func (h *processLifecycleHandler) ReplicateScenario(c *fiber.Ctx) error {
 func (h *processLifecycleHandler) PromoteScenario(c *fiber.Ctx) error {
 	ctx := c.UserContext()
 
-	operatorID, err := getUserIDUint64FromCtx(ctx)
-	if err != nil {
-		return domain.ErrAuthentication
-	}
-
 	var req requests.PromoteScenarioRequest
 	if err := c.BodyParser(&req); err != nil {
 		return domain.ErrInvalidArgument
 	}
 
-	if err := h.service.PromoteProcessVersion(ctx, req.ProcessVersionID, int64(operatorID), req.Comment); err != nil {
+	if err := h.service.PromoteProcessVersion(ctx, req.ProcessVersionID, req.PromotedBy, req.Comment); err != nil {
 		return err
 	}
 

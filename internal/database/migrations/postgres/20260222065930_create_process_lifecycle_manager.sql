@@ -36,10 +36,11 @@ CREATE TABLE process_versions (
     version_number INTEGER NOT NULL,
     sede_id BIGINT NULL,
     status process_version_status NOT NULL DEFAULT 'DRAFT',
-    operator_id BIGINT NULL,
+    operator_id BIGINT NOT NULL,
     archived_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (id, process_type_id)
 );
 
 -- Único PROD por tipo + sede
@@ -67,11 +68,14 @@ CREATE TABLE process_steps (
 
 CREATE TABLE process_version_history (
     id BIGSERIAL PRIMARY KEY,
-    process_version_id BIGINT NOT NULL REFERENCES process_versions(id),
+    process_version_id BIGINT NOT NULL,
+    process_type_id BIGINT NOT NULL,
     promoted_from_status process_version_status NOT NULL,
     promoted_at TIMESTAMP NOT NULL DEFAULT NOW(),
     promoted_by BIGINT NOT NULL,
-    comment VARCHAR(300) NOT NULL
+    comment VARCHAR(300) NOT NULL,
+    FOREIGN KEY (process_version_id, process_type_id)
+        REFERENCES process_versions(id, process_type_id)
 );
 
 ------------------------------------------------------------
@@ -117,6 +121,10 @@ BEGIN
         RAISE EXCEPTION 'Cannot promote version without steps';
     END IF;
 
+    IF v_old_status NOT IN ('TEST', 'HISTORY') THEN
+        RAISE EXCEPTION 'Only TEST or HISTORY versions can be promoted to PROD';
+    END IF;
+
     SELECT id INTO v_current_prod_id
     FROM process_versions
     WHERE process_type_id = v_process_type_id
@@ -130,19 +138,6 @@ BEGIN
         SET status = 'HISTORY',
             updated_at = NOW()
         WHERE id = v_current_prod_id;
-
-        INSERT INTO process_version_history(
-            process_version_id,
-            promoted_from_status,
-            promoted_by,
-            comment
-        )
-        VALUES (
-            v_current_prod_id,
-            'PROD',
-            p_operator_id,
-            p_comment
-        );
     END IF;
 
     UPDATE process_versions
@@ -152,12 +147,14 @@ BEGIN
 
     INSERT INTO process_version_history(
         process_version_id,
+        process_type_id,
         promoted_from_status,
         promoted_by,
         comment
     )
     VALUES (
         p_process_version_id,
+        v_process_type_id,
         v_old_status,
         p_operator_id,
         p_comment
@@ -171,7 +168,8 @@ $$;
 ------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION replicate_process_version(
-    p_process_version_id BIGINT
+    p_process_version_id BIGINT,
+    p_operator_id BIGINT
 )
 RETURNS BIGINT
 LANGUAGE plpgsql
@@ -202,13 +200,15 @@ BEGIN
         process_type_id,
         version_number,
         sede_id,
-        status
+        status,
+        operator_id
     )
     VALUES (
         v_process_type_id,
         v_next_version_number,
         v_sede_id,
-        'DRAFT'
+        'DRAFT',
+        p_operator_id
     )
     RETURNING id INTO v_new_version_id;
 

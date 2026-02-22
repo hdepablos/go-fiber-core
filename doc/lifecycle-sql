@@ -1,0 +1,11 @@
+-- Con el modelo actual ya puedes saber el “desde–hasta”
+SELECT
+  h.process_version_id,
+  h.promoted_at          AS valid_from,
+  LEAD(h.promoted_at) OVER (
+    PARTITION BY v.process_type_id, v.sede_id
+    ORDER BY h.promoted_at
+  )                      AS valid_to
+FROM process_version_history h
+JOIN process_versions v
+  ON v.id = h.process_version_id;

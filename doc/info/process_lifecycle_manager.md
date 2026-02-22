@@ -84,16 +84,21 @@ Pasos de una versión de proceso.
 Historial de cambios de estado relevantes (especialmente promociones a `PROD`).
 
 - `id BIGSERIAL PK`
-- `process_version_id BIGINT NOT NULL` → FK a `process_versions(id)`
+- `process_version_id BIGINT NOT NULL`
+- `process_type_id BIGINT NOT NULL`: copia denormalizada del tipo de proceso en el momento de la promoción. Mejora reporting y desacopla auditoría del modelo vivo.
 - `promoted_from_status process_version_status NOT NULL`: estado previo desde el que se promovió o cambió.
 - `promoted_at TIMESTAMP NOT NULL DEFAULT NOW()`: timestamp de la acción.
 - `promoted_by BIGINT NOT NULL`: identificador del usuario que ejecutó la promoción.
 - `comment VARCHAR(300) NOT NULL`: comentario obligatorio de la promoción (máx. 300 caracteres).
 
-Cada ejecución de `promote_process_version` agrega uno o dos registros:
+Cada ejecución de `promote_process_version` agrega **un solo registro**:
 
-- Uno para la versión que deja de ser `PROD` (si existía).
-- Uno para la nueva versión `PROD` (con su `v_old_status`).
+- Siempre para la nueva versión `PROD` (con su `v_old_status`).
+
+Restricciones de integridad:
+
+- FK compuesta `(process_version_id, process_type_id)` → `process_versions(id, process_type_id)`  
+  Garantiza que el `process_type_id` del evento concuerde con el de la versión real, haciendo el evento autónomo pero consistente.
 
 ---
 
@@ -131,30 +136,35 @@ Responsabilidad: promover una versión de proceso a `PROD` de forma **consistent
    Cuenta filas en `process_steps` para `p_process_version_id`.  
    Si `v_step_count = 0`, lanza: `Cannot promote version without steps`.
 
-4. **Buscar y bloquear la versión `PROD` actual (misma sede)**
+4. **Validar estado permitido para promoción**
+
+   Solo se permite promover versiones cuyo estado actual sea `TEST` o `HISTORY`.  
+   Si `v_old_status NOT IN ('TEST', 'HISTORY')`, lanza:
+
+   ```sql
+   RAISE EXCEPTION 'Only TEST or HISTORY versions can be promoted to PROD';
+   ```
+
+5. **Buscar y bloquear la versión `PROD` actual (misma sede)**
 
    Busca una versión `PROD` actual para el mismo `process_type_id` y misma `sede_id` (incluyendo comparaciones con `NULL` usando `IS NOT DISTINCT FROM`) y `archived_at IS NULL`, también con `FOR UPDATE`.
 
-5. **Si existe PROD actual, moverla a HISTORY + historial**
+6. **Si existe PROD actual, moverla a HISTORY**
 
-   - Actualiza esa versión a `status = 'HISTORY'` y `updated_at = NOW()`.
-   - Inserta en `process_version_history`:
-     - `process_version_id = v_current_prod_id`
-     - `promoted_from_status = 'PROD'`
-     - `operator_id = p_operator_id`
-     - `comment = p_comment`
+   - Actualiza esa versión a `status = 'HISTORY'` y `updated_at = NOW()`.  
+     No se genera registro en `process_version_history` para la versión anterior.
 
-6. **Promover la nueva versión a `PROD`**
+7. **Promover la nueva versión a `PROD`**
 
    - Actualiza `status = 'PROD'`, `updated_at = NOW()` para `p_process_version_id`.
 
-7. **Agregar historial para la nueva versión**
+8. **Agregar historial para la nueva versión**
 
    Inserta en `process_version_history`:
 
    - `process_version_id = p_process_version_id`
    - `promoted_from_status = v_old_status`
-   - `operator_id = p_operator_id`
+   - `promoted_by = p_operator_id`
    - `comment = p_comment`
 
 ### Uso típico (ejemplo SQL)
@@ -169,16 +179,45 @@ SELECT promote_process_version(
 
 ---
 
+## Índices y coherencia de datos
+
+- Unicidad de `PROD` por tipo y sede:
+
+  ```sql
+  CREATE UNIQUE INDEX ux_unique_prod_per_type_sede
+  ON process_versions(process_type_id, sede_id)
+  WHERE status = 'PROD' AND archived_at IS NULL;
+  ```
+
+- Soporte para FK compuesta desde el histórico:
+
+  ```sql
+  -- Asegura unicidad compatible con la FK (id, process_type_id)
+  -- (id ya es PK; esta UNIQ refuerza la composición usada por la FK)
+  ALTER TABLE process_versions
+  ADD CONSTRAINT ux_process_versions_id_type UNIQUE (id, process_type_id);
+  ```
+
+- Recomendación para reporting (opcional):
+
+  ```sql
+  CREATE INDEX IF NOT EXISTS ix_pvh_type_at
+  ON process_version_history(process_type_id, promoted_at);
+  ```
+
+---
+
 ## Función `replicate_process_version`
 
 ```sql
 CREATE OR REPLACE FUNCTION replicate_process_version(
-    p_process_version_id BIGINT
+    p_process_version_id BIGINT,
+    p_operator_id BIGINT
 )
 RETURNS BIGINT
 ```
 
-Responsabilidad: crear una **nueva versión en DRAFT** copiando la estructura de pasos de una versión existente.
+Responsabilidad: crear una **nueva versión en DRAFT** copiando la estructura de pasos de una versión existente y registrando quién creó esa nueva versión (`operator_id`).
 
 Devuelve: `id` de la nueva fila en `process_versions`.
 
@@ -201,6 +240,7 @@ Devuelve: `id` de la nueva fila en `process_versions`.
    - `version_number = v_next_version_number`
    - `sede_id = v_sede_id`
    - `status = 'DRAFT'`
+   - `operator_id = p_operator_id` (usuario que ejecuta la replicación)
 
 4. **Copiar pasos**
 
@@ -216,7 +256,7 @@ Devuelve: `id` de la nueva fila en `process_versions`.
 ### Uso típico (ejemplo SQL)
 
 ```sql
-SELECT replicate_process_version(25) AS new_version_id;
+SELECT replicate_process_version(25, 123) AS new_version_id;
 ```
 
 Luego, probablemente se editen los pasos de la nueva versión (en `DRAFT`/`TEST`) y, una vez validada, se promocione a `PROD` usando `promote_process_version`.

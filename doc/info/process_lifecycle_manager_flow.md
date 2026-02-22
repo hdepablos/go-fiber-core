@@ -73,9 +73,13 @@ No se detallan tablas, migraciones ni elementos técnicos; el enfoque es 100% fu
 
 7. **Historial y trazabilidad**
    - Cada vez que se promueve un escenario a Producción:
-     - Se registra desde qué estado venía (Borrador, Pruebas, Producción previa, etc.).
+     - Se registra desde qué estado venía (por ejemplo, Pruebas o Histórica).
      - Se guarda quién realizó la acción (operador).
-     - Se almacena el comentario que describe el motivo del cambio (por ejemplo, “Ajuste de reglas para nueva normativa”).
+     - Se almacena el comentario que describe el motivo del cambio.
+     - Se crea **un único** registro de historial asociado a la nueva versión en Producción (la versión anterior pasa a Histórica sin generar registro adicional).
+   - La vigencia de cada versión en Producción puede inferirse:
+     - `desde` = momento en que se promovió a Producción.
+     - `hasta` = momento en que una nueva versión la reemplazó (siguiente promoción).
    - Esto permite responder preguntas como:
      - “¿Qué escenario estaba en Producción el día X?”
      - “¿Quién aprobó el cambio de este escenario?”
@@ -93,7 +97,7 @@ Lectura del diagrama:
 
 - Un escenario nace en **Borrador**.
 - Cuando está listo para ser probado, pasa a **Pruebas**.
-- Tras la validación, se promueve a **Producción**.
+- Tras la validación, se promueve a **Producción** (solo se permite desde **Pruebas** o **Histórica**).
 - Cuando una nueva versión entra en Producción, la anterior pasa a **Histórica**.
 - En cualquier momento se puede tomar la versión en Producción (u otra versión) como base para crear un nuevo Borrador.
 

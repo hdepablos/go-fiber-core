@@ -11,7 +11,7 @@ import (
 )
 
 type Service interface {
-	ReplicateProcessVersion(ctx context.Context, processVersionID int64) (int64, error)
+	ReplicateProcessVersion(ctx context.Context, processVersionID int64, operatorID int64) (int64, error)
 	PromoteProcessVersion(ctx context.Context, processVersionID int64, operatorID int64, comment string) error
 	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64) (int64, []Step, error)
 	MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error
@@ -34,8 +34,8 @@ func NewService(conn *connect.ConnectDTO) Service {
 	}
 }
 
-func (s *service) ReplicateProcessVersion(ctx context.Context, processVersionID int64) (int64, error) {
-	if processVersionID <= 0 {
+func (s *service) ReplicateProcessVersion(ctx context.Context, processVersionID int64, operatorID int64) (int64, error) {
+	if processVersionID <= 0 || operatorID <= 0 {
 		return 0, domain.ErrInvalidArgument
 	}
 
@@ -46,7 +46,7 @@ func (s *service) ReplicateProcessVersion(ctx context.Context, processVersionID 
 
 	var newVersionID int64
 	err := db.
-		QueryRow(ctx, `SELECT replicate_process_version($1)`, processVersionID).
+		QueryRow(ctx, `SELECT replicate_process_version($1, $2)`, processVersionID, operatorID).
 		Scan(&newVersionID)
 	if err != nil {
 		return 0, mapPgxError(err)
@@ -150,7 +150,8 @@ func mapPgxError(err error) error {
 	case strings.Contains(msg, "Only DRAFT versions can be moved to TEST"):
 		return domain.ErrInvalidArgument
 	case strings.Contains(msg, "Cannot promote version without steps"),
-		strings.Contains(msg, "Promotion comment exceeds 300 characters"):
+		strings.Contains(msg, "Promotion comment exceeds 300 characters"),
+		strings.Contains(msg, "Only TEST or HISTORY versions can be promoted to PROD"):
 		return domain.ErrInvalidArgument
 	default:
 		return domain.ErrInternal

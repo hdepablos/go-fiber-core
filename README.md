@@ -55,7 +55,7 @@ En los flujos HTTP, el `operator_id` normalmente se toma del usuario autenticado
 La base de datos expone las funciones PL/pgSQL:
 
 - `promote_process_version(p_process_version_id BIGINT, p_operator_id BIGINT, p_comment VARCHAR)`
-- `replicate_process_version(p_process_version_id BIGINT) RETURNS BIGINT`
+- `replicate_process_version(p_process_version_id BIGINT, p_operator_id BIGINT) RETURNS BIGINT`
 - `resolve_process_version(p_process_type_id BIGINT, p_sede_id BIGINT, p_override_process_version_id BIGINT DEFAULT NULL) RETURNS TABLE (process_version_id BIGINT, process_steps JSONB)`
 - `move_process_version_to_test(p_process_version_id BIGINT) RETURNS VOID`
 
@@ -65,6 +65,16 @@ La documentación funcional y de modelo de datos está en:
 La explicación funcional del flujo (sin detalles técnicos) está en:
 
 - [doc/info/process_lifecycle_manager_flow.md](doc/info/process_lifecycle_manager_flow.md)
+
+### Reglas y coherencia de datos
+
+- Unicidad de `PROD` por `(process_type_id, sede_id)` con índice filtrado.
+- Promoción a `PROD` permitida solo desde `TEST` o `HISTORY`.
+- Al promover, la `PROD` anterior pasa a `HISTORY` sin crear registro de historial.
+- Cada promoción genera **un único** registro en `process_version_history` (para la nueva `PROD`):
+  - Incluye `process_version_id`, `process_type_id`, `promoted_from_status`, `promoted_at`, `promoted_by`, `comment`.
+- `process_version_history` tiene FK compuesta a `process_versions(id, process_type_id)`; el par `(id, process_type_id)` está protegido por una `UNIQUE` en `process_versions`.
+- `process_types.is_visible` permite ocultar tipos de proceso en el frontend.
 
 Visibilidad de tipos de proceso en frontend:
 
@@ -77,13 +87,15 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
 - `POST /api/v1/process-lifecycle/replicate`
   - Body:
     - `process_version_id` (int64, requerido, > 0)
+    - `operator_id` (int64, requerido, > 0): id del usuario que crea la nueva versión (se replica el escenario y se registra este operador en `process_versions.operator_id`).
   - Acción: invoca `replicate_process_version` y devuelve el nuevo `process_version_id` en `data.new_process_version_id`.
 
 - `POST /api/v1/process-lifecycle/promote`
   - Body:
     - `process_version_id` (int64, requerido, > 0)
     - `comment` (string, requerido, máx. 300 chars)
-  - Acción: invoca `promote_process_version` usando como `operator_id` el usuario autenticado (ID extraído del token).
+    - `promoted_by` (int64, requerido, > 0): id del operador que ejecuta la promoción, se persiste en `process_version_history.promoted_by`.
+  - Acción: invoca `promote_process_version` con el `promoted_by` indicado y registra el historial correspondiente (un solo registro por promoción).
 
 - `POST /api/v1/process-lifecycle/resolve`
   - Body:

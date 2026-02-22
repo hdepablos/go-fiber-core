@@ -81,20 +81,11 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 			}
 		}
 
-		const operatorID int64 = 1
-		if _, err := tx.Exec(ctx,
-			`SELECT promote_process_version($1, $2, $3)`,
-			baseVersionID,
-			operatorID,
-			"Initial promotion from seeder",
-		); err != nil {
-			return fmt.Errorf("promote_process_version: %w", err)
-		}
-
 		var newVersionID int64
 		if err := tx.QueryRow(ctx,
-			`SELECT replicate_process_version($1)`,
+			`SELECT replicate_process_version($1, $2)`,
 			baseVersionID,
+			1,
 		).Scan(&newVersionID); err != nil {
 			return fmt.Errorf("replicate_process_version: %w", err)
 		}
