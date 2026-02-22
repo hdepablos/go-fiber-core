@@ -1,11 +1,11 @@
 meta {
-  name: paginated not by user_id
+  name: paginated eliminar
   type: http
-  seq: 3
+  seq: 2
 }
 
 post {
-  url: {{urlBase}}api/v1/menu-users/not-by-user/32
+  url: {{urlBase}}api/v1/menu-users/eliminar/33
   body: json
   auth: bearer
 }
@@ -20,8 +20,7 @@ body:json {
       "sortDesc": [true],
       "filterBy": [],
       "filterValues": [],
-      "rowsPerPage": 15,
-      "page": 1
+      "rowsPerPage": 15
   }
   
 }

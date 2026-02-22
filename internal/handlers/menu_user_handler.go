@@ -73,10 +73,11 @@ func (h *menuUserHandler) GetMenusByUser(c *fiber.Ctx) error {
         return err
     }
 
-    return responses.Success(c, "Menus asociados obtenidos exitosamente", response)
+    return responses.Success(c, "Menus afassociados obtenidos exitosamente", response)
 }
 
 func (h *menuUserHandler) GetMenusNotByUser(c *fiber.Ctx) error {
+
 	ctx := c.UserContext()
 
 	userIDParam := c.Params("userId")
@@ -91,12 +92,20 @@ func (h *menuUserHandler) GetMenusNotByUser(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	response, err := h.menuUserPaginationService.GetMenusNotByUser(ctx, uint(userID64), req)
+	response, err := h.menuUserPaginationService.GetMenusNotByUser(
+		ctx,
+		uint(userID64),
+		req,
+	)
 	if err != nil {
 		return err
 	}
 
-	return responses.Success(c, "Menus no asociados obtenidos exitosamente", response)
+	return responses.Success(
+		c,
+		"Menus nofa asociados obtenidos exitosamente",
+		response,
+	)
 }
 
 func (h *menuUserHandler) GetMenuAssignmentStatus(c *fiber.Ctx) error {
