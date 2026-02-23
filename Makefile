@@ -108,6 +108,42 @@ check-env: ## ⚖️ Verifica que existan las variables de entorno indispensable
 
 	@echo "✅ Todas las variables de entorno están definidas en .env"
 
+.PHONY: redis-list-project-keys
+redis-list-project-keys: ## 🧱 Lista todas las keys de Redis del proyecto (prefijo APP_NAME o go-fiber-core). Uso: make redis-list-project-keys
+	@RAW_PREFIX=$${APP_NAME:-go-fiber-core}; \
+	APP_PREFIX=$$(echo "$$RAW_PREFIX" | tr -d '"'); \
+	echo "$(INFO)Listando keys de Redis para el proyecto con prefijo: $$APP_PREFIX$(RESET)"; \
+	if ! command -v redis-cli >/dev/null 2>&1; then \
+		echo "$(ERROR)redis-cli no está instalado en el sistema. Instálalo para usar este comando.$(RESET)"; \
+		exit 1; \
+	fi; \
+	if [ -z "$(REDIS_HOST)" ] || [ -z "$(REDIS_PORT)" ] || [ -z "$(REDIS_DATABASE)" ]; then \
+		echo "$(ERROR)Variables REDIS_HOST, REDIS_PORT o REDIS_DATABASE no están definidas.$(RESET)"; \
+		exit 1; \
+	fi; \
+	HOST="$(REDIS_HOST)"; \
+	if [ "$$HOST" = "redis" ]; then HOST="127.0.0.1"; fi; \
+	REDISCLI_AUTH="$(REDIS_PASSWORD)" redis-cli -h "$$HOST" -p "$(REDIS_PORT)" -n "$(REDIS_DATABASE)" KEYS "$$APP_PREFIX:*"
+
+.PHONY: redis-get-key
+redis-get-key: ## 🔎 Muestra el contenido de una key de Redis. Uso: make redis-get-key k="go-fiber-core:lifecycle-2"
+	@if [ -z "$(k)" ]; then \
+		echo "$(ERROR)Debes pasar el nombre de la key con k=\"nombre_key\".$(RESET)"; \
+		exit 1; \
+	fi; \
+	if ! command -v redis-cli >/dev/null 2>&1; then \
+		echo "$(ERROR)redis-cli no está instalado en el sistema. Instálalo para usar este comando.$(RESET)"; \
+		exit 1; \
+	fi; \
+	if [ -z "$(REDIS_HOST)" ] || [ -z "$(REDIS_PORT)" ] || [ -z "$(REDIS_DATABASE)" ]; then \
+		echo "$(ERROR)Variables REDIS_HOST, REDIS_PORT o REDIS_DATABASE no están definidas.$(RESET)"; \
+		exit 1; \
+	fi; \
+	HOST="$(REDIS_HOST)"; \
+	if [ "$$HOST" = "redis" ]; then HOST="127.0.0.1"; fi; \
+	echo "$(INFO)Mostrando contenido de la key: $(k)$(RESET)"; \
+	REDISCLI_AUTH="$(REDIS_PASSWORD)" redis-cli -h "$$HOST" -p "$(REDIS_PORT)" -n "$(REDIS_DATABASE)" GET "$(k)"
+
 ###############################################################################
 ## Golang
 ###############################################################################

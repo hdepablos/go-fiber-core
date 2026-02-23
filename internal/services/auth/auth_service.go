@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -293,7 +294,11 @@ func (s *authService) RevokeSession(ctx context.Context, sessionIDStr string) er
 	// 3. Agregar a Blacklist en Redis (si aún es válida)
 	if !session.IsBlocked && session.ExpiresAt.After(time.Now()) {
 		ttl := time.Until(session.ExpiresAt)
-		key := fmt.Sprintf("blacklist:session:%s", sessionID)
+		projectPrefix := os.Getenv("APP_NAME")
+		if projectPrefix == "" {
+			projectPrefix = "go-fiber-core"
+		}
+		key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sessionID)
 		if err := redisClient.Set(ctx, key, "revoked", ttl).Err(); err != nil {
 			fmt.Printf("Error setting redis blacklist: %v\n", err)
 			// No fallamos la request si Redis falla, pero logueamos
@@ -318,7 +323,11 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 	for _, sess := range sessions {
 		ttl := time.Until(sess.ExpiresAt)
 		if ttl > 0 {
-			key := fmt.Sprintf("blacklist:session:%s", sess.ID)
+			projectPrefix := os.Getenv("APP_NAME")
+			if projectPrefix == "" {
+				projectPrefix = "go-fiber-core"
+			}
+			key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sess.ID)
 			// Pipeline podría ser mejor aquí, pero iterar es simple
 			_ = redisClient.Set(ctx, key, "revoked", ttl).Err()
 		}

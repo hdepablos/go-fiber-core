@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
@@ -86,6 +88,12 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		return 0, nil, domain.ErrInvalidArgument
 	}
 
+	redisClient := s.conn.ConnectRedis
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+
 	db := s.conn.ConnectPgxWrite
 	if db == nil {
 		return 0, nil, fmt.Errorf("pgx write connection is not initialized")
@@ -102,6 +110,22 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 			return 0, nil, mapPgxError(err)
 		}
 	} else {
+		if redisClient != nil {
+			cacheKey := fmt.Sprintf("%s:lifecycle-%d", projectPrefix, processTypeID)
+			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+			cached, err := redisClient.Get(redisCtx, cacheKey).Bytes()
+			cancel()
+			if err == nil && len(cached) > 0 {
+				var payload struct {
+					ProcessVersionID int64  `json:"process_version_id"`
+					Steps            []Step `json:"steps"`
+				}
+				if err := json.Unmarshal(cached, &payload); err == nil {
+					return payload.ProcessVersionID, payload.Steps, nil
+				}
+			}
+		}
+
 		err := db.
 			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, NULL)`, processTypeID, sedeID).
 			Scan(&resolvedID, &stepsJSON)
@@ -116,6 +140,24 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	} else {
 		if err := json.Unmarshal(stepsJSON, &steps); err != nil {
 			return 0, nil, domain.ErrInternal
+		}
+	}
+
+	if overrideProcessVersionID == nil && redisClient != nil {
+		cacheKey := fmt.Sprintf("%s:lifecycle-%d", projectPrefix, processTypeID)
+		payload := struct {
+			ProcessVersionID int64  `json:"process_version_id"`
+			Steps            []Step `json:"steps"`
+		}{
+			ProcessVersionID: resolvedID,
+			Steps:            steps,
+		}
+
+		encoded, err := json.Marshal(payload)
+		if err == nil {
+			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+			_ = redisClient.Set(redisCtx, cacheKey, encoded, 0).Err()
+			cancel()
 		}
 	}
 

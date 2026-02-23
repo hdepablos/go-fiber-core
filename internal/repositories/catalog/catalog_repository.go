@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"time"
 
 	"go-fiber-core/internal/models"
@@ -24,9 +25,14 @@ type catalogRepository struct {
 }
 
 func NewCatalogRepository(redisClient *redis.Client) CatalogRepository {
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+
 	return &catalogRepository{
 		redis:      redisClient,
-		cacheKey:   "catalogs:all",
+		cacheKey:   projectPrefix + ":catalogs:all",
 		expiration: 24 * time.Hour, // TTL largo porque invalidaremos manualmente
 	}
 }

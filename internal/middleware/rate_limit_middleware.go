@@ -3,13 +3,12 @@ package middleware
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
 	redis "github.com/redis/go-redis/v9"
 )
-
-const rateLimitKeyPrefix = "rate_limit:"
 
 // RateLimitConfig permite configurar el middleware
 type RateLimitConfig struct {
@@ -26,7 +25,12 @@ func RateLimitMiddleware(redisClient *redis.Client, config RateLimitConfig) fibe
 			clientIdentifier = c.IP()
 		}
 
-		key := rateLimitKeyPrefix + clientIdentifier
+		projectPrefix := os.Getenv("APP_NAME")
+		if projectPrefix == "" {
+			projectPrefix = "go-fiber-core"
+		}
+
+		key := projectPrefix + ":rate-limit:" + clientIdentifier
 
 		// 2. Contexto con timeout acotado para evitar bloqueos ante errores de Redis.
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

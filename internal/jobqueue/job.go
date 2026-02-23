@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	redis "github.com/redis/go-redis/v9"
 )
@@ -49,5 +50,10 @@ func (e *Enqueuer) Enqueue(ctx context.Context, jobType string, data any) error 
 	}
 
 	// 4. Encolar el trabajo en Redis usando el cliente que ya tiene el servicio
-	return e.redisClient.RPush(ctx, "jobs:main", payload).Err()
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+
+	return e.redisClient.RPush(ctx, projectPrefix+":jobs:main", payload).Err()
 }
