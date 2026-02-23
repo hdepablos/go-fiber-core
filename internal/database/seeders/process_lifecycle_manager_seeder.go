@@ -18,7 +18,7 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 	logger := slog.Default().With("seeder", "process_lifecycle_manager")
 	logger.Info("iniciando seeder de process_lifecycle_manager")
 
-		if err := executeInTransaction(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
+	if err := executeInTransaction(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
 		for _, table := range []string{
 			"process_version_history",
 			"process_steps",
@@ -121,31 +121,31 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 				Order:        1,
 				Name:         "Age validation",
 				ExecutionKey: "loanrisk/NewAgeService",
-				Config:       `{"mode":"grid","error_tolerance":"inherit","required_keys":["age"],"min_age":40}`,
+				Config:       `{"error_tolerance":"inherit","required_keys":["age"],"min_age":40}`,
 			},
 			{
 				Order:        2,
 				Name:         "Special validation",
 				ExecutionKey: "loanrisk/NewValidationService",
-				Config:       `{"mode":"grid","error_tolerance":"tolerable"}`,
+				Config:       `{"error_tolerance":"tolerable"}`,
 			},
 			{
 				Order:        3,
 				Name:         "Salary validation",
 				ExecutionKey: "loanrisk/NewSalaryService",
-				Config:       `{"mode":"prefilter","error_tolerance":"critical","required_keys":["salary"],"min_salary":2500000}`,
+				Config:       `{"error_tolerance":"critical","required_keys":["salary"],"min_salary":2500000}`,
 			},
 			{
 				Order:        4,
 				Name:         "Renovation check",
 				ExecutionKey: "loanrisk/NewIsRenovationService",
-				Config:       `{"mode":"grid","error_tolerance":"inherit"}`,
+				Config:       `{"error_tolerance":"inherit","required_keys":["min_salary","salary_bracket_k_usd","salary_checked"]}`,
 			},
 			{
 				Order:        5,
 				Name:         "Risk level",
 				ExecutionKey: "loanrisk/NewRiskLevelService",
-				Config:       `{"mode":"grid","error_tolerance":"inherit"}`,
+				Config:       `{"error_tolerance":"inherit","required_keys":["is_renovation"]}`,
 			},
 		}
 

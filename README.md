@@ -115,6 +115,43 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
     - `process_version_id` (int64, requerido, > 0)
   - Acción: invoca `move_process_version_to_test` para mover una versión desde `DRAFT` a `TEST`. Si la versión no existe o está archivada, se traduce a `ErrNotFound`. Si la versión no está en `DRAFT`, se traduce a `ErrInvalidArgument`.
 
+- `POST /api/v1/process-lifecycle/run`
+  - Endpoint genérico para ejecutar un proceso completo usando el motor de lifecycle (`RunResolvedProcess`).
+  - Body (`RunProcessRequest`):
+    - `process_type_id` (int64, requerido, > 0): identifica el tipo de proceso a ejecutar (ej. Loan risk).
+    - `sede_id` (int64, requerido): sede desde la cual se resuelve la versión vigente.
+    - `override_process_version_id` (int64, opcional, puede ser `null`):
+      - `null` → usa la versión `PROD` vigente según `process_type_id` + `sede_id` (con fallback a versión global).
+      - `!= null` → fuerza la ejecución de esa versión específica, respetando las reglas de `resolve_process_version`.
+    - `input` (objeto JSON, requerido): bolsa de datos de negocio (`ServiceContext.Input`) que verán todos los servicios.
+      - El handler garantiza que `input["sede_id"]` exista (se copia desde `sede_id` si no viene).
+  - Acción:
+    - Resuelve la versión efectiva (`resolve_process_version`).
+    - Construye el registro de servicios a partir de los steps (`execution_key`, `step_order`, `config`, `required_keys`).
+    - Ejecuta todos los servicios en orden con el `input` dado (`RunResolvedProcess`).
+  - Respuesta exitosa (HTTP 200, `status = "success"`):
+    - `data.process_version_id`: id de la versión ejecutada.
+    - `data.input`: JSON de entrada (incluyendo `sede_id`).
+    - `data.results`: mapa de resultados por servicio (`execution_key` → `StepResult`).
+    - `data.execute_ordered`: arreglo ordenado por `step_order` con la forma:
+      - `service_path` (execution_key, ej. `loanrisk/NewAgeService`)
+      - `step_order` (int).
+  - Respuesta con error de ejecución (HTTP != 200, `status = "error"`):
+    - El endpoint **no pierde contexto de ejecución**:
+      - `data.process_version_id`: puede venir con el id resuelto antes del fallo.
+      - `data.input`: JSON de entrada.
+      - `data.results`: resultados parciales de servicios ejecutados hasta el momento del error.
+      - `data.execute_ordered`: orden de steps ejecutados/parcialmente ejecutados.
+      - `data.error`: detalle del fallo:
+        - `code`: uno de:
+          - `PROCESS_VERSION_NOT_FOUND` → cuando `resolve_process_version` no encuentra versión activa (mapeado a `domain.ErrNotFound` → HTTP 404).
+          - `MISSING_REQUIRED_KEY` → falta una key obligatoria en `input` (por ejemplo, `salary`, `min_salary`, `is_renovation`; mapeado a `domain.ErrMissingRequiredKey` → HTTP 422).
+          - `VALUE_OUT_OF_RANGE` → un valor está fuera de rango permitido (por ejemplo, salario menor al mínimo configurado; mapeado a `domain.ErrValueOutOfRange` → HTTP 422).
+          - `INVALID_ARGUMENT` → otros errores de validación de entrada que no encajan en los dos casos anteriores (mapeados a `domain.ErrInvalidArgument` → HTTP 422).
+          - `CRITICAL_ERROR` → errores críticos de negocio o técnicos que deben detener la cadena (por ejemplo, fallos en servicios marcados como críticos que no dependen solo de validaciones de input) → HTTP 500.
+          - `INTERNAL_ERROR` → cualquier otro fallo inesperado (incluye errores como “servicio no encontrado en el registro” si falta configuración de servicios) → HTTP 500.
+        - `message`: mensaje técnico completo, útil para debugging y trazas.
+
 ### Manejo de errores
 
 Las excepciones levantadas por las funciones SQL se traducen a errores de dominio:
@@ -131,6 +168,18 @@ Las excepciones levantadas por las funciones SQL se traducen a errores de domini
 
 Los errores inesperados se traducen a `domain.ErrInternal` → HTTP 500 con mensaje genérico.
 
+En el caso particular del endpoint `POST /api/v1/process-lifecycle/run`, además de este mapeo:
+
+- El handler devuelve un payload rico con:
+  - `process_version_id`, `input`, `results`, `execute_ordered` y un bloque `error` con `code` + `message`.
+- El código HTTP refleja el tipo de error:
+  - 404 cuando el proceso/versión no existe (`PROCESS_VERSION_NOT_FOUND`).
+  - 422 cuando la entrada es inválida:
+    - `MISSING_REQUIRED_KEY` (falta de keys como `salary`, `min_salary`, `salary_checked`, `is_renovation`, etc.).
+    - `VALUE_OUT_OF_RANGE` (por ejemplo, salario menor al mínimo permitido por configuración).
+    - `INVALID_ARGUMENT` (otros problemas de datos de entrada).
+  - 500 en errores críticos o internos (`CRITICAL_ERROR`, `INTERNAL_ERROR`).
+
 ### Requests en Bruno
 
 En la carpeta `bruno/process-lifecycle` hay requests de ejemplo que utilizan estos endpoints:
@@ -139,6 +188,65 @@ En la carpeta `bruno/process-lifecycle` hay requests de ejemplo que utilizan est
 - `promote-scenario.bru` → `POST /api/v1/process-lifecycle/promote`
 - `resolve-scenario.bru` → `POST /api/v1/process-lifecycle/resolve`
 - `move-to-test-scenario.bru` → `POST /api/v1/process-lifecycle/to-test`
+- `run-process.bru` → `POST /api/v1/process-lifecycle/run`
+  - Body de ejemplo (Loan risk lifecycle):
+    ```json
+    {
+      "process_type_id": 2,
+      "sede_id": 1,
+      "override_process_version_id": null,
+      "input": {
+        "age": 45,
+        "salary": 2500000
+      }
+    }
+    ```
+  - Body de ejemplo (otro proceso):
+    ```json
+    {
+      "process_type_id": 1,
+      "sede_id": 1,
+      "override_process_version_id": 123,
+      "input": {
+        "customer_id": 999,
+        "operation_id": "ABC-123"
+      }
+    }
+    ```
+
+### Registro de servicios configurables (Loan Risk y otros)
+
+El motor de lifecycle ejecuta servicios a partir de los `execution_key` definidos en `process_steps.execution_key`. Para que estos servicios estén disponibles en tiempo de ejecución:
+
+- Cada servicio debe registrar su constructor en el mapa global:
+  - Ejemplo (`internal/services/loanrisk/age.go`):
+    ```go
+    func init() {
+      serviceconfig.Register("loanrisk/NewAgeService", NewAgeService)
+    }
+    ```
+- Es **obligatorio** que el binario que ejecuta el motor (`cmd/api`, `cmd/cmd-cli`, workers, etc.) importe el paquete de servicios con **importación en blanco**, para que los `init()` se ejecuten y el registro se llene:
+  - Ejemplo en `cmd/api/main.go`:
+    ```go
+    import (
+      // ...
+      fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
+
+      // Importación en blanco para asegurar el registro de servicios Loan Risk
+      _ "go-fiber-core/internal/services/loanrisk"
+    )
+    ```
+
+Si se omite esta importación:
+
+- El motor no encuentra las factories (`GetServiceFactory`) para claves como `loanrisk/NewAgeService`.
+- La ejecución de `ExecuteServicesInOrder` falla con un error interno:
+  - `error al obtener la fábrica para loanrisk/NewAgeService: servicio no encontrado en el registro: loanrisk/NewAgeService`
+- En el contexto del endpoint `/run`:
+  - El HTTP será 500.
+  - `data.error` vendrá con:
+    - `code = "INTERNAL_ERROR"`.
+    - `message` con el detalle del problema de registro.
 
 Todos heredan la configuración de autenticación y base URL (`{{urlBase}}`) definida en `bruno/environments`.
 

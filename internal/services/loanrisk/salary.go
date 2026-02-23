@@ -28,7 +28,11 @@ func (s *Salary) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (s *Salary) Execute() error {
 	fmt.Println("💰 Ejecutando servicio Salary")
 
-	rawSalary, _ := s.ctx.GetInputValue("salary")
+	rawSalary, ok := s.ctx.GetInputValue("salary")
+	if !ok {
+		return fmt.Errorf("%w: missing required input key 'salary' for Salary", domain.ErrMissingRequiredKey)
+	}
+
 	salary := 0
 	switch v := rawSalary.(type) {
 	case int:
@@ -55,13 +59,17 @@ func (s *Salary) Execute() error {
 	}
 
 	if salary < minSalary {
-		return fmt.Errorf("%w: salario %d menor al mínimo permitido %d", domain.ErrCritical, salary, minSalary)
+		return fmt.Errorf("%w: salario %d menor al mínimo permitido %d", domain.ErrValueOutOfRange, salary, minSalary)
 	}
 
 	data := map[string]any{
 		"salary_checked":       true,
 		"min_salary":           minSalary,
 		"salary_bracket_k_usd": salary / 1000,
+	}
+
+	for k, v := range data {
+		s.ctx.SetInputValue(k, v)
 	}
 
 	result := contracts.StepResult{

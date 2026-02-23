@@ -2,6 +2,7 @@ package loanrisk
 
 import (
 	"fmt"
+	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -27,11 +28,21 @@ func (r *IsRenovation) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (r *IsRenovation) Execute() error {
 	fmt.Println("🔁 Ejecutando servicio IsRenovation")
 
+	requiredKeys := []string{"min_salary", "salary_bracket_k_usd", "salary_checked"}
+	for _, key := range requiredKeys {
+		if _, ok := r.ctx.GetInputValue(key); !ok {
+			return fmt.Errorf("%w: missing required input key '%s' for IsRenovation", domain.ErrMissingRequiredKey, key)
+		}
+	}
+
+	r.ctx.SetInputValue("is_renovation", true)
+
 	data := map[string]any{
 		"renovation_check": true,
 	}
 	result := contracts.StepResult{
 		Status: "ok",
+		Input:  r.ctx.SnapshotInput(),
 		Data:   data,
 	}
 	r.ctx.SetResult(r.servicePath, result)

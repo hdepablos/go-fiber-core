@@ -1,0 +1,27 @@
+meta {
+  name: run process
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 2,
+    "sede_id": 1,
+    "override_process_version_id": null,
+    "input": {
+      "age": 45,
+      "salary": 2500000
+    }
+  }
+}

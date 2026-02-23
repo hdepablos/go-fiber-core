@@ -56,7 +56,7 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
 			for _, key := range serviceConfig.RequiredKeys {
 				if _, ok := svcCtx.GetInputValue(key); !ok {
-					execErr = fmt.Errorf("missing required key '%s' for service '%s': %w", key, serviceConfig.Path, domain.ErrCritical)
+					execErr = fmt.Errorf("missing required key '%s' for service '%s': %w", key, serviceConfig.Path, domain.ErrMissingRequiredKey)
 					break
 				}
 			}
@@ -92,6 +92,13 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 			default:
 				log.Printf("🛑 Error no clasificado en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
 				return execErr
+			}
+		} else {
+			if svcCtx != nil {
+				if res, ok := svcCtx.GetResult(serviceConfig.Path); ok {
+					res.StepOrder = serviceConfig.Order
+					svcCtx.SetResult(serviceConfig.Path, res)
+				}
 			}
 		}
 	}

@@ -12,6 +12,9 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
+
+	// Importación en blanco para asegurar el registro de servicios Loan Risk
+	_ "go-fiber-core/internal/services/loanrisk"
 )
 
 var fiberLambda *fiberadapter.FiberLambda

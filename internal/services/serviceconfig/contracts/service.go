@@ -6,10 +6,11 @@ import (
 )
 
 type StepResult struct {
-	Status  string         `json:"status"`
-	Message string         `json:"message,omitempty"`
-	Input   map[string]any `json:"input,omitempty"`
-	Data    map[string]any `json:"data,omitempty"`
+	Status    string         `json:"status"`
+	Message   string         `json:"message,omitempty"`
+	Input     map[string]any `json:"input,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
+	StepOrder int            `json:"step_order,omitempty"`
 }
 
 type ServiceContext struct {

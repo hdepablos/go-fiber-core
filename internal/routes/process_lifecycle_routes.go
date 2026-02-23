@@ -50,4 +50,10 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 		"/versions/:id",
 		handler.GetProcessVersion,
 	)
+
+	group.Post(
+		"/run",
+		utils.Validate(new(requests.RunProcessRequest)),
+		handler.RunLoanRiskLifecycle,
+	)
 }

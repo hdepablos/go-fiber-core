@@ -17,5 +17,11 @@ var (
 	// Por ejemplo, si un servicio opcional de enriquecimiento de datos falla.
 	ErrTolerable = errors.New("error tolerable")
 
+	// ErrMissingRequiredKey se usa cuando falta una key obligatoria en el input.
+	ErrMissingRequiredKey = errors.New("falta una clave requerida en el input")
+
+	// ErrValueOutOfRange se usa cuando un valor está fuera de los rangos permitidos.
+	ErrValueOutOfRange = errors.New("valor fuera de rango permitido")
+
 	// ... y otros errores de negocio que necesites
 )
