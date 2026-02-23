@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -27,8 +28,9 @@ func RateLimitMiddleware(redisClient *redis.Client, config RateLimitConfig) fibe
 
 		key := rateLimitKeyPrefix + clientIdentifier
 
-		// 2. Utiliza el contexto de la petición de Fiber.
-		ctx := c.Context()
+		// 2. Contexto con timeout acotado para evitar bloqueos ante errores de Redis.
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
 
 		// 3. Usa una pipeline de Redis para ejecutar comandos de forma atómica.
 		var countCmd *redis.IntCmd
