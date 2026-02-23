@@ -3,18 +3,34 @@ package cmd
 import (
 	"fmt"
 	"go-fiber-core/internal/database/seeders"
+	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
 
 var onlySeeders string
+var listOnly bool
 
 var seedCmd = &cobra.Command{
 	Use:   "seed",
 	Short: "Ejecuta los seeders para poblar la base de datos",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		fmt.Println("Ejecutando los seeders...")
+		fmt.Println("Seeders disponibles:")
+		all := seeders.ListSeedersNames()
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "NOMBRE\tCOMANDO")
+		for _, name := range all {
+			fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
+		}
+		w.Flush()
+
+		if listOnly {
+			return nil
+		}
+
+		fmt.Println("\nEjecutando los seeders...")
 
 		var selected []string
 		if onlySeeders != "" {
@@ -36,5 +52,6 @@ var seedCmd = &cobra.Command{
 
 func init() {
 	seedCmd.Flags().StringVar(&onlySeeders, "only", "", "Nombres de seeders a ejecutar, separados por coma")
+	seedCmd.Flags().BoolVar(&listOnly, "list", false, "Solo mostrar los seeders disponibles sin ejecutarlos")
 	rootCmd.AddCommand(seedCmd)
 }

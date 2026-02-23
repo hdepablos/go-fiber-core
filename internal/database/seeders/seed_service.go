@@ -31,6 +31,19 @@ type SeederConfig struct {
 	Seeder Seeder
 }
 
+func ListSeedersNames() []string {
+	return []string{
+		"banks",
+		"roles",
+		"menus",
+		"catalog_items",
+		"create_test_user",
+		"role_user",
+		"menu_user",
+		"process_lifecycle_manager",
+	}
+}
+
 func NewSeederService(logger *slog.Logger) *SeederService {
 	if logger == nil {
 		logger = slog.Default()

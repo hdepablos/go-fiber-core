@@ -715,6 +715,11 @@ run-cli: ## ▶️ Ejecuta un comando CLI personalizado. Uso: make run-cli c="co
 	@echo "▶️ Ejecutando comando CLI: $(c)..."
 	@$(DC_RUN) go run ./cmd/cmd-cli/main.go $(c)
 
+.PHONY: cli-help
+cli-help: ## 🧾 Lista los comandos CLI disponibles y su uso. Uso: make cli-help
+	@echo "🧾 Comandos CLI disponibles:"
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go --help
+
 .PHONY: create-command
 create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command name=nuevoComando
 	@if [ -z "$(name)" ]; then \
@@ -777,3 +782,8 @@ seed-one: ## 🎯 Ejecuta un seeder específico. Uso: make seed-one name=catalog
 	fi; \
 	echo "Ejecutando seeder: $(name)"; \
 	$(DC_RUN) go run ./cmd/cmd-cli/main.go seed --only $(name)
+
+.PHONY: seed-list
+seed-list: ## 📋 Muestra la lista de seeders disponibles y cómo ejecutarlos. Uso: make seed-list
+	@echo "📋 Seeders disponibles:"
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go seed --list

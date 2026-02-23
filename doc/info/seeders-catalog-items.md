@@ -109,10 +109,16 @@ Ejecutar solo el seeder de `catalog_items`:
 go run ./cmd/cmd-cli main.go seed --only catalog_items
 ```
 
-Se pueden ejecutar varios a la vez separados por comas:
+Ejecutar varios seeders a la vez (CLI directa):
 
 ```bash
 go run ./cmd/cmd-cli main.go seed --only banks,roles,catalog_items
+```
+
+Ejecutar varios seeders a la vez usando Makefile:
+
+```bash
+make run-cli c='seed --only "banks,roles,menus"'
 ```
 
 Nombres de seeders registrados actualmente:
@@ -124,4 +130,3 @@ Nombres de seeders registrados actualmente:
 - `create_test_user`
 - `role_user`
 - `menu_user`
-
