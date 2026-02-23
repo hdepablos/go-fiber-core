@@ -14,6 +14,8 @@ type ProcessLifecycleHandler interface {
 	ReplicateScenario(c *fiber.Ctx) error
 	PromoteScenario(c *fiber.Ctx) error
 	ResolveScenario(c *fiber.Ctx) error
+	ResolveCurrentVersion(c *fiber.Ctx) error
+	GetProcessVersion(c *fiber.Ctx) error
 	MoveToTestScenario(c *fiber.Ctx) error
 	ListProcessVersions(c *fiber.Ctx) error
 }
@@ -77,6 +79,48 @@ func (h *processLifecycleHandler) ResolveScenario(c *fiber.Ctx) error {
 	return responses.Success(c, "Escenario resuelto exitosamente", fiber.Map{
 		"process_version_id": resolvedID,
 		"process_steps":      steps,
+	})
+}
+
+func (h *processLifecycleHandler) ResolveCurrentVersion(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.ResolveScenarioRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	resolvedID, _, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID)
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Versión vigente resuelta exitosamente", fiber.Map{
+		"process_version_id": resolvedID,
+	})
+}
+
+func (h *processLifecycleHandler) GetProcessVersion(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	idUint, err := getUintID(c)
+	if err != nil {
+		return err
+	}
+
+	item, svcErr := h.service.GetProcessVersionByID(ctx, int64(idUint))
+	if svcErr != nil {
+		return svcErr
+	}
+
+	steps, svcErr := h.service.GetProcessStepsByVersionID(ctx, int64(idUint))
+	if svcErr != nil {
+		return svcErr
+	}
+
+	return responses.Success(c, "Versión de proceso obtenida exitosamente", fiber.Map{
+		"version": item,
+		"steps":   steps,
 	})
 }
 

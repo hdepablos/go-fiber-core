@@ -28,19 +28,48 @@ func (s *Salary) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (s *Salary) Execute() error {
 	fmt.Println("💰 Ejecutando servicio Salary")
 
-	// --- LÓGICA DE ERROR CRÍTICO ---
-	// Si el salario no es válido, es un problema grave para un préstamo y debe detener todo.
-	if s.ctx.Salary <= 0 {
-		// Devolvemos nuestro mensaje de error específico envuelto con el tipo ErrCritical.
-		return fmt.Errorf("%w: el salario debe ser un valor positivo, pero se recibió %d", domain.ErrCritical, s.ctx.Salary)
+	rawSalary, _ := s.ctx.GetInputValue("salary")
+	salary := 0
+	switch v := rawSalary.(type) {
+	case int:
+		salary = v
+	case int64:
+		salary = int(v)
+	case float64:
+		salary = int(v)
 	}
 
-	result := map[string]any{
+	// Leer min_salary desde la configuración del step (por defecto 1)
+	minSalary := 1
+	if cfg := s.ctx.CurrentStepConfig; cfg != nil {
+		if v, ok := cfg["min_salary"]; ok {
+			switch n := v.(type) {
+			case int:
+				minSalary = n
+			case int64:
+				minSalary = int(n)
+			case float64:
+				minSalary = int(n)
+			}
+		}
+	}
+
+	if salary < minSalary {
+		return fmt.Errorf("%w: salario %d menor al mínimo permitido %d", domain.ErrCritical, salary, minSalary)
+	}
+
+	data := map[string]any{
 		"salary_checked":       true,
-		"salary_bracket_k_usd": s.ctx.Salary / 1000,
+		"min_salary":           minSalary,
+		"salary_bracket_k_usd": salary / 1000,
 	}
 
-	s.ctx.Results[s.servicePath] = result
+	result := contracts.StepResult{
+		Status: "ok",
+		Input:  s.ctx.SnapshotInput(),
+		Data:   data,
+	}
+	s.ctx.SetResult(s.servicePath, result)
 	return nil
 }
 

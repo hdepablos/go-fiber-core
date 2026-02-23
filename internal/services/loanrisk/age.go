@@ -29,15 +29,41 @@ func (a *Age) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (a *Age) Execute() error {
 	fmt.Println("🧮 Ejecutando servicio Age")
 
-	// Accede a los datos de entrada de forma segura desde el contexto.
-	age := a.ctx.Age
-	result := map[string]any{
-		"age_processed": fmt.Sprintf("Edad validada: %v", age),
-		"is_adult":      age >= 18,
+	rawAge, _ := a.ctx.GetInputValue("age")
+	age := 0
+	switch v := rawAge.(type) {
+	case int:
+		age = v
+	case int64:
+		age = int(v)
+	case float64:
+		age = int(v)
 	}
-
-	// Añade su resultado al mapa de resultados compartidos del contexto.
-	a.ctx.Results[a.servicePath] = result
+	// Leer min_age desde la configuración del step (por defecto 18)
+	minAge := 18
+	if cfg := a.ctx.CurrentStepConfig; cfg != nil {
+		if v, ok := cfg["min_age"]; ok {
+			switch n := v.(type) {
+			case int:
+				minAge = n
+			case int64:
+				minAge = int(n)
+			case float64:
+				minAge = int(n)
+			}
+		}
+	}
+	data := map[string]any{
+		"age_processed": fmt.Sprintf("Edad validada: %v", age),
+		"min_age":       minAge,
+		"is_adult":      age >= minAge,
+	}
+	result := contracts.StepResult{
+		Status: "ok",
+		Input:  a.ctx.SnapshotInput(),
+		Data:   data,
+	}
+	a.ctx.SetResult(a.servicePath, result)
 	return nil // No hay error
 }
 

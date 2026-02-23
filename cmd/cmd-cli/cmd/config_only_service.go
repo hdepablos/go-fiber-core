@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
@@ -27,8 +28,7 @@ Ejemplo: go run . serviceconfigonly loanrisk/NewAgeService`,
 		// Creamos nuestro contexto de datos, igual que antes.
 		ctx := contracts.NewServiceContext(45, 100000)
 
-		// Llamamos a nuestra nueva función ExecuteService.
-		err := serviceconfig.ExecuteService(pathService, ctx)
+		err := serviceconfig.ExecuteService(context.Background(), pathService, ctx)
 		if err != nil {
 			// El error ya fue logueado dentro de ExecuteService, aquí solo salimos.
 			return

@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/services/serviceconfig"
+	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
 type Service interface {
@@ -18,6 +21,9 @@ type Service interface {
 	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64) (int64, []Step, error)
 	MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error
 	ListProcessVersions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.ProcessVersionListItem], error)
+	GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error)
+	GetProcessStepsByVersionID(ctx context.Context, processVersionID int64) ([]Step, error)
+	RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64) (int64, *contracts.ServiceContext, error)
 }
 
 type Step struct {
@@ -286,6 +292,176 @@ func (s *service) ListProcessVersions(ctx context.Context, req dtos.PaginationRe
 		RowsPerPage: req.RowsPerPage,
 		Extras:      map[string]any{},
 	}, nil
+}
+
+func (s *service) GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error) {
+	if processVersionID <= 0 {
+		return nil, domain.ErrInvalidArgument
+	}
+
+	db := s.conn.ConnectGormRead
+	if db == nil {
+		return nil, fmt.Errorf("gorm read connection is not initialized")
+	}
+
+	var row models.ProcessVersionRow
+
+	err := db.WithContext(ctx).
+		Table("process_versions pv").
+		Select(`
+			pv.id,
+			pt.name AS process_type_name,
+			pt.is_visible AS process_type_is_visible,
+			pv.version_number,
+			pv.sede_id,
+			pv.status,
+			u.email AS operator_email,
+			hv.valid_from,
+			hv.valid_to
+		`).
+		Joins("JOIN process_types pt ON pt.id = pv.process_type_id").
+		Joins("LEFT JOIN users u ON u.id = pv.operator_id").
+		Joins(`LEFT JOIN (
+			SELECT
+				h.process_version_id,
+				h.promoted_at AS valid_from,
+				LEAD(h.promoted_at) OVER (
+					PARTITION BY v.process_type_id, v.sede_id
+					ORDER BY h.promoted_at
+				) AS valid_to
+			FROM process_version_history h
+			JOIN process_versions v ON v.id = h.process_version_id
+		) hv ON hv.process_version_id = pv.id`).
+		Where("pv.id = ? AND pv.archived_at IS NULL", processVersionID).
+		Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+
+	item := &models.ProcessVersionListItem{
+		ID:                   row.ID,
+		ProcessTypeName:      row.ProcessTypeName,
+		ProcessTypeIsVisible: row.ProcessTypeIsVisible,
+		VersionNumber:        row.VersionNumber,
+		SedeID:               row.SedeID,
+		Status:               row.Status,
+		OperatorEmail:        row.OperatorEmail,
+		ValidFrom:            row.ValidFrom,
+		ValidTo:              row.ValidTo,
+	}
+	return item, nil
+}
+
+func (s *service) GetProcessStepsByVersionID(ctx context.Context, processVersionID int64) ([]Step, error) {
+	if processVersionID <= 0 {
+		return nil, domain.ErrInvalidArgument
+	}
+
+	db := s.conn.ConnectGormRead
+	if db == nil {
+		return nil, fmt.Errorf("gorm read connection is not initialized")
+	}
+
+	var steps []Step
+	err := db.WithContext(ctx).
+		Table("process_steps").
+		Select(`
+			name,
+			execution_key,
+			config,
+			step_order
+		`).
+		Where("process_version_id = ?", processVersionID).
+		Order("step_order ASC").
+		Scan(&steps).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if steps == nil {
+		return []Step{}, nil
+	}
+
+	return steps, nil
+}
+
+func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistryRow, error) {
+	rows := make([]serviceconfig.ServiceRegistryRow, 0, len(steps))
+
+	for _, step := range steps {
+		errorTolerance := "inherit"
+
+		if len(step.Config) > 0 {
+			var cfg struct {
+				ErrorTolerance string `json:"error_tolerance"`
+			}
+			if err := json.Unmarshal(step.Config, &cfg); err != nil {
+				return nil, domain.ErrInternal
+			}
+
+			if cfg.ErrorTolerance != "" {
+				e := strings.ToLower(cfg.ErrorTolerance)
+				switch e {
+				case "critical", "tolerable", "inherit":
+					errorTolerance = e
+				default:
+					errorTolerance = "inherit"
+				}
+			}
+		}
+
+		row := serviceconfig.ServiceRegistryRow{
+			Path:           step.ExecutionKey,
+			Order:          int(step.StepOrder),
+			ErrorTolerance: errorTolerance,
+			Config:         step.Config,
+		}
+		rows = append(rows, row)
+	}
+
+	return rows, nil
+}
+
+func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64) (int64, *contracts.ServiceContext, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	var sedeID int64 = 1
+	if input != nil {
+		if raw, ok := input["sede_id"]; ok {
+			switch v := raw.(type) {
+			case int:
+				sedeID = int64(v)
+			case int64:
+				sedeID = v
+			case float64:
+				sedeID = int64(v)
+			case string:
+				if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+					sedeID = parsed
+				}
+			}
+		}
+	}
+
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	registryRows, err := BuildServiceRegistryFromSteps(steps)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	serviceCtx := contracts.NewServiceContextFromInput(ctx, input)
+
+	if err := serviceconfig.ExecuteServicesInOrder(ctx, registryRows, serviceCtx); err != nil {
+		return processVersionID, serviceCtx, err
+	}
+
+	return processVersionID, serviceCtx, nil
 }
 
 func mapPgxError(err error) error {

@@ -27,18 +27,44 @@ func (p *RiskLevel) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (p *RiskLevel) Execute() error {
 	fmt.Println("📊 Ejecutando servicio RiskLevel")
 
-	// Lógica de ejemplo: el riesgo es alto si el salario es bajo y la edad es avanzada.
+	rawSalary, _ := p.ctx.GetInputValue("salary")
+	salary := 0
+	switch v := rawSalary.(type) {
+	case int:
+		salary = v
+	case int64:
+		salary = int(v)
+	case float64:
+		salary = int(v)
+	}
+
+	rawAge, _ := p.ctx.GetInputValue("age")
+	age := 0
+	switch v := rawAge.(type) {
+	case int:
+		age = v
+	case int64:
+		age = int(v)
+	case float64:
+		age = int(v)
+	}
+
 	risk := "bajo"
-	if p.ctx.Salary < 50000 && p.ctx.Age > 60 {
+	if salary < 50000 && age > 60 {
 		risk = "alto"
-	} else if p.ctx.Salary < 80000 {
+	} else if salary < 80000 {
 		risk = "medio"
 	}
 
-	result := map[string]any{
+	data := map[string]any{
 		"calculated_risk": risk,
 	}
-	p.ctx.Results[p.servicePath] = result
+	result := contracts.StepResult{
+		Status: "ok",
+		Input:  p.ctx.SnapshotInput(),
+		Data:   data,
+	}
+	p.ctx.SetResult(p.servicePath, result)
 	return nil
 }
 

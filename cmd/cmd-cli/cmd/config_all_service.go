@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
@@ -19,11 +20,33 @@ import (
 func fetchServiceConfigFromDB() []serviceconfig.ServiceRegistryRow {
 	fmt.Println("🗄️ Obteniendo configuración de servicios desde la base de datos...")
 	return []serviceconfig.ServiceRegistryRow{
-		{Path: "loanrisk/NewAgeService", Order: 1},
-		{Path: "loanrisk/NewValidationService", Order: 2},
-		{Path: "loanrisk/NewSalaryService", Order: 3},
-		{Path: "loanrisk/NewIsRenovationService", Order: 4},
-		{Path: "loanrisk/NewRiskLevelService", Order: 5},
+		{
+			Path:         "loanrisk/NewAgeService",
+			Order:        1,
+			Config:       []byte(`{"min_age":40,"required_keys":["age"]}`),
+			RequiredKeys: []string{"age"},
+		},
+		{
+			Path:   "loanrisk/NewValidationService",
+			Order:  2,
+			Config: []byte(`{}`),
+		},
+		{
+			Path:         "loanrisk/NewSalaryService",
+			Order:        3,
+			Config:       []byte(`{"min_salary":2500000,"required_keys":["salary"]}`),
+			RequiredKeys: []string{"salary"},
+		},
+		{
+			Path:   "loanrisk/NewIsRenovationService",
+			Order:  4,
+			Config: []byte(`{}`),
+		},
+		{
+			Path:   "loanrisk/NewRiskLevelService",
+			Order:  5,
+			Config: []byte(`{}`),
+		},
 	}
 }
 
@@ -33,15 +56,12 @@ var serviceconfigallCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, _ []string) {
 		services := fetchServiceConfigFromDB()
 
-		// --- CASO 1: ÉXITO (con error tolerable) ---
 		fmt.Println("\n=============================================")
 		fmt.Println("🚀 INICIANDO CASO 1: Éxito con Error Tolerable")
 		fmt.Println("=============================================")
-		// Usamos una edad de 50 para activar el error tolerable
 		ctxSuccess := contracts.NewServiceContext(50, 100000)
-		err := serviceconfig.ExecuteServicesInOrder(services, ctxSuccess)
+		err := serviceconfig.ExecuteServicesInOrder(context.Background(), services, ctxSuccess)
 		if err != nil {
-			// Este bloque no debería ejecutarse si solo hay errores tolerables.
 			log.Printf("🚨 El Caso 1 finalizó con un error inesperado: %v", err)
 		} else {
 			jsonBytes, _ := json.MarshalIndent(ctxSuccess.Results, "", "  ")
@@ -49,17 +69,13 @@ var serviceconfigallCmd = &cobra.Command{
 			fmt.Println(string(jsonBytes))
 		}
 
-		// --- CASO 2: FALLO (con error crítico) ---
 		fmt.Println("\n==========================================")
 		fmt.Println("🚀 INICIANDO CASO 2: Fallo con Error Crítico")
 		fmt.Println("==========================================")
-		// Usamos un salario de 0 para activar el error crítico
 		ctxFailure := contracts.NewServiceContext(45, 0)
-		err = serviceconfig.ExecuteServicesInOrder(services, ctxFailure)
+		err = serviceconfig.ExecuteServicesInOrder(context.Background(), services, ctxFailure)
 		if err != nil {
-			// Este bloque SÍ debería ejecutarse.
 			log.Printf("✅ El Caso 2 finalizó correctamente con el error crítico esperado.")
-			// Observa que los servicios posteriores al de Salario no se ejecutaron.
 		}
 
 		fmt.Println("\n--- Fin de la simulación ---")

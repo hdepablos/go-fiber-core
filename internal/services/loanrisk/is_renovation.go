@@ -27,10 +27,14 @@ func (r *IsRenovation) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (r *IsRenovation) Execute() error {
 	fmt.Println("🔁 Ejecutando servicio IsRenovation")
 
-	result := map[string]any{
+	data := map[string]any{
 		"renovation_check": true,
 	}
-	r.ctx.Results[r.servicePath] = result
+	result := contracts.StepResult{
+		Status: "ok",
+		Data:   data,
+	}
+	r.ctx.SetResult(r.servicePath, result)
 	return nil
 }
 
