@@ -15,3 +15,6 @@ Actualizar sqs-consumer para:
 
     Recrear en el entorno aws el s3 con la configuración del MultipartUpload
 
+Aplicar lógica de validación en age como el de salary
+
+modificar el registre que sea igual al de la ruta del archivo

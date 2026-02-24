@@ -8,3 +8,38 @@ logger.GetLogger("notificaciones").Info("Notificación enviada", zap.String("ema
 
 La ruta de salida
     pkg/logs/*.log
+
+
+Otro uso
+
+// Esta es una forma de implementar el logger
+"go-fiber-core/internal/logger"
+
+// y la declaro en la función que la valla a utilizar 
+log := logger.GetLogger("catalogs-cache")
+
+// uso
+log.Info("catalogs: intentando leer cache Redis", zap.String("key", r.cacheKey))
+log.Info("catalogs: cache hit", zap.String("key", r.cacheKey), zap.Int("bytes", len(cachedBytes)))
+log.Error("catalogs: error al deserializar cache", zap.String("key", r.cacheKey), zap.Error(err))
+log.Info("catalogs: cache miss o error en GET", zap.String("key", r.cacheKey), zap.Error(err))
+log.Info("catalogs: cache vacio", zap.String("key", r.cacheKey))
+log.Info("catalogs: redis client es nil, se salta cache")
+log.Info("catalogs: consultando bancos en DB")
+log.Error("catalogs: error consultando DB", zap.Error(err))
+log.Info(
+	"catalogs: DB OK",
+	zap.Int("banks", len(response.Banks)),
+	zap.Int("roles", len(response.Roles)),
+	zap.Int("users", len(response.Users)),
+	zap.Int("menus", len(response.Menus)),
+)
+log.Info(
+	"catalogs: escribiendo cache Redis",
+	zap.String("key", r.cacheKey),
+	zap.Duration("timeout", timeout),
+	zap.Int("bytes", len(data)),
+)
+log.Error("catalogs: error al escribir cache Redis", zap.String("key", r.cacheKey), zap.Error(errSet))
+log.Info("catalogs: cache Redis escrito correctamente", zap.String("key", r.cacheKey))
+log.Error("catalogs: error serializando respuesta para cache", zap.Error(err))
