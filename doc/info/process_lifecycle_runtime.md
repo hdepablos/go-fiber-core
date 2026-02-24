@@ -42,7 +42,7 @@ type ServiceContext struct {
   - Viene del campo `config` de la tabla `process_steps` (JSONB).
   - El executor lo parsea y lo asigna antes de llamar a `Execute()` del servicio.
 
-> **Nota sobre Roadmap**: El motor filtra los pasos disponibles según el campo `roadmap` de `process_steps`. Solo se ejecutan los servicios que coinciden con el roadmap solicitado en `RunResolvedProcess`.
+> **Nota sobre Roadmap**: El motor filtra los pasos disponibles según el campo `roadmap` de `process_steps`. Solo se ejecutan los servicios que coinciden con el roadmap solicitado en `Run`.
 
 ### Constructores relevantes
 
@@ -60,6 +60,14 @@ func NewServiceContextFromInput(ctx context.Context, input map[string]any) *Serv
 ```
 
 Este es el constructor recomendado para flujos reales: el JSON de negocio entra una vez, se carga en `Input` y fluye por todos los servicios.
+
+- **Acceso a Resultados (GetAll)**:
+
+```go
+// Retorna un mapa plano con todos los valores de `Data` de todos los pasos ejecutados.
+func (c *ServiceContext) GetAll() map[string]any
+```
+Ex: `{"score": 85, "approved": true}`.
 
 ---
 

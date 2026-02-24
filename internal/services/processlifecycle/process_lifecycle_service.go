@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/cache"
 	"go-fiber-core/internal/services/serviceconfig"
@@ -26,7 +26,7 @@ type Service interface {
 	ListProcessVersions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.ProcessVersionListItem], error)
 	GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error)
 	GetProcessStepsByVersionID(ctx context.Context, processVersionID int64) ([]Step, error)
-	RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error)
+	Run(ctx context.Context, req requests.RunProcessRequest) (int64, *contracts.ServiceContext, error)
 }
 
 type Step struct {
@@ -522,30 +522,35 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 	return rows, nil
 }
 
-func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error) {
+func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int64, *contracts.ServiceContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	var sedeID int64 = 1
-	if input != nil {
-		if raw, ok := input["sede_id"]; ok {
-			switch v := raw.(type) {
-			case int:
-				sedeID = int64(v)
-			case int64:
-				sedeID = v
-			case float64:
-				sedeID = int64(v)
-			case string:
-				if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
-					sedeID = parsed
-				}
-			}
+	// Validate SedeID (although DTO validation should catch it if applied)
+	if req.SedeID <= 0 {
+		// Fallback or error? DTO has validate:"required", so it should be valid.
+		// But let's be safe or default to 1 as before if needed.
+		// The previous logic defaulted to 1 if not present.
+		// Here, we trust the caller provided it or default if 0.
+		if req.SedeID == 0 {
+			req.SedeID = 1
 		}
 	}
 
-	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID, roadmap)
+	// Ensure input is initialized
+	if req.Input == nil {
+		req.Input = make(map[string]any)
+	}
+
+	// Inject context variables from request
+	req.Input["sede_id"] = req.SedeID
+	req.Input["roadmap"] = req.Roadmap
+	if req.OperatorID > 0 {
+		req.Input["operator_id"] = req.OperatorID
+	}
+
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, req.Roadmap)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -555,7 +560,7 @@ func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, i
 		return 0, nil, err
 	}
 
-	serviceCtx := contracts.NewServiceContextFromInput(ctx, input)
+	serviceCtx := contracts.NewServiceContextFromInput(ctx, req.Input)
 
 	if err := serviceconfig.ExecuteServicesInOrder(ctx, registryRows, serviceCtx); err != nil {
 		return processVersionID, serviceCtx, err

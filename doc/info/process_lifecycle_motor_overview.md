@@ -309,31 +309,40 @@ Aquí se traduce la definición de la BD (`Step`) al formato que entiende el exe
 
 ---
 
-## 6. Orquestación completa: RunResolvedProcess
+## 6. Orquestación completa: Run
 
 Archivo: `internal/services/processlifecycle/process_lifecycle_service.go`
 
 ```go
-func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error) {
+func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int64, *contracts.ServiceContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	var sedeID int64 = 1
-	// Sede se puede obtener desde input["sede_id"]
+	// 1. Validar y normalizar Input (sede_id, roadmap, operator_id)
+	if req.SedeID <= 0 { req.SedeID = 1 }
+	if req.Input == nil { req.Input = make(map[string]any) }
+	
+	req.Input["sede_id"] = req.SedeID
+	req.Input["roadmap"] = req.Roadmap
+	if req.OperatorID > 0 { req.Input["operator_id"] = req.OperatorID }
 
-	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID, roadmap)
+	// 2. Resolver versión y pasos
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, req.Roadmap)
 	if err != nil {
 		return 0, nil, err
 	}
 
+	// 3. Convertir a registro de servicios
 	registryRows, err := BuildServiceRegistryFromSteps(steps)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	serviceCtx := contracts.NewServiceContextFromInput(ctx, input)
+	// 4. Crear contexto de ejecución
+	serviceCtx := contracts.NewServiceContextFromInput(ctx, req.Input)
 
+	// 5. Ejecutar servicios
 	if err := serviceconfig.ExecuteServicesInOrder(ctx, registryRows, serviceCtx); err != nil {
 		return processVersionID, serviceCtx, err
 	}
@@ -353,6 +362,7 @@ Resumen del flujo:
    - `ServiceContext` con:
      - `Input` final (bolsa de datos de negocio).
      - `Results` con resultados por servicio.
+     - `GetAll()`: Mapa aplanado de resultados para consumo sencillo.
 
-Este es el punto de entrada que usan tanto CLI como posibles endpoints API para ejecutar un proceso completo basado en configuración.
+Este es el punto de entrada estandarizado (`RunProcessRequest`) para ejecutar un proceso completo.
 

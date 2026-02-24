@@ -12,6 +12,7 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type ProcessLifecycleHandler interface {
@@ -176,23 +177,36 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		req.Input["sede_id"] = req.SedeID
 	}
 
-	// Inyectar el roadmap al input para que esté disponible en el contexto si es necesario,
-	// aunque ahora se pasa explícitamente al servicio.
-	if req.Roadmap != nil {
-		req.Input["roadmap"] = *req.Roadmap
+	// Extract OperatorID from JWT claims (if available)
+	if token := c.Locals("user"); token != nil {
+		if t, ok := token.(*jwt.Token); ok {
+			if claims, ok := t.Claims.(jwt.MapClaims); ok {
+				if id, ok := claims["id"].(float64); ok {
+					req.OperatorID = int64(id)
+				}
+			}
+		}
 	}
 
-	processVersionID, svcCtx, execErr := h.service.RunResolvedProcess(ctx, req.ProcessTypeID, req.Input, req.OverrideProcessVersionID, *req.Roadmap)
+	// Inyectar el roadmap al input para que esté disponible en el contexto si es necesario
+	// (la nueva DTO y servicio ya lo hacen, pero mantenemos por claridad)
+	req.Input["roadmap"] = req.Roadmap
+
+	processVersionID, svcCtx, execErr := h.service.Run(ctx, req)
 	output := map[string]any{
 		"process_version_id": processVersionID,
 		"input":              req.Input,
 		"results":            map[string]any{},
 	}
 
-	if svcCtx != nil && svcCtx.Results != nil {
-		output["results"] = svcCtx.Results
+	if svcCtx != nil {
+		if svcCtx.Results != nil {
+			output["results"] = svcCtx.Results
+		}
+		output["all_data"] = svcCtx.GetAll()
 
-		type orderedResult struct {
+		if svcCtx.Results != nil {
+			type orderedResult struct {
 			ServicePath string `json:"service_path"`
 			StepOrder   int    `json:"step_order"`
 		}
@@ -222,6 +236,7 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		})
 
 		output["execute_ordered"] = ordered
+	}
 	}
 
 	if execErr != nil {

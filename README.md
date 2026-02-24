@@ -117,24 +117,26 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
   - Acción: invoca `move_process_version_to_test` para mover una versión desde `DRAFT` a `TEST`. Si la versión no existe o está archivada, se traduce a `ErrNotFound`. Si la versión no está en `DRAFT`, se traduce a `ErrInvalidArgument`.
 
 - `POST /api/v1/process-lifecycle/run`
-  - Endpoint genérico para ejecutar un proceso completo usando el motor de lifecycle (`RunResolvedProcess`).
+  - Endpoint genérico para ejecutar un proceso completo usando el motor de lifecycle (`Run`).
   - Body (`RunProcessRequest`):
     - `process_type_id` (int64, requerido, > 0): identifica el tipo de proceso a ejecutar (ej. Loan risk).
     - `sede_id` (int64, requerido): sede desde la cual se resuelve la versión vigente.
     - `override_process_version_id` (int64, opcional, puede ser `null`):
       - `null` → usa la versión `PROD` vigente según `process_type_id` + `sede_id` (con fallback a versión global).
       - `!= null` → fuerza la ejecución de esa versión específica, respetando las reglas de `resolve_process_version`.
-    - `roadmap` (int, requerido): define el segmento de pasos a ejecutar.
+    - `roadmap` (int, opcional, default 0): define qué segmento de pasos se resolverá.
     - `input` (objeto JSON, requerido): bolsa de datos de negocio (`ServiceContext.Input`) que verán todos los servicios.
       - El handler garantiza que `input["sede_id"]` exista (se copia desde `sede_id` si no viene).
+      - `operator_id` **NO** se envía en el body; se inyecta automáticamente desde el token JWT del usuario autenticado.
   - Acción:
     - Resuelve la versión efectiva (`resolve_process_version`).
     - Construye el registro de servicios a partir de los steps (`execution_key`, `step_order`, `config`, `required_keys`).
-    - Ejecuta todos los servicios en orden con el `input` dado (`RunResolvedProcess`).
+    - Ejecuta todos los servicios en orden con el `input` dado (`Run`).
   - Respuesta exitosa (HTTP 200, `status = "success"`):
     - `data.process_version_id`: id de la versión ejecutada.
     - `data.input`: JSON de entrada (incluyendo `sede_id`).
     - `data.results`: mapa de resultados por servicio (`execution_key` → `StepResult`).
+    - `data.all_data`: mapa aplanado de resultados (`GetAll()`) para consumo sencillo (ej: `{"score": 85, "approved": true}`).
     - `data.execute_ordered`: arreglo ordenado por `step_order` con la forma:
       - `service_path` (execution_key, ej. `loanrisk/NewAgeService`)
       - `step_order` (int).

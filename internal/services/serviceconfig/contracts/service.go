@@ -99,11 +99,52 @@ func (c *ServiceContext) GetInputValue(key string) (any, bool) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.Input == nil {
-		return nil, false
-	}
 	v, ok := c.Input[key]
 	return v, ok
+}
+
+// GetAll returns a copy of all results in a simple map
+func (c *ServiceContext) GetAll() map[string]any {
+	if c == nil {
+		return make(map[string]any)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	result := make(map[string]any)
+	for k, v := range c.Results {
+		// If the result is a StepResult struct, we might want to extract the Data
+		// or just return the StepResult. The user example showed "score": 85
+		// which implies flat access.
+		// However, Results stores `StepResult` or `any`?
+		// SetResult stores `StepResult`.
+		// Let's assume we want to return the Data part or flatten it.
+		// But the user said: {"score": 85, "approved": true, ...}
+		// If StepResult has Data map, maybe we should merge them?
+		// Or maybe Results stores direct values?
+		// Looking at SetResult: c.Results[key] = result (StepResult)
+		// So Results contains StepResult objects.
+		// If the user wants {"score": 85}, and "score" is a key in Results?
+		// No, keys in Results are usually Step names or IDs.
+		// If a step produces multiple outputs, they are in StepResult.Data.
+		// So GetAll() should probably aggregate all Data from all StepResults?
+		// Or maybe just return the map of StepResults?
+		// The user example: `resultados := resultadoContexto.GetAll() // {"score": 85, "approved": true}`
+		// implies that the context accumulates *business variables*.
+		// If `Results` only stores `StepResult` keyed by step name, then we need to flatten `StepResult.Data`.
+
+		if sr, ok := v.(StepResult); ok {
+			if sr.Data != nil {
+				for dataKey, dataVal := range sr.Data {
+					result[dataKey] = dataVal
+				}
+			}
+		} else {
+			// Fallback if it's not a StepResult
+			result[k] = v
+		}
+	}
+	return result
 }
 
 func (c *ServiceContext) SnapshotInput() map[string]any {
