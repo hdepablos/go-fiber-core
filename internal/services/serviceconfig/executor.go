@@ -9,6 +9,9 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"log"
 	"sort"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type ServiceRegistryRow struct {
@@ -17,6 +20,7 @@ type ServiceRegistryRow struct {
 	ErrorTolerance string
 	Config         []byte
 	RequiredKeys   []string
+	Timeout        time.Duration // Nuevo campo para timeout
 }
 
 func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, svcCtx *contracts.ServiceContext) error {
@@ -30,65 +34,169 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		return services[i].Order < services[j].Order
 	})
 
-	for _, serviceConfig := range services {
+	// Agrupar servicios por Orden
+	grouped := make(map[int][]ServiceRegistryRow)
+	var orders []int
+	for _, s := range services {
+		if _, exists := grouped[s.Order]; !exists {
+			orders = append(orders, s.Order)
+		}
+		grouped[s.Order] = append(grouped[s.Order], s)
+	}
+	sort.Ints(orders) // Asegurar orden ascendente de grupos
+
+	for _, order := range orders {
+		groupRows := grouped[order]
+
+		// Verificar cancelación del contexto antes de iniciar el grupo
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		fmt.Printf("\n▶️ Procesando servicio: %s (Orden: %d)\n", serviceConfig.Path, serviceConfig.Order)
-		factory, err := GetServiceFactory(serviceConfig.Path)
-		if err != nil {
-			return fmt.Errorf("error al obtener la fábrica para %s: %w", serviceConfig.Path, err)
+
+		// Ejecución paralela para el grupo usando errgroup
+		g, groupCtx := errgroup.WithContext(ctx)
+
+		for _, serviceConfig := range groupRows {
+			sc := serviceConfig // Capturar variable para la goroutine
+			g.Go(func() error {
+				return executeOneService(groupCtx, sc, svcCtx)
+			})
 		}
-		serviceInstance := factory()
-		if svcCtx != nil {
-			svcCtx.CurrentStepConfig = nil
-			if len(serviceConfig.Config) > 0 {
-				var cfg map[string]any
-				if err := json.Unmarshal(serviceConfig.Config, &cfg); err == nil {
-					svcCtx.CurrentStepConfig = cfg
-				}
-			}
-		}
-		serviceInstance.Init(svcCtx, serviceConfig.Path)
-		var execErr error
-		if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
-			var missing []string
-			for _, key := range serviceConfig.RequiredKeys {
-				if _, ok := svcCtx.GetInputValue(key); !ok {
-					missing = append(missing, key)
-				}
-			}
-			if len(missing) > 0 {
-				execErr = fmt.Errorf("%w: claves faltantes %v para el servicio '%s'", domain.ErrMissingRequiredKey, missing, serviceConfig.Path)
-			}
-		}
-		if execErr == nil {
-			execErr = serviceInstance.Execute()
-		}
-		if execErr != nil {
-			if errors.Is(execErr, domain.ErrTolerable) {
-				if serviceConfig.ErrorTolerance == "tolerable" {
-					log.Printf("⚠️ Error tolerable en '%s'. La ejecución continuará. Error: %v", serviceConfig.Path, execErr)
-					continue
-				}
-				log.Printf("🔴 Error tolerable tratado como crítico en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-				return execErr
-			}
-			log.Printf("🔴 Error en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-			return execErr
-		} else {
-			if svcCtx != nil {
-				if res, ok := svcCtx.GetResult(serviceConfig.Path); ok {
-					res.StepOrder = serviceConfig.Order
-					svcCtx.SetResult(serviceConfig.Path, res)
-				}
-			}
+
+		// Esperar a que todos los servicios del grupo terminen
+		// Si alguno devuelve un error NO tolerable, g.Wait() lo retornará y detendrá la cadena.
+		if err := g.Wait(); err != nil {
+			return err
 		}
 	}
+
 	fmt.Println("\n✅ Cadena de servicios completada.")
 	return nil
+}
+
+func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, svcCtx *contracts.ServiceContext) error {
+	// Manejo de Timeout específico para este paso
+	var cancel context.CancelFunc
+	if serviceConfig.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, serviceConfig.Timeout)
+		defer cancel()
+	}
+
+	// Verificar contexto
+	select {
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			err := fmt.Errorf("timeout exceeded (%v): %w", serviceConfig.Timeout, ctx.Err())
+			return handleExecutionError(serviceConfig, err)
+		}
+		return ctx.Err()
+	default:
+	}
+
+	fmt.Printf("\n▶️ Procesando servicio: %s (Orden: %d)\n", serviceConfig.Path, serviceConfig.Order)
+
+	factory, err := GetServiceFactory(serviceConfig.Path)
+	if err != nil {
+		return fmt.Errorf("error al obtener la fábrica para %s: %w", serviceConfig.Path, err)
+	}
+
+	serviceInstance := factory()
+
+	// Preparar Configuración
+	var cfg map[string]any
+	if len(serviceConfig.Config) > 0 {
+		if err := json.Unmarshal(serviceConfig.Config, &cfg); err != nil {
+			// Error de configuración suele ser crítico
+			return fmt.Errorf("error config unmarshal en '%s': %w", serviceConfig.Path, err)
+		}
+	}
+
+	// Inicializar Servicio de forma segura (thread-safe)
+	if svcCtx != nil {
+		svcCtx.InitService(serviceInstance, serviceConfig.Path, cfg)
+	} else {
+		serviceInstance.Init(nil, serviceConfig.Path)
+	}
+
+	// Verificar Claves Requeridas
+	var execErr error
+	if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
+		var missing []string
+		for _, key := range serviceConfig.RequiredKeys {
+			if _, ok := svcCtx.GetInputValue(key); !ok {
+				missing = append(missing, key)
+			}
+		}
+		if len(missing) > 0 {
+			execErr = fmt.Errorf("%w: claves faltantes %v para el servicio '%s'", domain.ErrMissingRequiredKey, missing, serviceConfig.Path)
+		}
+	}
+
+	if execErr == nil {
+		// Ejecutar Servicio
+		// Usamos un canal para respetar la cancelación del contexto si el servicio se bloquea
+		done := make(chan error, 1)
+		go func() {
+			// Panic recovery dentro de la goroutine del servicio
+			defer func() {
+				if r := recover(); r != nil {
+					done <- fmt.Errorf("panic en servicio '%s': %v", serviceConfig.Path, r)
+				}
+			}()
+			done <- serviceInstance.Execute()
+		}()
+
+		select {
+		case <-ctx.Done():
+			// Contexto cancelado (timeout o padre cancelado)
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				execErr = fmt.Errorf("timeout exceeded (%v): %w", serviceConfig.Timeout, ctx.Err())
+			} else {
+				execErr = ctx.Err()
+			}
+		case err := <-done:
+			execErr = err
+		}
+	}
+
+	if execErr != nil {
+		return handleExecutionError(serviceConfig, execErr)
+	}
+
+	// Éxito: Guardar Resultado
+	// Nota: SetResult usa Mutex internamente, es seguro.
+	if svcCtx != nil {
+		if res, ok := svcCtx.GetResult(serviceConfig.Path); ok {
+			res.StepOrder = serviceConfig.Order
+			svcCtx.SetResult(serviceConfig.Path, res)
+		}
+	}
+	return nil
+}
+
+func handleExecutionError(serviceConfig ServiceRegistryRow, err error) error {
+	// Si está configurado explícitamente como tolerable, ignoramos cualquier error
+	if serviceConfig.ErrorTolerance == "tolerable" {
+		log.Printf("⚠️ Error tolerable (config) en '%s'. La ejecución continuará. Error: %v", serviceConfig.Path, err)
+		return nil // Retornar nil para que errgroup no cancele el grupo
+	}
+
+	// Si el error es de dominio ErrTolerable (comportamiento legacy/interno)
+	if errors.Is(err, domain.ErrTolerable) {
+		// Si la config dice explícitamente critical, lo respetamos
+		if serviceConfig.ErrorTolerance == "critical" {
+			log.Printf("🔴 Error tolerable tratado como crítico (config) en '%s'. Deteniendo. Error: %v", serviceConfig.Path, err)
+			return err
+		}
+		log.Printf("⚠️ Error tolerable (domain) en '%s'. La ejecución continuará. Error: %v", serviceConfig.Path, err)
+		return nil
+	}
+
+	// Por defecto: Error Crítico
+	log.Printf("🔴 Error en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, err)
+	return err
 }
 
 func ExecuteService(ctx context.Context, path string, svcCtx *contracts.ServiceContext) error {

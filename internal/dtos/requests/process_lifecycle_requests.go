@@ -13,7 +13,7 @@ type PromoteScenarioRequest struct {
 
 type ResolveScenarioRequest struct {
 	ProcessTypeID            int64  `json:"process_type_id" validate:"required,gt=0"`
-	SedeID                   int64  `json:"sede_id" validate:"required"`
+	SedeID                   int64  `json:"sede_id" validate:"gte=0"`
 	OverrideProcessVersionID *int64 `json:"override_process_version_id,omitempty"`
 	Roadmap                  *int   `json:"roadmap" validate:"required"`
 }

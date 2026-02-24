@@ -163,6 +163,19 @@ func (c *ServiceContext) SnapshotInput() map[string]any {
 	return out
 }
 
+func (c *ServiceContext) InitService(service Service, path string, config map[string]any) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.CurrentStepConfig = config
+	service.Init(c, path)
+	// Limpiamos la configuración para evitar efectos secundarios,
+	// asumiendo que el servicio ya leyó lo que necesitaba en Init.
+	c.CurrentStepConfig = nil
+}
+
 type Service interface {
 	Init(ctx *ServiceContext, servicePath string)
 	Execute() error

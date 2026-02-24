@@ -519,11 +519,13 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 	for _, step := range steps {
 		errorTolerance := "inherit"
 		var requiredKeys []string
+		var timeout time.Duration
 
 		if len(step.Config) > 0 {
 			var cfg struct {
 				ErrorTolerance string   `json:"error_tolerance"`
 				RequiredKeys   []string `json:"required_keys"`
+				TimeoutMs      int64    `json:"timeout_ms"`
 			}
 			if err := json.Unmarshal(step.Config, &cfg); err != nil {
 				return nil, domain.ErrInternal
@@ -542,6 +544,10 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 			if len(cfg.RequiredKeys) > 0 {
 				requiredKeys = cfg.RequiredKeys
 			}
+
+			if cfg.TimeoutMs > 0 {
+				timeout = time.Duration(cfg.TimeoutMs) * time.Millisecond
+			}
 		}
 
 		row := serviceconfig.ServiceRegistryRow{
@@ -550,6 +556,7 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 			ErrorTolerance: errorTolerance,
 			Config:         step.Config,
 			RequiredKeys:   requiredKeys,
+			Timeout:        timeout,
 		}
 		rows = append(rows, row)
 	}
