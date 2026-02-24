@@ -19,15 +19,15 @@ func RegisterMenuRoutes(router fiber.Router, menuHandler handlers.MenuHandler) {
 	// --- 2) ASIGNACIÓN MASIVA MENÚS ↔ USUARIOS ---
 	// POST /menus/users/bulk
 	menuGroup.Post(
-		"/users/bulk",
+		"/users-agregar/bulk",
 		utils.Validate(new(requests.BulkAssignMenuUsersRequest)),
 		menuHandler.AddBulkUsers,
 	)
 
 	// --- 3) REMOCIÓN MASIVA MENÚS ↔ USUARIOS ---
 	// DELETE /menus/users/bulk
-	menuGroup.Delete(
-		"/users/bulk",
+	menuGroup.Post(
+		"/users-delete/bulk",
 		menuHandler.BulkRemoveUsers,
 	)
 }

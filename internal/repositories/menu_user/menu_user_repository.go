@@ -57,10 +57,11 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 
 	base := db.WithContext(ctx).
 		Table("menu_user mu").
-		Joins("LEFT JOIN menus m ON m.id = mu.menu_id").
-		Joins("LEFT JOIN users u ON u.id = mu.user_id").
-		Joins("LEFT JOIN users o ON o.id = mu.operator_id").
-		Where("mu.user_id = ? AND m.item_type = ?", userID, "link")
+			Joins("LEFT JOIN menus m ON m.id = mu.menu_id").
+			Joins("LEFT JOIN users u ON u.id = mu.user_id").
+			Joins("LEFT JOIN users o ON o.id = mu.operator_id").
+			Where("mu.deleted_at IS NULL").
+			Where("mu.user_id = ? AND m.item_type = ?", userID, "link")
 
 	/* =================================================
 	   🔥 FILTROS DINÁMICOS (desde tu JSON)
@@ -256,7 +257,7 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(
 		Joins("LEFT JOIN users u ON u.id = mu.user_id").
 		Joins("LEFT JOIN users o ON o.id = mu.operator_id").
 		Where("m.item_type = ?", "link").
-		Where("mu.id IS NULL") // 🔥 SOLO LOS NO ASIGNADOS
+		Where("(mu.id IS NULL OR mu.deleted_at IS NOT NULL)")
 
 	/* ==============================
 	   FILTROS

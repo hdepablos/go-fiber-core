@@ -4,8 +4,8 @@ meta {
   seq: 4
 }
 
-delete {
-  url: {{urlBase}}api/v1/menus/users/bulk
+post {
+  url: {{urlBase}}api/v1/menus/users-delete/bulk
   body: json
   auth: bearer
 }
@@ -20,8 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "user_ids": [31, 6],
-    "menu_ids": [28, 25]
+    "user_ids": [32],
+    "menu_ids": [7,8]
   }
   
 }

@@ -90,22 +90,12 @@ func (s *menuUserPaginationService) GetAllPaginated(ctx context.Context, req dto
 	}, nil
 }
 
-func (s *menuUserPaginationService) GetMenusByUser(
-	ctx context.Context,
-	userID uint,
-	req dtos.PaginationRequest,
-) (*dtos.PaginationResponse[models.MenuUserResponse], error){
+func (s *menuUserPaginationService) GetMenusByUser(ctx context.Context,userID uint,req dtos.PaginationRequest) (*dtos.PaginationResponse[models.MenuUserResponse], error){
 	return s.paginator.GetMenusByUser(ctx, s.conn.ConnectGormRead, userID, req)
 }
 
 func (s *menuUserPaginationService) GetMenusNotByUser(ctx context.Context, userID uint, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.MenuUserResponse], error) {
-
-	return s.paginator.GetMenusNotByUser(
-		ctx,
-		s.conn.ConnectGormRead,
-		userID,
-		req,
-	)
+	return s.paginator.GetMenusNotByUser(ctx, s.conn.ConnectGormRead, userID, req)
 }
 
 

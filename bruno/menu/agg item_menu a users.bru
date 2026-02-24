@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{urlBase}}api/v1/menus/users/bulk
+  url: {{urlBase}}api/v1/menus/users-agregar/bulk
   body: json
   auth: bearer
 }
@@ -20,8 +20,8 @@ auth:bearer {
 
 body:json {
   {
-    "user_ids": [1],
-    "menu_ids": [29]
+    "user_ids": [32],
+    "menu_ids": [7,8]
   }
   
 }

@@ -2,6 +2,7 @@ package menu
 
 import (
 	"context"
+	"fmt"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/repositories/menu"
 )
@@ -30,10 +31,19 @@ func (s *menuWriterService) AddBulkUsers(
 	userIDs []uint64,
 ) error {
 
+
+	fmt.Println(" Va a procesarrrrr")
+
 	// Uso el writer exacto como tu repository
 	db := s.conn.ConnectGormWrite
 
-	return s.repo.AddBulkUsers(ctx, db, menuIDs, userIDs)
+	error := s.repo.AddBulkUsers(ctx, db, menuIDs, userIDs)
+		if error != nil {
+			fmt.Print("error general")
+			fmt.Print(error.Error())
+		}
+
+	return nil
 }
 
 func (s *menuWriterService) BulkRemoveUsers(
