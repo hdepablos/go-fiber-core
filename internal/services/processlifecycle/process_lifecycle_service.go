@@ -13,6 +13,7 @@ import (
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/services/cache"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -20,12 +21,12 @@ import (
 type Service interface {
 	ReplicateProcessVersion(ctx context.Context, processVersionID int64, operatorID int64) (int64, error)
 	PromoteProcessVersion(ctx context.Context, processVersionID int64, operatorID int64, comment string) error
-	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64) (int64, []Step, error)
+	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int) (int64, []Step, error)
 	MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error
 	ListProcessVersions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.ProcessVersionListItem], error)
 	GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error)
 	GetProcessStepsByVersionID(ctx context.Context, processVersionID int64) ([]Step, error)
-	RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64) (int64, *contracts.ServiceContext, error)
+	RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error)
 }
 
 type Step struct {
@@ -76,14 +77,54 @@ func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID in
 		return fmt.Errorf("pgx write connection is not initialized")
 	}
 
-	_, err := db.Exec(ctx, `SELECT promote_process_version($1, $2, $3)`, processVersionID, operatorID, comment)
+	redisClient := s.conn.ConnectRedis
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+	// TODO: Get processTypeID and roadmap from processVersionID to lock specific key
+	// For now, we invalidate all keys related to the process version type after promotion
+	// But since we don't have processTypeID easily available here without querying,
+	// and PromoteProcessVersion is an admin task, we rely on the fact that the next ResolveProcessVersion
+	// will fetch from DB if we delete the key.
+	// BETTER APPROACH: Implement Lock/Unlock pattern.
+
+	// 1. Fetch process info to know which key to lock
+	var processTypeID int64
+	var roadmap int
+	err := db.QueryRow(ctx, `SELECT process_type_id, roadmap FROM process_versions WHERE id = $1`, processVersionID).Scan(&processTypeID, &roadmap)
 	if err != nil {
 		return mapPgxError(err)
 	}
+
+	cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+	lockService := cache.NewRedisLockService(redisClient)
+
+	// 2. Lock
+	if redisClient != nil {
+		// 10 seconds safety TTL
+		_ = lockService.Lock(ctx, cacheKey, 10*time.Second)
+	}
+
+	// 3. Promote in DB
+	_, err = db.Exec(ctx, `SELECT promote_process_version($1, $2, $3)`, processVersionID, operatorID, comment)
+	if err != nil {
+		// Attempt to unlock if DB fails, though TTL will handle it eventually
+		if redisClient != nil {
+			_ = lockService.Unlock(ctx, cacheKey)
+		}
+		return mapPgxError(err)
+	}
+
+	// 4. Unlock and Invalidate
+	if redisClient != nil {
+		_ = lockService.Unlock(ctx, cacheKey)
+	}
+
 	return nil
 }
 
-func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64) (int64, []Step, error) {
+func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int) (int64, []Step, error) {
 	if processTypeID <= 0 {
 		return 0, nil, domain.ErrInvalidArgument
 	}
@@ -104,30 +145,37 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 
 	if overrideProcessVersionID != nil {
 		err := db.
-			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, $3)`, processTypeID, sedeID, *overrideProcessVersionID).
+			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, $3, $4)`, processTypeID, sedeID, *overrideProcessVersionID, roadmap).
 			Scan(&resolvedID, &stepsJSON)
 		if err != nil {
 			return 0, nil, mapPgxError(err)
 		}
 	} else {
+		// Try Redis with Locking Strategy
 		if redisClient != nil {
-			cacheKey := fmt.Sprintf("%s:lifecycle-%d", projectPrefix, processTypeID)
+			cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+			lockService := cache.NewRedisLockService(redisClient)
+
 			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-			cached, err := redisClient.Get(redisCtx, cacheKey).Bytes()
+			cached, err := lockService.Get(redisCtx, cacheKey)
 			cancel()
+
+			// If err is ErrCacheLocked, it means update in progress -> go to DB
+			// If err is ErrCacheMiss, it means not in cache -> go to DB
+			// If err is nil and cached has content -> return cache
 			if err == nil && len(cached) > 0 {
 				var payload struct {
 					ProcessVersionID int64  `json:"process_version_id"`
 					Steps            []Step `json:"steps"`
 				}
-				if err := json.Unmarshal(cached, &payload); err == nil {
+				if err := json.Unmarshal([]byte(cached), &payload); err == nil {
 					return payload.ProcessVersionID, payload.Steps, nil
 				}
 			}
 		}
 
 		err := db.
-			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, NULL)`, processTypeID, sedeID).
+			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, NULL, $3)`, processTypeID, sedeID, roadmap).
 			Scan(&resolvedID, &stepsJSON)
 		if err != nil {
 			return 0, nil, mapPgxError(err)
@@ -144,7 +192,9 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	}
 
 	if overrideProcessVersionID == nil && redisClient != nil {
-		cacheKey := fmt.Sprintf("%s:lifecycle-%d", projectPrefix, processTypeID)
+		cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+		lockService := cache.NewRedisLockService(redisClient)
+
 		payload := struct {
 			ProcessVersionID int64  `json:"process_version_id"`
 			Steps            []Step `json:"steps"`
@@ -156,7 +206,8 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		encoded, err := json.Marshal(payload)
 		if err == nil {
 			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-			_ = redisClient.Set(redisCtx, cacheKey, encoded, 0).Err()
+			// Using standard Set without lock for repopulation
+			_ = lockService.Set(redisCtx, cacheKey, encoded, 0)
 			cancel()
 		}
 	}
@@ -471,7 +522,7 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 	return rows, nil
 }
 
-func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64) (int64, *contracts.ServiceContext, error) {
+func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -494,7 +545,7 @@ func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, i
 		}
 	}
 
-	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID)
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID, roadmap)
 	if err != nil {
 		return 0, nil, err
 	}

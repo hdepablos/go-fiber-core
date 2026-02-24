@@ -35,10 +35,11 @@ Cada escenario de proceso tiene una versión (`process_versions`) y una lista de
 
 - `process_steps.process_version_id`: a qué versión pertenece el step.
 - `process_steps.step_order`: orden en el que el step debe ejecutarse.
+- `process_steps.roadmap`: segmento del roadmap al que pertenece el paso.
 - `process_steps.execution_key`: ID lógico del servicio que se ejecutará.
 - `process_steps.config` (JSONB): configuración específica del step.
 
-El motor siempre ordena los steps por `step_order` antes de ejecutar.
+El motor siempre filtra por `roadmap` y ordena los steps por `step_order` antes de ejecutar.
 
 ---
 
@@ -313,7 +314,7 @@ Aquí se traduce la definición de la BD (`Step`) al formato que entiende el exe
 Archivo: `internal/services/processlifecycle/process_lifecycle_service.go`
 
 ```go
-func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64) (int64, *contracts.ServiceContext, error) {
+func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, input map[string]any, overrideProcessVersionID *int64, roadmap int) (int64, *contracts.ServiceContext, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -321,7 +322,7 @@ func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, i
 	var sedeID int64 = 1
 	// Sede se puede obtener desde input["sede_id"]
 
-	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID)
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID, roadmap)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -343,7 +344,7 @@ func (s *service) RunResolvedProcess(ctx context.Context, processTypeID int64, i
 
 Resumen del flujo:
 
-1. Resolver la versión de proceso vigente (`ResolveProcessVersion`).
+1. Resolver la versión de proceso vigente y los pasos asociados al roadmap (`ResolveProcessVersion`).
 2. Convertir los steps de BD a `ServiceRegistryRow` (`BuildServiceRegistryFromSteps`).
 3. Construir `ServiceContext` a partir del `input`.
 4. Ejecutar servicios en orden (`ExecuteServicesInOrder`).

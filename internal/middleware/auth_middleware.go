@@ -4,6 +4,8 @@ import (
 	"go-fiber-core/internal/contextkeys" // <-- Importa tu nuevo paquete
 	"go-fiber-core/internal/dtos/responses"
 	"go-fiber-core/internal/services/auth"
+	"go-fiber-core/internal/services/cache"
+	"os"
 	"strings"
 
 	"fmt"
@@ -44,9 +46,18 @@ func AuthMiddleware(tokenService auth.TokenService, redisClient *redis.Client) f
 
 		// --- VERIFICACIÓN DE SESIÓN (REVOCACIÓN INMEDIATA) ---
 		if sid, ok := claims["sid"].(string); ok {
-			key := fmt.Sprintf("blacklist:session:%s", sid)
-			exists, err := redisClient.Exists(c.Context(), key).Result()
-			if err == nil && exists > 0 {
+			projectPrefix := os.Getenv("APP_NAME")
+			if projectPrefix == "" {
+				projectPrefix = "go-fiber-core"
+			}
+			
+			key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sid)
+			
+			lockService := cache.NewRedisLockService(redisClient)
+			val, err := lockService.Get(c.Context(), key)
+			
+			// Si hay valor (blacklist) o está bloqueado (escritura en proceso), denegamos
+			if (err == nil && val != "") || err == cache.ErrCacheLocked {
 				return responses.Error(c, fiber.StatusUnauthorized, "sesión revocada")
 			}
 		}

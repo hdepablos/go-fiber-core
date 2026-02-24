@@ -76,7 +76,7 @@ func (h *processLifecycleHandler) ResolveScenario(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	resolvedID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID)
+	resolvedID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (h *processLifecycleHandler) ResolveCurrentVersion(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	resolvedID, _, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID)
+	resolvedID, _, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,13 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		req.Input["sede_id"] = req.SedeID
 	}
 
-	processVersionID, svcCtx, execErr := h.service.RunResolvedProcess(ctx, req.ProcessTypeID, req.Input, req.OverrideProcessVersionID)
+	// Inyectar el roadmap al input para que esté disponible en el contexto si es necesario,
+	// aunque ahora se pasa explícitamente al servicio.
+	if req.Roadmap != nil {
+		req.Input["roadmap"] = *req.Roadmap
+	}
+
+	processVersionID, svcCtx, execErr := h.service.RunResolvedProcess(ctx, req.ProcessTypeID, req.Input, req.OverrideProcessVersionID, *req.Roadmap)
 	output := map[string]any{
 		"process_version_id": processVersionID,
 		"input":              req.Input,

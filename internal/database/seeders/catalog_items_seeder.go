@@ -169,10 +169,10 @@ func ensureItem(ctx context.Context, tx pgx.Tx, jsonID int, source map[int]RawCa
 	// Check existence by unique key (code, parent_id) where deleted_at IS NULL
 	var existingID int64
 	err = tx.QueryRow(ctx,
-		`SELECT id FROM catalog_items 
-         WHERE code=$1 
-           AND ((parent_id IS NULL AND $2::bigint IS NULL) OR parent_id=$2) 
-           AND deleted_at IS NULL`,
+		`SELECT id FROM catalog_items
+        WHERE code=$1
+		AND ((parent_id IS NULL AND $2::bigint IS NULL) OR parent_id=$2) 
+		AND deleted_at IS NULL`,
 		code, parentDBID,
 	).Scan(&existingID)
 	if err == nil {
@@ -201,8 +201,8 @@ func ensureItem(ctx context.Context, tx pgx.Tx, jsonID int, source map[int]RawCa
 	var newID int64
 	if err := tx.QueryRow(ctx,
 		`INSERT INTO catalog_items (name, code, parent_id, sort_order, is_active, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id`,
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id`,
 		it.Name, code, parentDBID, it.Order, isActive, metaBytes,
 	).Scan(&newID); err != nil {
 		return 0, fmt.Errorf("insertar catalog_item (code=%s): %w", code, err)

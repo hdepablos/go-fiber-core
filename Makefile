@@ -60,6 +60,15 @@ DC_RUN  = $(DC_BASE) run --rm $(SERVICE_NAME)
 ###############################################################################
 # Comandos disponibles
 ###############################################################################
+.PHONY: redis-del
+redis-del: ## 🧹 Elimina keys de Redis. Si usas *, se restringe al proyecto. Uso: make redis-del key="catalogs*"
+	@if [ -z "$(key)" ]; then \
+		echo "$(ERROR)❌ Debes especificar la key o patrón. Uso: make redis-del key=\"catalogs*\"$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🔍 Ejecutando limpieza de Redis con patrón: $(key)$(RESET)"
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go redis-clear-keys --pattern "$(key)"
+
 .PHONY: help
 help: ## ℹ️ Muestra todos los comandos disponibles con su descripción. Uso: make help
 	@awk -F ':|##' '/^[a-zA-Z0-9_-]+:.*?##/ {printf "\033[36m%-20s\033[0m %s\n", $$1, $$NF}' $(MAKEFILE_LIST)

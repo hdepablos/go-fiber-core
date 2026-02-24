@@ -23,6 +23,7 @@ import (
 	sessionRepo "go-fiber-core/internal/repositories/session"
 	userRepo "go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/services"
+	"go-fiber-core/internal/services/cache"
 	menuService "go-fiber-core/internal/services/menu"
 )
 
@@ -299,7 +300,9 @@ func (s *authService) RevokeSession(ctx context.Context, sessionIDStr string) er
 			projectPrefix = "go-fiber-core"
 		}
 		key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sessionID)
-		if err := redisClient.Set(ctx, key, "revoked", ttl).Err(); err != nil {
+		
+		lockService := cache.NewRedisLockService(redisClient)
+		if err := lockService.Set(ctx, key, "revoked", ttl); err != nil {
 			fmt.Printf("Error setting redis blacklist: %v\n", err)
 			// No fallamos la request si Redis falla, pero logueamos
 		}
@@ -320,6 +323,7 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 	}
 
 	// 2. Blacklist en Redis
+	lockService := cache.NewRedisLockService(redisClient)
 	for _, sess := range sessions {
 		ttl := time.Until(sess.ExpiresAt)
 		if ttl > 0 {
@@ -329,7 +333,7 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 			}
 			key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sess.ID)
 			// Pipeline podría ser mejor aquí, pero iterar es simple
-			_ = redisClient.Set(ctx, key, "revoked", ttl).Err()
+			_ = lockService.Set(ctx, key, "revoked", ttl)
 		}
 	}
 

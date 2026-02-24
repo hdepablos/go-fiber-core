@@ -76,6 +76,7 @@ Pasos de una versión de proceso.
 - `step_order INTEGER NOT NULL`: orden secuencial del paso.
 - `name VARCHAR(150) NOT NULL`: nombre/etiqueta del paso.
 - `execution_key VARCHAR(150) NOT NULL`: clave técnica estable para identificar el paso en tiempo de ejecución (por ejemplo, nombre de clase/servicio, key de orquestador, etc.).
+- `roadmap INTEGER NOT NULL DEFAULT 0`: identificador del segmento del roadmap al que pertenece el paso. Permite tener múltiples flujos o variantes dentro de una misma versión.
 - `config JSONB`: configuración arbitraria del paso (payload libre).
 - `created_at TIMESTAMP NOT NULL DEFAULT NOW()`
 
@@ -269,7 +270,8 @@ Luego, probablemente se editen los pasos de la nueva versión (en `DRAFT`/`TEST`
 CREATE OR REPLACE FUNCTION resolve_process_version(
     p_process_type_id BIGINT,
     p_sede_id BIGINT,
-    p_override_process_version_id BIGINT DEFAULT NULL
+    p_override_process_version_id BIGINT DEFAULT NULL,
+    p_roadmap INTEGER DEFAULT 0
 )
 RETURNS TABLE (
     process_version_id BIGINT,
@@ -281,6 +283,7 @@ Responsabilidad: resolver cuál es la versión efectiva a usar para un proceso d
 
 - Respeta override explícito cuando se pasa `p_override_process_version_id`.
 - Si no hay override, elige una versión `PROD` por sede, con fallback a versión global.
+- Filtra los pasos (`process_steps`) según el `roadmap` indicado.
 
 ### Flujo interno
 

@@ -1,0 +1,26 @@
+select * from process_types pt ;
+select * from process_versions pv order by pv.id ;
+select * from process_steps ps ;
+select * from process_version_history pvh ;
+
+
+select * from process_steps ps where ps.process_version_id = 3;
+-- Mover a TEST (Solo desde DRAFT)
+-- SELECT move_process_version_to_test(VERSION_ID);
+SELECT move_process_version_to_test(3);
+
+-- Promover a PROD
+-- SELECT promote_process_version(VERSION_ID, OPERATOR_ID, 'Comentario');
+SELECT promote_process_version(3, 1, 'Comentario');
+
+-- Replicar (Clonar) versión
+-- SELECT replicate_process_version(VERSION_ID, OPERATOR_ID);
+SELECT replicate_process_version(VERSION_ID, 1);
+
+-- Ejemplo: Process Type 1, Sede 1, Version ID 123 (override) | null, Roadmap 0
+-- SELECT * FROM resolve_process_version(1, 1, 123, 0);
+SELECT * FROM resolve_process_version(2, 1, null, 10);
+
+-- Ejemplo: Process Type 1, Sede 1, Roadmap 0
+-- SELECT * FROM resolve_process_version(1, 1, NULL, 0);
+SELECT * FROM resolve_process_version(1, 1, NULL, 0);

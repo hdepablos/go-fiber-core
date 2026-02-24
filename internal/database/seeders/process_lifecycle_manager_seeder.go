@@ -70,8 +70,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 
 		for _, s := range steps {
 			if _, err := tx.Exec(ctx,
-				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config)
-                 VALUES ($1, $2, $3, $4, $5::jsonb)`,
+				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
+                 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
 				baseVersionID,
 				s.Order,
 				s.Name,
@@ -151,8 +151,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 
 		for _, s := range loanSteps {
 			if _, err := tx.Exec(ctx,
-				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config)
-                 VALUES ($1, $2, $3, $4, $5::jsonb)`,
+				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
+                 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
 				loanBaseVersionID,
 				s.Order,
 				s.Name,

@@ -56,6 +56,7 @@ CREATE TABLE process_steps (
     id BIGSERIAL PRIMARY KEY,
     process_version_id BIGINT NOT NULL REFERENCES process_versions(id) ON DELETE CASCADE,
     step_order INTEGER NOT NULL,
+    roadmap INTEGER NOT NULL DEFAULT 0,
     name VARCHAR(150) NOT NULL,
     execution_key VARCHAR(150) NOT NULL,
     config JSONB,
@@ -215,6 +216,7 @@ BEGIN
     INSERT INTO process_steps(
         process_version_id,
         step_order,
+        roadmap,
         name,
         execution_key,
         config
@@ -222,6 +224,7 @@ BEGIN
     SELECT
         v_new_version_id,
         step_order,
+        roadmap,
         name,
         execution_key,
         config
@@ -240,7 +243,8 @@ $$;
 CREATE OR REPLACE FUNCTION resolve_process_version(
     p_process_type_id BIGINT,
     p_sede_id BIGINT,
-    p_override_process_version_id BIGINT DEFAULT NULL
+    p_override_process_version_id BIGINT DEFAULT NULL,
+    p_roadmap INTEGER DEFAULT 0
 )
 RETURNS TABLE (
     process_version_id BIGINT,
@@ -306,12 +310,14 @@ BEGIN
                             'name', ps.name,
                             'execution_key', ps.execution_key,
                             'config', COALESCE(ps.config, '{}'::jsonb),
-                            'step_order', ps.step_order
+                            'step_order', ps.step_order,
+                            'roadmap', ps.roadmap
                         )
                         ORDER BY ps.step_order
                     )
                 FROM process_steps ps
                 WHERE ps.process_version_id = v_process_version_id
+                  AND ps.roadmap = p_roadmap
             ),
             '[]'::jsonb
         ) AS process_steps;

@@ -42,6 +42,8 @@ type ServiceContext struct {
   - Viene del campo `config` de la tabla `process_steps` (JSONB).
   - El executor lo parsea y lo asigna antes de llamar a `Execute()` del servicio.
 
+> **Nota sobre Roadmap**: El motor filtra los pasos disponibles según el campo `roadmap` de `process_steps`. Solo se ejecutan los servicios que coinciden con el roadmap solicitado en `RunResolvedProcess`.
+
 ### Constructores relevantes
 
 - Desde age/salary (modo demo / compatibilidad):

@@ -102,6 +102,7 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
     - `process_type_id` (int64, requerido, > 0)
     - `sede_id` (int64, requerido)
     - `override_process_version_id` (int64, opcional, puede ser `null`)
+    - `roadmap` (int, requerido): define qué segmento de pasos se resolverá.
   - Acción: invoca `resolve_process_version` y devuelve en `data`:
     - `process_version_id`: id de la versión efectiva resuelta.
     - `process_steps`: array de pasos asociados a esa versión, ordenados por `step_order`, con la forma:
@@ -123,6 +124,7 @@ Todos los endpoints viven bajo `/api/v1/process-lifecycle` y usan el esquema de 
     - `override_process_version_id` (int64, opcional, puede ser `null`):
       - `null` → usa la versión `PROD` vigente según `process_type_id` + `sede_id` (con fallback a versión global).
       - `!= null` → fuerza la ejecución de esa versión específica, respetando las reglas de `resolve_process_version`.
+    - `roadmap` (int, requerido): define el segmento de pasos a ejecutar.
     - `input` (objeto JSON, requerido): bolsa de datos de negocio (`ServiceContext.Input`) que verán todos los servicios.
       - El handler garantiza que `input["sede_id"]` exista (se copia desde `sede_id` si no viene).
   - Acción:
