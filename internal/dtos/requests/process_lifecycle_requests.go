@@ -20,9 +20,9 @@ type ResolveScenarioRequest struct {
 
 type RunProcessRequest struct {
 	ProcessTypeID            int64          `json:"process_type_id" validate:"required,gt=0"`
-	SedeID                   int64          `json:"sede_id" validate:"required"`
-	OverrideProcessVersionID *int64         `json:"override_process_version_id,omitempty"`
-	Roadmap                  int            `json:"roadmap"` // Optional, default 0
+	SedeID                   *int64         `json:"sede_id" validate:"required,gte=0"`
+	OverrideProcessVersionID *int64         `json:"override_process_version_id" validate:"required,gte=0"`
+	Roadmap                  *int           `json:"roadmap" validate:"required,gte=0"`
 	Input                    map[string]any `json:"input" validate:"required"`
 	OperatorID               int64          `json:"-"` // Injected by controller, secure
 }

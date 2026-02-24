@@ -77,7 +77,7 @@ func (h *processLifecycleHandler) ResolveScenario(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	resolvedID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap)
+	resolvedID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap, true)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (h *processLifecycleHandler) ResolveCurrentVersion(c *fiber.Ctx) error {
 		return domain.ErrInvalidArgument
 	}
 
-	resolvedID, _, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap)
+	resolvedID, _, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap, true)
 	if err != nil {
 		return err
 	}
@@ -250,12 +250,24 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		case errors.Is(execErr, domain.ErrNotFound):
 			statusCode = fiber.StatusNotFound
 			errorPayload["code"] = "PROCESS_VERSION_NOT_FOUND"
+		case errors.Is(execErr, domain.ErrSedeNotFound):
+			statusCode = fiber.StatusNotFound
+			errorPayload["code"] = "SEDE_NOT_FOUND"
+		case errors.Is(execErr, domain.ErrRoadmapNotFound):
+			statusCode = fiber.StatusNotFound
+			errorPayload["code"] = "ROADMAP_NOT_FOUND"
+		case errors.Is(execErr, domain.ErrOverrideVersionNotFound):
+			statusCode = fiber.StatusNotFound
+			errorPayload["code"] = "OVERRIDE_VERSION_NOT_FOUND"
 		case errors.Is(execErr, domain.ErrMissingRequiredKey):
 			statusCode = fiber.StatusUnprocessableEntity
 			errorPayload["code"] = "MISSING_REQUIRED_KEY"
 		case errors.Is(execErr, domain.ErrValueOutOfRange):
 			statusCode = fiber.StatusUnprocessableEntity
 			errorPayload["code"] = "VALUE_OUT_OF_RANGE"
+		case errors.Is(execErr, domain.ErrBusinessRuleViolation):
+			statusCode = fiber.StatusUnprocessableEntity
+			errorPayload["code"] = "BUSINESS_RULE_VIOLATION"
 		case errors.Is(execErr, domain.ErrInvalidArgument):
 			statusCode = fiber.StatusUnprocessableEntity
 			errorPayload["code"] = "INVALID_ARGUMENT"

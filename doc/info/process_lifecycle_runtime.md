@@ -179,6 +179,19 @@ Esto permite parametrizar qué datos de entrada son obligatorios para cada step 
 
 ---
 
+## 4. Ejecución y Caché (Run)
+
+El método `Run` (`/api/v1/process-lifecycle/run`) implementa una estrategia inteligente de caché para equilibrar rendimiento y consistencia:
+
+1.  **Modo Producción** (`override_process_version_id = null`):
+    - Utiliza **Redis** (Cache-Aside) para resolver la versión vigente.
+    - Esto maximiza el rendimiento en entornos productivos de alto tráfico.
+
+2.  **Modo Override / Test** (`override_process_version_id > 0`):
+    - **Ignora Redis** completamente.
+    - Consulta siempre directamente a PostgreSQL (`resolve_process_version`).
+    - Garantiza que al probar una versión específica (DRAFT o TEST), siempre se ejecute la configuración más reciente de la base de datos, sin interferencia de cachés antiguas.
+
 ## 5. Manejo de errores en la cadena de servicios
 
 Archivo: `internal/services/serviceconfig/executor.go`

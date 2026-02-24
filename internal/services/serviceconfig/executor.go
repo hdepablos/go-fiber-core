@@ -54,11 +54,14 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		serviceInstance.Init(svcCtx, serviceConfig.Path)
 		var execErr error
 		if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
+			var missing []string
 			for _, key := range serviceConfig.RequiredKeys {
 				if _, ok := svcCtx.GetInputValue(key); !ok {
-					execErr = fmt.Errorf("missing required key '%s' for service '%s': %w", key, serviceConfig.Path, domain.ErrCritical)
-					break
+					missing = append(missing, key)
 				}
+			}
+			if len(missing) > 0 {
+				execErr = fmt.Errorf("%w: claves faltantes %v para el servicio '%s'", domain.ErrMissingRequiredKey, missing, serviceConfig.Path)
 			}
 		}
 		if execErr == nil {

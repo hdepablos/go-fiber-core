@@ -21,7 +21,7 @@ import (
 type Service interface {
 	ReplicateProcessVersion(ctx context.Context, processVersionID int64, operatorID int64) (int64, error)
 	PromoteProcessVersion(ctx context.Context, processVersionID int64, operatorID int64, comment string) error
-	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int) (int64, []Step, error)
+	ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int, useCache bool) (int64, []Step, error)
 	MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error
 	ListProcessVersions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.ProcessVersionListItem], error)
 	GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error)
@@ -124,7 +124,7 @@ func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID in
 	return nil
 }
 
-func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int) (int64, []Step, error) {
+func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64, sedeID int64, overrideProcessVersionID *int64, roadmap int, useCache bool) (int64, []Step, error) {
 	if processTypeID <= 0 {
 		return 0, nil, domain.ErrInvalidArgument
 	}
@@ -140,6 +140,41 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		return 0, nil, fmt.Errorf("pgx write connection is not initialized")
 	}
 
+	// 1. Validar existencia de Sede (si aplica)
+	if sedeID > 0 {
+		var exists bool
+		// Asumimos tabla 'sedes'. Si falla, el error indicará el problema.
+		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM sedes WHERE id = $1)", sedeID).Scan(&exists); err != nil {
+			return 0, nil, mapPgxError(err)
+		}
+		if !exists {
+			return 0, nil, domain.ErrSedeNotFound
+		}
+	}
+
+	// 2. Validar existencia de Roadmap (si aplica)
+	if roadmap > 0 {
+		var exists bool
+		// Asumimos tabla 'roadmaps'.
+		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM roadmaps WHERE id = $1)", roadmap).Scan(&exists); err != nil {
+			return 0, nil, mapPgxError(err)
+		}
+		if !exists {
+			return 0, nil, domain.ErrRoadmapNotFound
+		}
+	}
+
+	// 3. Validar existencia de Versión Específica (si aplica)
+	if overrideProcessVersionID != nil && *overrideProcessVersionID > 0 {
+		var exists bool
+		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM process_versions WHERE id = $1)", *overrideProcessVersionID).Scan(&exists); err != nil {
+			return 0, nil, mapPgxError(err)
+		}
+		if !exists {
+			return 0, nil, domain.ErrOverrideVersionNotFound
+		}
+	}
+
 	var resolvedID int64
 	var stepsJSON []byte
 
@@ -151,8 +186,8 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 			return 0, nil, mapPgxError(err)
 		}
 	} else {
-		// Try Redis with Locking Strategy
-		if redisClient != nil {
+		// Try Redis with Locking Strategy only if useCache is true
+		if useCache && redisClient != nil {
 			cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
 			lockService := cache.NewRedisLockService(redisClient)
 
@@ -191,7 +226,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		}
 	}
 
-	if overrideProcessVersionID == nil && redisClient != nil {
+	if overrideProcessVersionID == nil && useCache && redisClient != nil {
 		cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
 		lockService := cache.NewRedisLockService(redisClient)
 
@@ -527,30 +562,31 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 		ctx = context.Background()
 	}
 
-	// Validate SedeID (although DTO validation should catch it if applied)
-	if req.SedeID <= 0 {
-		// Fallback or error? DTO has validate:"required", so it should be valid.
-		// But let's be safe or default to 1 as before if needed.
-		// The previous logic defaulted to 1 if not present.
-		// Here, we trust the caller provided it or default if 0.
-		if req.SedeID == 0 {
-			req.SedeID = 1
-		}
+	// Validate required fields (Strict Validation)
+	if req.SedeID == nil {
+		return 0, nil, domain.ErrInvalidArgument
 	}
-
-	// Ensure input is initialized
+	if req.OverrideProcessVersionID == nil {
+		return 0, nil, domain.ErrInvalidArgument
+	}
+	if req.Roadmap == nil {
+		return 0, nil, domain.ErrInvalidArgument
+	}
 	if req.Input == nil {
-		req.Input = make(map[string]any)
+		return 0, nil, domain.ErrInvalidArgument
 	}
 
 	// Inject context variables from request
-	req.Input["sede_id"] = req.SedeID
-	req.Input["roadmap"] = req.Roadmap
+	req.Input["sede_id"] = *req.SedeID
+	req.Input["roadmap"] = *req.Roadmap
 	if req.OperatorID > 0 {
 		req.Input["operator_id"] = req.OperatorID
 	}
 
-	processVersionID, steps, err := s.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, req.Roadmap)
+	// UseCache = true:
+	// - If override_process_version_id is set, ResolveProcessVersion logic IGNORES cache and goes to DB.
+	// - If override_process_version_id is nil (Production), it uses Redis for performance.
+	processVersionID, steps, err := s.ResolveProcessVersion(ctx, req.ProcessTypeID, *req.SedeID, req.OverrideProcessVersionID, *req.Roadmap, true)
 	if err != nil {
 		return 0, nil, err
 	}

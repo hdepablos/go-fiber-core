@@ -6,20 +6,34 @@ Esta guía explica cómo ejecutar un proceso de negocio completo utilizando el m
 
 El ejecutor centraliza la lógica de negocio en "Pasos" configurables. Para invocar un proceso, no llamas a los servicios individuales, sino que le pides al motor que ejecute un "Tipo de Proceso" (ej: Evaluación de Riesgo, Validación de Documentos) pasando un conjunto de datos de entrada (`Input`).
 
-## 2. Estructura del Request
+## 2. Estructura del Request y Validaciones
 
-Utilizamos el DTO `requests.RunProcessRequest` para estandarizar la llamada.
+Utilizamos el DTO `requests.RunProcessRequest` con validaciones estrictas para garantizar la integridad de los datos. Todos los campos son obligatorios o tienen valores por defecto seguros.
 
 ```go
 type RunProcessRequest struct {
-    ProcessTypeID            int64          // ID del tipo de proceso (ej: 1=Loan, 2=Validation)
-    SedeID                   int64          // Sede contextual (default: 1)
-    Roadmap                  int            // (Opcional) Segmento de pasos a ejecutar
-    Input                    map[string]any // Datos de negocio iniciales
-    OverrideProcessVersionID *int64         // (Opcional) Forzar una versión específica
-    OperatorID               int64          // (Interno) ID del operador, inyectado automáticamente
+    ProcessTypeID            int64          // Requerido (> 0)
+    SedeID                   *int64         // Requerido (No Nulo)
+    OverrideProcessVersionID *int64         // Requerido (No Nulo)
+    Roadmap                  *int           // Requerido (No Nulo)
+    Input                    map[string]any // Requerido (No Nulo)
+    OperatorID               int64          // (Interno) Inyectado automáticamente
 }
 ```
+
+### Reglas de Validación y Garantías del Motor
+
+El método `Run` implementa una validación **ESTRICTA**. El motor **rechazará** cualquier petición que omita campos o envíe valores nulos (`nil`). El cliente es responsable de enviar valores explícitos, incluso si son "vacíos" (como `0` o `{}`).
+
+| Campo | Validación / Regla | Comportamiento si es inválido o falta |
+| :--- | :--- | :--- |
+| **`process_type_id`** | Debe ser `> 0` | Retorna error `ErrInvalidArgument`. |
+| **`sede_id`** | **Requerido**. No puede ser `nil`. | Retorna error `ErrInvalidArgument`.<br>Si no aplica, enviar `0`. |
+| **`override_process_version_id`** | **Requerido**. No puede ser `nil`. | Retorna error `ErrInvalidArgument`.<br>Para producción, enviar `0`. |
+| **`roadmap`** | **Requerido**. No puede ser `nil`. | Retorna error `ErrInvalidArgument`.<br>Si no aplica, enviar `0`. |
+| **`input`** | **Requerido**. No puede ser `nil`. | Retorna error `ErrInvalidArgument`.<br>Si no hay datos, enviar `{}` (mapa vacío). |
+
+> **Nota Importante:** Esta validación aplica para llamadas externas (API) y ejecuciones internas. El objetivo es eliminar ambigüedades: un campo faltante se considera un error de integración, no un valor por defecto.
 
 ## 3. Pasos para ejecutar un proceso
 
@@ -68,7 +82,67 @@ if err != nil {
 }
 ```
 
-### Paso 5: Consumir Resultados (`GetAll`)
+## 4. Manejo de Errores (Error Handling)
+
+El sistema utiliza un conjunto estandarizado de errores para comunicar problemas de validación o lógica de negocio.
+
+### Estructura de Respuesta de Error
+
+Cuando ocurre un error, la API retorna un JSON con el siguiente formato:
+
+```json
+{
+  "status": "error",
+  "message": "Error ejecutando proceso lifecycle",
+  "data": {
+    "error": {
+      "code": "CODIGO_DE_ERROR",
+      "message": "Descripción detallada del problema"
+    }
+  }
+}
+```
+
+### Tipos de Errores Comunes
+
+| Código | Status HTTP | Significado | Ejemplo de Mensaje |
+| :--- | :--- | :--- | :--- |
+| **`MISSING_REQUIRED_KEY`** | `422 Unprocessable Entity` | Faltan datos obligatorios en el `input` para que un paso pueda ejecutarse. | `"falta una clave requerida en el input: claves faltantes [salary, age] para el servicio 'loanrisk/Validator'"` |
+| **`BUSINESS_RULE_VIOLATION`** | `422 Unprocessable Entity` | Los datos existen, pero no cumplen con una regla de negocio específica (ej: edad mínima, saldo insuficiente). | `"violación de regla de negocio: la edad 15 es menor a la mínima requerida (18)"` |
+| **`INVALID_ARGUMENT`** | `422 Unprocessable Entity` | Argumentos del request inválidos (ej: IDs negativos, tipos de datos incorrectos). | `"argumento inválido"` |
+| **`PROCESS_VERSION_NOT_FOUND`** | `404 Not Found` | No se encontró una versión activa del proceso para ejecutar. | `"el recurso solicitado no fue encontrado"` |
+| **`SEDE_NOT_FOUND`** | `404 Not Found` | El `sede_id` proporcionado no existe en la base de datos. | `"la sede especificada no existe"` |
+| **`ROADMAP_NOT_FOUND`** | `404 Not Found` | El `roadmap` proporcionado no existe en la base de datos. | `"el roadmap especificado no existe"` |
+| **`OVERRIDE_VERSION_NOT_FOUND`** | `404 Not Found` | El `override_process_version_id` proporcionado no existe. | `"la versión de proceso específica no existe"` |
+| **`CRITICAL_ERROR`** | `500 Internal Server Error` | Fallo inesperado o crítico del sistema (ej: error de base de datos). | `"error crítico"` |
+
+### Ejemplo: Lanzar un Error de Negocio desde un Servicio
+
+Si estás desarrollando un nuevo servicio (Paso), así es como debes reportar una violación de regla de negocio:
+
+```go
+import (
+    "fmt"
+    "go-fiber-core/internal/domain"
+)
+
+func (s *MyService) Execute() error {
+    age := s.ctx.GetInputValue("age").(int)
+    minAge := 18
+
+    if age < minAge {
+        // Envuelve domain.ErrBusinessRuleViolation con tu mensaje específico
+        return fmt.Errorf("%w: edad %d insuficiente (mínimo %d)", 
+            domain.ErrBusinessRuleViolation, age, minAge)
+    }
+
+    return nil
+}
+```
+
+---
+
+## 5. Consumir Resultados (`GetAll`)
 Usa el método `GetAll()` del contexto devuelto para obtener un mapa plano con todos los resultados.
 
 ```go

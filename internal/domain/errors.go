@@ -23,5 +23,14 @@ var (
 	// ErrValueOutOfRange se usa cuando un valor está fuera de los rangos permitidos.
 	ErrValueOutOfRange = errors.New("valor fuera de rango permitido")
 
+	// ErrBusinessRuleViolation se usa cuando una regla de negocio específica no se cumple.
+	// Por ejemplo: "Edad insuficiente", "Saldo insuficiente", "Usuario bloqueado".
+	ErrBusinessRuleViolation = errors.New("violación de regla de negocio")
+
+	// Errores de existencia referencial
+	ErrSedeNotFound            = errors.New("la sede especificada no existe")
+	ErrRoadmapNotFound         = errors.New("el roadmap especificado no existe")
+	ErrOverrideVersionNotFound = errors.New("la versión de proceso específica no existe")
+
 	// ... y otros errores de negocio que necesites
 )
