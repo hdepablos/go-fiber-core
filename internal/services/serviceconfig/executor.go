@@ -56,7 +56,7 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
 			for _, key := range serviceConfig.RequiredKeys {
 				if _, ok := svcCtx.GetInputValue(key); !ok {
-					execErr = fmt.Errorf("missing required key '%s' for service '%s': %w", key, serviceConfig.Path, domain.ErrMissingRequiredKey)
+					execErr = fmt.Errorf("missing required key '%s' for service '%s': %w", key, serviceConfig.Path, domain.ErrCritical)
 					break
 				}
 			}
@@ -65,34 +65,16 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 			execErr = serviceInstance.Execute()
 		}
 		if execErr != nil {
-			if errors.Is(execErr, domain.ErrCritical) {
-				log.Printf("🔴 Error crítico en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-				return execErr
-			}
 			if errors.Is(execErr, domain.ErrTolerable) {
-				switch serviceConfig.ErrorTolerance {
-				case "critical":
-					log.Printf("🔴 Error tolerable tratado como crítico en '%s' por configuración. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-					return execErr
-				case "tolerable", "inherit", "":
+				if serviceConfig.ErrorTolerance == "tolerable" {
 					log.Printf("⚠️ Error tolerable en '%s'. La ejecución continuará. Error: %v", serviceConfig.Path, execErr)
 					continue
-				default:
-					log.Printf("🛑 Error tolerable con configuración desconocida en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-					return execErr
 				}
-			}
-			switch serviceConfig.ErrorTolerance {
-			case "tolerable":
-				log.Printf("⚠️ Error tolerable por configuración en '%s'. La ejecución continuará. Error: %v", serviceConfig.Path, execErr)
-				continue
-			case "critical":
-				log.Printf("🔴 Error crítico por configuración en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
-				return execErr
-			default:
-				log.Printf("🛑 Error no clasificado en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
+				log.Printf("🔴 Error tolerable tratado como crítico en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
 				return execErr
 			}
+			log.Printf("🔴 Error en '%s'. Deteniendo la cadena. Error: %v", serviceConfig.Path, execErr)
+			return execErr
 		} else {
 			if svcCtx != nil {
 				if res, ok := svcCtx.GetResult(serviceConfig.Path); ok {

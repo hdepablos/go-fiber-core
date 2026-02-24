@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 // Age es la implementación concreta para el servicio de validación de edad.
@@ -29,30 +30,8 @@ func (a *Age) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (a *Age) Execute() error {
 	fmt.Println("🧮 Ejecutando servicio Age")
 
-	rawAge, _ := a.ctx.GetInputValue("age")
-	age := 0
-	switch v := rawAge.(type) {
-	case int:
-		age = v
-	case int64:
-		age = int(v)
-	case float64:
-		age = int(v)
-	}
-	// Leer min_age desde la configuración del step (por defecto 18)
-	minAge := 18
-	if cfg := a.ctx.CurrentStepConfig; cfg != nil {
-		if v, ok := cfg["min_age"]; ok {
-			switch n := v.(type) {
-			case int:
-				minAge = n
-			case int64:
-				minAge = int(n)
-			case float64:
-				minAge = int(n)
-			}
-		}
-	}
+	age := utils.GetIntInput(a.ctx, "age")
+	minAge := utils.GetIntConfig(a.ctx.CurrentStepConfig, "min_age", 18)
 	data := map[string]any{
 		"age_processed": fmt.Sprintf("Edad validada: %v", age),
 		"min_age":       minAge,

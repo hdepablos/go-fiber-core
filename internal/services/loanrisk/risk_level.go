@@ -5,6 +5,7 @@ import (
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 // RiskLevel es la implementación para el servicio de cálculo de riesgo.
@@ -32,27 +33,8 @@ func (p *RiskLevel) Execute() error {
 		return fmt.Errorf("%w: missing required input key 'is_renovation' for RiskLevel", domain.ErrMissingRequiredKey)
 	}
 
-	rawSalary, _ := p.ctx.GetInputValue("salary")
-	salary := 0
-	switch v := rawSalary.(type) {
-	case int:
-		salary = v
-	case int64:
-		salary = int(v)
-	case float64:
-		salary = int(v)
-	}
-
-	rawAge, _ := p.ctx.GetInputValue("age")
-	age := 0
-	switch v := rawAge.(type) {
-	case int:
-		age = v
-	case int64:
-		age = int(v)
-	case float64:
-		age = int(v)
-	}
+	salary := utils.GetIntInput(p.ctx, "salary")
+	age := utils.GetIntInput(p.ctx, "age")
 
 	risk := "bajo"
 	if salary < 50000 && age > 60 {

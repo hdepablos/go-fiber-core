@@ -5,6 +5,7 @@ import (
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 // Salary es la implementación para el servicio de validación de salario.
@@ -28,35 +29,8 @@ func (s *Salary) Init(ctx *contracts.ServiceContext, servicePath string) {
 func (s *Salary) Execute() error {
 	fmt.Println("💰 Ejecutando servicio Salary")
 
-	rawSalary, ok := s.ctx.GetInputValue("salary")
-	if !ok {
-		return fmt.Errorf("%w: missing required input key 'salary' for Salary", domain.ErrMissingRequiredKey)
-	}
-
-	salary := 0
-	switch v := rawSalary.(type) {
-	case int:
-		salary = v
-	case int64:
-		salary = int(v)
-	case float64:
-		salary = int(v)
-	}
-
-	// Leer min_salary desde la configuración del step (por defecto 1)
-	minSalary := 1
-	if cfg := s.ctx.CurrentStepConfig; cfg != nil {
-		if v, ok := cfg["min_salary"]; ok {
-			switch n := v.(type) {
-			case int:
-				minSalary = n
-			case int64:
-				minSalary = int(n)
-			case float64:
-				minSalary = int(n)
-			}
-		}
-	}
+	salary := utils.GetIntInput(s.ctx, "salary")
+	minSalary := utils.GetIntConfig(s.ctx.CurrentStepConfig, "min_salary", 1)
 
 	if salary < minSalary {
 		return fmt.Errorf("%w: salario %d menor al mínimo permitido %d", domain.ErrValueOutOfRange, salary, minSalary)
