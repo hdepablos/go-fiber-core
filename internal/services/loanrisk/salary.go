@@ -57,5 +57,5 @@ func (s *Salary) Execute() error {
 
 // init registra el servicio en el mapa central.
 func init() {
-	serviceconfig.Register("loanrisk/NewSalaryService", NewSalaryService)
+	serviceconfig.Register("loanrisk/salary", NewSalaryService)
 }

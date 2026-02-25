@@ -196,14 +196,14 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 	output := map[string]any{
 		"process_version_id": processVersionID,
 		"input":              req.Input,
-		"results":            map[string]any{},
+		"details":            map[string]any{},
 	}
 
 	if svcCtx != nil {
 		if svcCtx.Results != nil {
-			output["results"] = svcCtx.Results
+			output["details"] = svcCtx.Results
 		}
-		output["all_data"] = svcCtx.GetAll()
+		output["result"] = svcCtx.GetAll()
 
 		if svcCtx.Results != nil {
 			type orderedResult struct {
@@ -236,6 +236,11 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		})
 
 		output["execute_ordered"] = ordered
+		
+		// Inyectar métricas de rendimiento si existen (solo en modo Test)
+		if svcCtx.Metrics != nil {
+			output["performance"] = svcCtx.Metrics
+		}
 	}
 	}
 

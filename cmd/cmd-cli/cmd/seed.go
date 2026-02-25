@@ -17,17 +17,27 @@ var seedCmd = &cobra.Command{
 	Use:   "seed",
 	Short: "Ejecuta los seeders para poblar la base de datos",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		fmt.Println("Seeders disponibles:")
-		all := seeders.ListSeedersNames()
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NOMBRE\tCOMANDO")
-		for _, name := range all {
-			fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
-		}
-		w.Flush()
-
 		if listOnly {
+			fmt.Println("Seeders disponibles:")
+			all := seeders.ListSeedersNames()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "NOMBRE\tCOMANDO")
+			for _, name := range all {
+				fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
+			}
+			w.Flush()
 			return nil
+		}
+
+		if onlySeeders == "" {
+			fmt.Println("Seeders disponibles:")
+			all := seeders.ListSeedersNames()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "NOMBRE\tCOMANDO")
+			for _, name := range all {
+				fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
+			}
+			w.Flush()
 		}
 
 		fmt.Println("\nEjecutando los seeders...")

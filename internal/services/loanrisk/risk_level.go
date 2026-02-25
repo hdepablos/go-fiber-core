@@ -57,5 +57,5 @@ func (p *RiskLevel) Execute() error {
 
 // init registra el servicio en el mapa central.
 func init() {
-	serviceconfig.Register("loanrisk/NewRiskLevelService", NewRiskLevelService)
+	serviceconfig.Register("loanrisk/risk_level", NewRiskLevelService)
 }

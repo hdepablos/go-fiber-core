@@ -30,6 +30,7 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 	if svcCtx != nil {
 		svcCtx.Ctx = ctx
 	}
+	// Sort services by order
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Order < services[j].Order
 	})
@@ -120,9 +121,10 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 		serviceInstance.Init(nil, serviceConfig.Path)
 	}
 
-	// Verificar Claves Requeridas
+	// Ejecutar Servicio
 	var execErr error
 	if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
+		// ... (código existente de required keys) ...
 		var missing []string
 		for _, key := range serviceConfig.RequiredKeys {
 			if _, ok := svcCtx.GetInputValue(key); !ok {
@@ -135,11 +137,17 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 	}
 
 	if execErr == nil {
-		// Ejecutar Servicio
+		// INICIO MEDICIÓN TIEMPO (Solo si hay métricas activas en contexto)
+		var startTime time.Time
+		var isTrackingTime bool
+		if svcCtx != nil && svcCtx.Metrics != nil {
+			startTime = time.Now()
+			isTrackingTime = true
+		}
+
 		// Usamos un canal para respetar la cancelación del contexto si el servicio se bloquea
 		done := make(chan error, 1)
 		go func() {
-			// Panic recovery dentro de la goroutine del servicio
 			defer func() {
 				if r := recover(); r != nil {
 					done <- fmt.Errorf("panic en servicio '%s': %v", serviceConfig.Path, r)
@@ -150,7 +158,6 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 
 		select {
 		case <-ctx.Done():
-			// Contexto cancelado (timeout o padre cancelado)
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				execErr = fmt.Errorf("timeout exceeded (%v): %w", serviceConfig.Timeout, ctx.Err())
 			} else {
@@ -158,6 +165,34 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 			}
 		case err := <-done:
 			execErr = err
+		}
+
+		// FIN MEDICIÓN TIEMPO E INYECCIÓN
+		if isTrackingTime && svcCtx != nil {
+			// Usamos Microsegundos para mayor precisión en steps rápidos (lógica pura)
+			duration := time.Since(startTime).Microseconds()
+			
+			// Recuperamos el resultado actual (que el servicio pudo haber seteado)
+			// O creamos uno nuevo si falló pero queremos registrar el tiempo
+			res, ok := svcCtx.GetResult(serviceConfig.Path)
+			if !ok {
+				// Si el servicio no guardó nada (ej: error), creamos un placeholder
+				res = contracts.StepResult{
+					Status: "failed", // Asumimos failed si no hay result, se sobreescribirá si execErr es nil
+				}
+				if execErr == nil {
+					res.Status = "completed"
+				}
+			}
+
+			// Inyectamos duration_us en Data
+			if res.Data == nil {
+				res.Data = make(map[string]any)
+			}
+			res.Data["duration_us"] = duration
+			
+			// Guardamos de vuelta
+			svcCtx.SetResult(serviceConfig.Path, res)
 		}
 	}
 

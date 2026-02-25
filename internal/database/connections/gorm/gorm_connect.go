@@ -82,8 +82,74 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(time.Duration(cfg.MaxConnLifeTimeInSeconds) * time.Second)
 
+	// Register performance hooks
+	registerPerformanceHooks(db)
+
 	log.Printf("✅ Conexión GORM exitosa a %s", cfg.Host)
 	return db, sqlDB, nil
+}
+
+func registerPerformanceHooks(db *gorm.DB) {
+	// Start timer before any operation
+	db.Callback().Create().Before("gorm:create").Register("perf:before_create", startTimer)
+	db.Callback().Query().Before("gorm:query").Register("perf:before_query", startTimer)
+	db.Callback().Update().Before("gorm:update").Register("perf:before_update", startTimer)
+	db.Callback().Delete().Before("gorm:delete").Register("perf:before_delete", startTimer)
+	db.Callback().Row().Before("gorm:row").Register("perf:before_row", startTimer)
+	db.Callback().Raw().Before("gorm:raw").Register("perf:before_raw", startTimer)
+
+	// Measure duration after operation
+	db.Callback().Create().After("gorm:create").Register("perf:after_create", endTimerWrite)
+	db.Callback().Query().After("gorm:query").Register("perf:after_query", endTimerRead)
+	db.Callback().Update().After("gorm:update").Register("perf:after_update", endTimerWrite)
+	db.Callback().Delete().After("gorm:delete").Register("perf:after_delete", endTimerWrite)
+	db.Callback().Row().After("gorm:row").Register("perf:after_row", endTimerRead)
+	db.Callback().Raw().After("gorm:raw").Register("perf:after_raw", endTimerRead)
+}
+
+func startTimer(db *gorm.DB) {
+	if db.Statement.Context != nil {
+		// SHORT-CIRCUIT: Verificar PRIMERO si existe el colector de métricas en el contexto.
+		// Si no existe (99% de los casos en Producción), retornamos inmediatamente.
+		// Esto evita llamar a time.Now() y allocar memoria innecesariamente.
+		if db.Statement.Context.Value("db_metrics_collector") == nil {
+			return
+		}
+		
+		db.Set("perf:start_time", time.Now())
+	}
+}
+
+func endTimerRead(db *gorm.DB) {
+	endTimer(db, false)
+}
+
+func endTimerWrite(db *gorm.DB) {
+	endTimer(db, true)
+}
+
+func endTimer(db *gorm.DB, isWrite bool) {
+	// Recuperar start time del mapa interno de GORM (no del context de Go, sino del Scope de GORM)
+	startTime, ok := db.Get("perf:start_time")
+	if !ok {
+		return
+	}
+	
+	t, ok := startTime.(time.Time)
+	if !ok {
+		return
+	}
+
+	duration := time.Since(t).Milliseconds()
+
+	// Check for a specific key in the context that holds the metrics collector
+	if db.Statement.Context != nil {
+		if collector, ok := db.Statement.Context.Value("db_metrics_collector").(interface {
+			AddDBMetric(int64, bool)
+		}); ok {
+			collector.AddDBMetric(duration, isWrite)
+		}
+	}
 }
 
 func getGormLogger(writer logger.Writer) logger.Interface {

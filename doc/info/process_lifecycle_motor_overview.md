@@ -16,18 +16,18 @@ Este documento resume cómo funciona el motor de **Process Lifecycle** y el **mo
 
 - Campo en la tabla `process_steps` que identifica de forma lógica un servicio.
 - Ejemplos:
-  - `loanrisk/NewAgeService`
-  - `loanrisk/NewSalaryService`
-  - `loanrisk/NewIsRenovationService`
-  - `loanrisk/NewValidationService`
+  - `loanrisk/age`
+  - `loanrisk/salary`
+  - `loanrisk/is_renovation`
+  - `loanrisk/validation`
 - Esta misma cadena se usa en tres lugares:
   - BD: `process_steps.execution_key`.
   - Registro de servicios en Go:
-    - `serviceconfig.Register("loanrisk/NewAgeService", NewAgeService)`.
+    - `serviceconfig.Register("loanrisk/age", NewAgeService)`.
   - Resultados de ejecución:
-    - `ServiceContext.Results["loanrisk/NewAgeService"]`.
+    - `ServiceContext.Results["loanrisk/age"]`.
 
-Punto clave: es un **ID lógico estable de servicio**, no necesariamente el nombre literal de una función de Go, aunque por convención se parece (`paquete/NewXService`).
+Punto clave: es un **ID lógico estable de servicio**, no necesariamente el nombre literal de una función de Go, aunque por convención se parece (`paquete/nombre`).
 
 ### 1.2 `process_steps` y `step_order`
 

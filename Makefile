@@ -153,6 +153,17 @@ redis-get-key: ## 🔎 Muestra el contenido de una key de Redis. Uso: make redis
 	echo "$(INFO)Mostrando contenido de la key: $(k)$(RESET)"; \
 	REDISCLI_AUTH="$(REDIS_PASSWORD)" redis-cli -h "$$HOST" -p "$(REDIS_PORT)" -n "$(REDIS_DATABASE)" GET "$(k)"
 
+.PHONY: create-step
+create-step: ## 👣 Crea un nuevo servicio (Step) con boilerplate y auto-wiring. Uso: make create-step name=folder/service_name
+	@if [ -z "$(name)" ]; then \
+		echo "$(ERROR)❌ Debes especificar el nombre: make create-step name=folder/service_name$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🚀 Creando servicio $(name)...$(RESET)"
+	@go run tools/make-service/main.go -name "$(name)"
+	@echo "$(SUCCESS)✨ Servicio creado e inyectado correctamente.$(RESET)"
+	@echo "$(INFO)📝 Ahora edita el archivo generado para implementar tu lógica.$(RESET)"
+
 ###############################################################################
 ## Golang
 ###############################################################################

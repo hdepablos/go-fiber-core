@@ -1,0 +1,143 @@
+{
+  "status": "success",
+  "message": "Loan risk lifecycle ejecutado exitosamente",
+  "data": {
+    "details": {
+      "loanrisk/age": {
+        "status": "ok",
+        "input": {
+          "age": 0,
+          "roadmap": 0,
+          "salary": 2500000,
+          "sede_id": 0
+        },
+        "data": {
+          "age_processed": "Edad validada: 0",
+          "duration_ms": 2,
+          "is_adult": false,
+          "min_age": 18
+        },
+        "step_order": 1
+      },
+      "loanrisk/is_renovation": {
+        "status": "ok",
+        "input": {
+          "age": 0,
+          "is_renovation": true,
+          "min_salary": 1,
+          "roadmap": 0,
+          "salary": 2500000,
+          "salary_bracket_k_usd": 2500,
+          "salary_checked": true,
+          "sede_id": 0
+        },
+        "data": {
+          "duration_ms": 0,
+          "renovation_check": true
+        },
+        "step_order": 4
+      },
+      "loanrisk/risk_level": {
+        "status": "ok",
+        "input": {
+          "age": 0,
+          "is_renovation": true,
+          "min_salary": 1,
+          "roadmap": 0,
+          "salary": 2500000,
+          "salary_bracket_k_usd": 2500,
+          "salary_checked": true,
+          "sede_id": 0
+        },
+        "data": {
+          "calculated_risk": "bajo",
+          "duration_ms": 0
+        },
+        "step_order": 5
+      },
+      "loanrisk/salary": {
+        "status": "ok",
+        "input": {
+          "age": 0,
+          "min_salary": 1,
+          "roadmap": 0,
+          "salary": 2500000,
+          "salary_bracket_k_usd": 2500,
+          "salary_checked": true,
+          "sede_id": 0
+        },
+        "data": {
+          "duration_ms": 0,
+          "min_salary": 1,
+          "salary_bracket_k_usd": 2500,
+          "salary_checked": true
+        },
+        "step_order": 3
+      },
+      "loanrisk/validation": {
+        "status": "ok",
+        "input": {
+          "age": 0,
+          "roadmap": 0,
+          "salary": 2500000,
+          "sede_id": 0
+        },
+        "data": {
+          "duration_ms": 0,
+          "special_validation_passed": true
+        },
+        "step_order": 2
+      }
+    },
+    "execute_ordered": [
+      {
+        "service_path": "loanrisk/age",
+        "step_order": 1
+      },
+      {
+        "service_path": "loanrisk/validation",
+        "step_order": 2
+      },
+      {
+        "service_path": "loanrisk/salary",
+        "step_order": 3
+      },
+      {
+        "service_path": "loanrisk/is_renovation",
+        "step_order": 4
+      },
+      {
+        "service_path": "loanrisk/risk_level",
+        "step_order": 5
+      }
+    ],
+    "input": {
+      "age": 0,
+      "roadmap": 0,
+      "salary": 2500000,
+      "sede_id": 0
+    },
+    "performance": {
+      "execution_id": "7cf7b9c5-1f7b-4d20-96e0-2bd7e68c67d6",
+      "total_duration_ms": 5,
+      "db_read_ms": 0,
+      "db_write_ms": 0,
+      "db_total_queries": 0,
+      "memory_used_mb": 1.6190109252929688,
+      "goroutines": 8
+    },
+    "process_version_id": 3,
+    "result": {
+      "age_processed": "Edad validada: 0",
+      "calculated_risk": "bajo",
+      "duration_ms": 0,
+      "is_adult": false,
+      "min_age": 18,
+      "min_salary": 1,
+      "renovation_check": true,
+      "salary_bracket_k_usd": 2500,
+      "salary_checked": true,
+      "special_validation_passed": true
+    }
+  }
+}

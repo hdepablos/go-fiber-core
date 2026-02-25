@@ -15,6 +15,9 @@ import (
 
 	// Importación en blanco para asegurar el registro de servicios Loan Risk
 	_ "go-fiber-core/internal/services/loanrisk"
+	// Importación en blanco para registrar servicios de prueba concurrente
+	_ "go-fiber-core/internal/services/test/steps_concurrent"
+	_ "go-fiber-core/internal/services/test/imputation"
 )
 
 var fiberLambda *fiberadapter.FiberLambda

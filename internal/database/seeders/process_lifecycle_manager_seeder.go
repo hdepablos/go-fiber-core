@@ -120,31 +120,31 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 			{
 				Order:        1,
 				Name:         "Age validation",
-				ExecutionKey: "loanrisk/NewAgeService",
+				ExecutionKey: "loanrisk/age",
 				Config:       `{"error_tolerance":"inherit","required_keys":["age"],"min_age":40}`,
 			},
 			{
 				Order:        2,
 				Name:         "Special validation",
-				ExecutionKey: "loanrisk/NewValidationService",
+				ExecutionKey: "loanrisk/validation",
 				Config:       `{"error_tolerance":"tolerable"}`,
 			},
 			{
 				Order:        3,
 				Name:         "Salary validation",
-				ExecutionKey: "loanrisk/NewSalaryService",
+				ExecutionKey: "loanrisk/salary",
 				Config:       `{"error_tolerance":"critical","required_keys":["salary"],"min_salary":2500000}`,
 			},
 			{
 				Order:        4,
 				Name:         "Renovation check",
-				ExecutionKey: "loanrisk/NewIsRenovationService",
+				ExecutionKey: "loanrisk/is_renovation",
 				Config:       `{"error_tolerance":"inherit","required_keys":["min_salary","salary_bracket_k_usd","salary_checked"]}`,
 			},
 			{
 				Order:        5,
 				Name:         "Risk level",
-				ExecutionKey: "loanrisk/NewRiskLevelService",
+				ExecutionKey: "loanrisk/risk_level",
 				Config:       `{"error_tolerance":"inherit","required_keys":["is_renovation"]}`,
 			},
 		}

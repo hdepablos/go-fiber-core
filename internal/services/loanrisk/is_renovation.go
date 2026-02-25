@@ -43,5 +43,5 @@ func (r *IsRenovation) Execute() error {
 
 // init registra el servicio en el mapa central.
 func init() {
-	serviceconfig.Register("loanrisk/NewIsRenovationService", NewIsRenovationService)
+	serviceconfig.Register("loanrisk/is_renovation", NewIsRenovationService)
 }

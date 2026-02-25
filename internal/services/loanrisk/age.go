@@ -50,5 +50,5 @@ func (a *Age) Execute() error {
 // Su única misión es registrar este servicio en el mapa central
 // para que el ejecutor pueda encontrarlo por su ruta.
 func init() {
-	serviceconfig.Register("loanrisk/NewAgeService", NewAgeService)
+	serviceconfig.Register("loanrisk/age", NewAgeService)
 }

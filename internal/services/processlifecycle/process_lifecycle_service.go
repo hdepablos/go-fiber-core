@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
@@ -129,6 +132,11 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		return 0, nil, domain.ErrInvalidArgument
 	}
 
+	// Normalize overrideProcessVersionID: treat 0 as nil (no override)
+	if overrideProcessVersionID != nil && *overrideProcessVersionID == 0 {
+		overrideProcessVersionID = nil
+	}
+
 	redisClient := s.conn.ConnectRedis
 	projectPrefix := os.Getenv("APP_NAME")
 	if projectPrefix == "" {
@@ -140,6 +148,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		return 0, nil, fmt.Errorf("pgx write connection is not initialized")
 	}
 
+	/*
 	// 1. Validar existencia de Sede (si aplica)
 	if sedeID > 0 {
 		var exists bool
@@ -163,6 +172,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 			return 0, nil, domain.ErrRoadmapNotFound
 		}
 	}
+	*/
 
 	// 3. Validar existencia de Versión Específica (si aplica)
 	if overrideProcessVersionID != nil && *overrideProcessVersionID > 0 {
@@ -188,7 +198,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	} else {
 		// Try Redis with Locking Strategy only if useCache is true
 		if useCache && redisClient != nil {
-			cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+			cacheKey := fmt.Sprintf("%s:lifecycle-%d:sede-%d:roadmap-%d", projectPrefix, processTypeID, sedeID, roadmap)
 			lockService := cache.NewRedisLockService(redisClient)
 
 			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
@@ -227,7 +237,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	}
 
 	if overrideProcessVersionID == nil && useCache && redisClient != nil {
-		cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+		cacheKey := fmt.Sprintf("%s:lifecycle-%d:sede-%d:roadmap-%d", projectPrefix, processTypeID, sedeID, roadmap)
 		lockService := cache.NewRedisLockService(redisClient)
 
 		payload := struct {
@@ -604,6 +614,30 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 	}
 
 	serviceCtx := contracts.NewServiceContextFromInput(ctx, req.Input)
+
+	// Inicializar métricas solo si es modo Test (override > 0)
+	isTestMode := req.OverrideProcessVersionID != nil && *req.OverrideProcessVersionID > 0
+	if isTestMode {
+		serviceCtx.Metrics = &contracts.ExecutionMetrics{
+			ExecutionID:     uuid.New().String(), // Requiere "github.com/google/uuid"
+			GoroutinesCount: runtime.NumGoroutine(),
+		}
+		// Iniciar medición de tiempo
+		start := time.Now()
+		defer func() {
+			serviceCtx.Metrics.TotalDurationMs = time.Since(start).Milliseconds()
+			serviceCtx.Metrics.GoroutinesCount = runtime.NumGoroutine() // Actualizar al final
+			
+			// Medir memoria
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			serviceCtx.Metrics.MemoryUsedMB = float64(m.Alloc) / 1024 / 1024
+		}()
+		
+		// Inyectar el ServiceContext en el contexto de Go para que GORM lo vea
+		ctx = context.WithValue(ctx, "db_metrics_collector", serviceCtx)
+		serviceCtx.Ctx = ctx // Actualizar también dentro del struct
+	}
 
 	if err := serviceconfig.ExecuteServicesInOrder(ctx, registryRows, serviceCtx); err != nil {
 		return processVersionID, serviceCtx, err

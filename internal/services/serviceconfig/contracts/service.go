@@ -16,9 +16,21 @@ type StepResult struct {
 type ServiceContext struct {
 	Ctx               context.Context `json:"-"`
 	mu                sync.Mutex
-	Input             map[string]any  `json:"input,omitempty"`
-	Results           map[string]any `json:"results"`
-	CurrentStepConfig map[string]any `json:"-"`
+	Input             map[string]any    `json:"input,omitempty"`
+	Results           map[string]any    `json:"results"`
+	CurrentStepConfig map[string]any    `json:"-"`
+	Metrics           *ExecutionMetrics `json:"performance,omitempty"` // Métricas de ejecución (solo en modo test)
+}
+
+type ExecutionMetrics struct {
+	ExecutionID         string  `json:"execution_id,omitempty"`
+	ProcessedItemsCount int     `json:"processed_items_count,omitempty"`
+	TotalDurationMs     int64   `json:"total_duration_ms"`
+	DBReadMs            int64   `json:"db_read_ms"`
+	DBWriteMs           int64   `json:"db_write_ms"`
+	DBTotalQueries      int     `json:"db_total_queries"`
+	MemoryUsedMB        float64 `json:"memory_used_mb"`
+	GoroutinesCount     int     `json:"goroutines"`
 }
 
 func NewServiceContext(age, salary int) *ServiceContext {
@@ -30,8 +42,8 @@ func NewServiceContextWithCtx(ctx context.Context, age, salary int) *ServiceCont
 		ctx = context.Background()
 	}
 	return &ServiceContext{
-		Ctx:    ctx,
-		Input:  map[string]any{"age": age, "salary": salary},
+		Ctx:     ctx,
+		Input:   map[string]any{"age": age, "salary": salary},
 		Results: make(map[string]any),
 	}
 }
@@ -48,6 +60,20 @@ func NewServiceContextFromInput(ctx context.Context, input map[string]any) *Serv
 		Ctx:     ctx,
 		Input:   m,
 		Results: make(map[string]any),
+	}
+}
+
+func (c *ServiceContext) AddDBMetric(durationMs int64, isWrite bool) {
+	if c == nil || c.Metrics == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Metrics.DBTotalQueries++
+	if isWrite {
+		c.Metrics.DBWriteMs += durationMs
+	} else {
+		c.Metrics.DBReadMs += durationMs
 	}
 }
 

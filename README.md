@@ -19,6 +19,12 @@ La documentación completa sobre logs (CloudWatch, niveles de log, buenas práct
 
 - [doc/info/logs.md](doc/info/logs.md)
 
+## Creación de Servicios (Steps)
+
+La guía paso a paso para crear e integrar nuevos servicios (Steps) en el Process Lifecycle Manager se encuentra en:
+
+- [doc/info/create-services-steps.md](doc/info/create-services-steps.md)
+
 ## Migraciones
 
 La convención de nombres y el uso de `make create-migration` (incluyendo procesos como `create_process_lifecycle_manager`) se encuentra en:

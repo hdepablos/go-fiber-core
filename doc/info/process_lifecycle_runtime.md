@@ -34,7 +34,7 @@ type ServiceContext struct {
     - `SnapshotInput() map[string]any` (fotografía del input actual, útil para debug).
 
 - `Results`:
-  - Mapa con los resultados por servicio, indexado por `servicePath` (por ejemplo `loanrisk/NewAgeService`).
+  - Mapa con los resultados por servicio, indexado por `servicePath` (por ejemplo `loanrisk/age`).
   - Se llena con `SetResult(path string, result StepResult)`.
 
 - `CurrentStepConfig`:
@@ -367,7 +367,93 @@ func (s *Salary) Execute() error {
 
 ---
 
-## 7. Comandos CLI relevantes
+## 8. Modo Test y Métricas de Rendimiento
+
+El motor incluye un modo especial de **Test / Diagnóstico** que se activa cuando se solicita explícitamente ejecutar una versión específica (override) en lugar de la versión productiva vigente.
+
+### 8.1. Activación
+
+Para activar este modo, se debe enviar `override_process_version_id > 0` en el request al endpoint `POST /api/v1/process-lifecycle/run`.
+
+```json
+{
+  "process_type_id": 1,
+  "sede_id": 1,
+  "override_process_version_id": 5, // <--- Activa modo Test
+  "input": { ... }
+}
+```
+
+### 8.2. Comportamiento Diferenciado
+
+| Característica | Modo Producción (Default) | Modo Test (Override > 0) |
+| :--- | :--- | :--- |
+| **Resolución de Versión** | **Redis (Cache)**. Maximiza velocidad. | **PostgreSQL (Directo)**. Garantiza consistencia inmediata. |
+| **Métricas Globales** | Desactivadas (Cero overhead). | Activadas (`performance` object). |
+| **Métricas por Step** | Desactivadas. | Activadas (`duration_us` en `details`). |
+| **Respuesta API** | Limpia (solo negocio). | Enriquecida con tiempos y recursos. |
+
+### 8.3. Estructura de Respuesta en Modo Test
+
+Cuando el modo test está activo, la respuesta JSON se enriquece con métricas de rendimiento detalladas.
+
+```json
+{
+  "status": "success",
+  "data": {
+    "process_version_id": 5,
+    "input": { ... },
+
+    // 1. Resultado Consolidado (Output final del proceso)
+    "result": {
+      "score": 85,
+      "approved": true
+    },
+
+    // 2. Detalle paso a paso (Incluye tiempos individuales)
+    "details": {
+      "loanrisk/age": {
+        "status": "ok",
+        "data": {
+          "is_adult": true,
+          "duration_us": 45  // <--- Tiempo en Microsegundos (µs)
+        }
+      },
+      "loanrisk/salary": {
+        "status": "ok",
+        "data": {
+          "salary_checked": true,
+          "duration_us": 120 // <--- 120 µs
+        }
+      }
+    },
+
+    // 3. Métricas Globales del Sistema
+    "performance": {
+      "execution_id": "uuid-v4...",
+      "total_duration_ms": 5,       // Tiempo total (incluye overhead)
+      "db_read_ms": 2,              // Tiempo acumulado en lecturas DB
+      "db_write_ms": 1,             // Tiempo acumulado en escrituras DB
+      "db_total_queries": 3,        // Cantidad de queries ejecutadas
+      "memory_used_mb": 1.5,        // Memoria asignada (Heap Alloc)
+      "goroutines": 12              // Gorutinas activas
+    }
+  }
+}
+```
+
+### 8.4. Unidades de Medida
+
+*   **Steps Individuales (`duration_us`)**: Se miden en **Microsegundos (µs)**.
+    *   Razón: Los servicios de lógica de negocio en Go son extremadamente rápidos (a menudo < 1ms). Usar milisegundos daría `0` en la mayoría de los casos.
+    *   Ejemplo: `45` significa 45 microsegundos (0.045 ms).
+
+*   **Total Global (`total_duration_ms`)**: Se mide en **Milisegundos (ms)**.
+    *   Razón: Representa la latencia total desde la perspectiva del motor, incluyendo overhead de orquestación, red y base de datos.
+
+---
+
+## 9. Comandos CLI relevantes
 
 ### 7.1. Seeder de Process Lifecycle
 

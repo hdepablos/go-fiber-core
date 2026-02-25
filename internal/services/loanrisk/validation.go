@@ -57,5 +57,5 @@ func (v *Validation) Execute() error {
 
 // init registra este nuevo servicio en el mapa central.
 func init() {
-	serviceconfig.Register("loanrisk/NewValidationService", NewValidationService)
+	serviceconfig.Register("loanrisk/validation", NewValidationService)
 }
