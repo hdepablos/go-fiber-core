@@ -73,7 +73,7 @@ func (h *menuUserHandler) GetMenusByUser(c *fiber.Ctx) error {
         return err
     }
 
-    return responses.Success(c, "Menus afassociados obtenidos exitosamente", response)
+    return responses.Success(c, "Menus asociados obtenidos exitosamente", response)
 }
 
 func (h *menuUserHandler) GetMenusNotByUser(c *fiber.Ctx) error {
@@ -103,7 +103,7 @@ func (h *menuUserHandler) GetMenusNotByUser(c *fiber.Ctx) error {
 
 	return responses.Success(
 		c,
-		"Menus nofa asociados obtenidos exitosamente",
+		"Menus no asociados obtenidos exitosamente",
 		response,
 	)
 }
