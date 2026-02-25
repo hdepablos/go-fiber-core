@@ -341,6 +341,11 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 	return s.sessionRepo.RevokeAllByUserID(ctx, dbWrite, userID)
 }
 
+func (s *authService) RevokeAllSessions(ctx context.Context) error {
+	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
+	return s.sessionRepo.RevokeAll(ctx, dbWrite)
+}
+
 // ────────────────────────────────────────────────
 // GET ACTIVE SESSIONS PAGINATED
 // ────────────────────────────────────────────────

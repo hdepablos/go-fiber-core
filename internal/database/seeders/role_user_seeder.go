@@ -4,78 +4,81 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// RoleUser-specific constants
 const (
+	roleUserCSVPath   = "internal/database/seeders/files/role_user.csv"
 	roleUserTableName = "role_user"
+	roleUserTimeout   = 30 * time.Second
 )
 
-// RoleUserSeeder seeds the role_user relationship table.
-// Assigns role_id = 1 to user_id = 1.
+type RoleUser struct {
+	RoleID uint
+	UserID uint
+}
+
 func RoleUserSeeder(pool *pgxpool.Pool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultSeederTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), roleUserTimeout)
 	defer cancel()
 
 	logger := slog.Default().With("seeder", "role_user")
-	logger.Info("iniciando seeder de relación role_user")
 
-	// Create the relationships
-	roleUsers := []*RoleUser{
-		{
-			RoleID: 1, // Primer rol (ej: Admin)
-			UserID: 1, // Usuario test
-		},
-		// Puedes agregar más relaciones aquí:
-		// {RoleID: 2, UserID: 1}, // Si el usuario 1 tiene múltiples roles
+	records, err := parseCSV(roleUserCSVPath)
+	if err != nil {
+		return err
 	}
 
-	if err := seedRoleUsers(ctx, pool, roleUsers, logger); err != nil {
-		return fmt.Errorf("seedRoleUsers: %w", err)
-	}
+	rows, errs := parseRoleUserRecords(records)
+	logParseErrors(logger, errs)
 
-	logger.Info("seeder completado exitosamente", "relaciones_insertadas", len(roleUsers))
-	return nil
+	return seedRoleUsers(ctx, pool, rows, logger)
 }
 
-// RoleUser represents a role-user relationship for seeding.
-type RoleUser struct {
-	RoleID uint64
-	UserID uint64
-}
+func parseRoleUserRecords(records [][]string) ([]*RoleUser, []error) {
+	list := []*RoleUser{}
+	errs := []error{}
 
-// seedRoleUsers executes the database seeding operation within a transaction.
-func seedRoleUsers(ctx context.Context, pool *pgxpool.Pool, roleUsers []*RoleUser, logger *slog.Logger) error {
-	return executeInTransaction(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
-		if err := truncateTable(ctx, tx, roleUserTableName); err != nil {
-			return fmt.Errorf("truncate: %w", err)
+	for i := 1; i < len(records); i++ {
+		row := records[i]
+
+		roleID, err1 := parseUint(row[0])
+		userID, err2 := parseUint(row[1])
+
+		if err1 != nil || err2 != nil {
+			errs = append(errs, fmt.Errorf("línea %d inválida", i+1))
+			continue
 		}
-		logger.Debug("tabla truncada", "table", roleUserTableName)
 
-		rows := roleUsersToCopyRows(roleUsers)
-		count, err := tx.CopyFrom(
+		list = append(list, &RoleUser{roleID, userID})
+	}
+
+	return list, errs
+}
+
+func seedRoleUsers(ctx context.Context, pool *pgxpool.Pool, rows []*RoleUser, logger *slog.Logger) error {
+	return executeInTransaction(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
+
+		if err := truncateTable(ctx, tx, roleUserTableName); err != nil {
+			return err
+		}
+
+		copyRows := make([][]any, 0, len(rows))
+		for _, r := range rows {
+			copyRows = append(copyRows, []any{r.RoleID, r.UserID})
+		}
+
+		_, err := tx.CopyFrom(
 			ctx,
 			pgx.Identifier{roleUserTableName},
 			[]string{"role_id", "user_id"},
-			pgx.CopyFromRows(rows),
+			pgx.CopyFromRows(copyRows),
 		)
-		if err != nil {
-			return fmt.Errorf("CopyFrom: %w", err)
-		}
 
-		logger.Debug("relaciones insertadas vía COPY", "count", count)
-		return nil
+		logger.Info("role_user seed completado", "rows", len(rows))
+		return err
 	})
-}
-
-// roleUsersToCopyRows converts RoleUser structs to the format required by CopyFrom.
-func roleUsersToCopyRows(roleUsers []*RoleUser) [][]any {
-	rows := make([][]any, 0, len(roleUsers))
-	for _, ru := range roleUsers {
-		rows = append(rows, []any{ru.RoleID, ru.UserID})
-	}
-	return rows
 }

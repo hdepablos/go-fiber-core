@@ -18,6 +18,7 @@ type AuthService interface {
 	Logout(ctx context.Context, userID uint64) error
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeUserSessions(ctx context.Context, userID uint64) error
+	RevokeAllSessions(ctx context.Context) error
 	GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error)
 }
 
