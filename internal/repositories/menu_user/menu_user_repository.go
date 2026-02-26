@@ -110,6 +110,9 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 			
 			case "menu.name":
 				base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+			case "menu.name:fuzzy":
+    			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
 		}
 
 	}
@@ -280,6 +283,9 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(
 
 		case "menus.is_active":
 			base = base.Where("m.is_active = ?", val)
+
+		case "menu.name:fuzzy":
+    		base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
 		}
 	}
 
