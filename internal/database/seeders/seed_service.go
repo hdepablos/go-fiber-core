@@ -42,6 +42,7 @@ func ListSeedersNames() []string {
 		"menu_user",
 		"process_lifecycle_manager",
 		"test_process_scenarios",
+		"all_menus",
 	}
 }
 
@@ -270,6 +271,9 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return TestProcessScenariosSeeder(pool)
 	})
 
+	service.AddSeeder("all_menus", func() error {
+	return AllMenusSeeder(pool, configPath)
+})
 	// Example: Seed menus for multiple users at once
 	// Uncomment this if you created multiple users above
 	// service.AddSeeder("menu_user_multiple", func() error {

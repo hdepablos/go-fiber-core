@@ -179,6 +179,13 @@
 				"to_path": "/menu-users",
 				"icon": "mdi-account-group",
 				"order_index": 240
+			},
+			{
+				"item_type": "link",
+				"item_name": "RevokeAllUsuarios",
+				"to_path": "/revoke-all-users",
+				"icon": "mdi-account-minus-outline",
+				"order_index": 225
 			}
 		]
 	}

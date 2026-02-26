@@ -19,6 +19,7 @@ type AuthHandler interface {
 	Logout(c *fiber.Ctx) error
 	RevokeSession(c *fiber.Ctx) error
 	RevokeUserSessions(c *fiber.Ctx) error
+	RevokeAllSessions(c *fiber.Ctx) error
 	GetActiveSessions(c *fiber.Ctx) error
 }
 
@@ -160,4 +161,12 @@ func (h *authHandler) GetActiveSessions(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Sesiones activas obtenidas exitosamente", response)
+}
+
+func (h *authHandler) RevokeAllSessions(c *fiber.Ctx) error {
+	if err := h.authService.RevokeAllSessions(c.Context()); err != nil {
+		return err
+	}
+
+	return responses.Success(c, "todas las sesiones fueron revocadas", nil)
 }

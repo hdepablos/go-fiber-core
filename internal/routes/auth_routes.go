@@ -23,4 +23,5 @@ func RegisterProtectedAuthRoutes(router fiber.Router, authHandler handlers.AuthH
 	auth.Post("/revoke-session", authHandler.RevokeSession)
 	auth.Post("/revoke-user-sessions", authHandler.RevokeUserSessions)
 	auth.Post("/active-sessions", authHandler.GetActiveSessions)
+	auth.Post("/revoke-all-sessions", authHandler.RevokeAllSessions)
 }

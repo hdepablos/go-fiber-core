@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -132,4 +133,46 @@ func validateRecords(records [][]string, minColumns int) error {
 // buildFilePath constructs the full path for a CSV file.
 func buildFilePath(filename string) string {
 	return fmt.Sprintf("%s/%s", seedersFilesPath, filename)
+}
+
+
+func getIDByField(ctx context.Context, pool *pgxpool.Pool, table, field string, value any) (uint, error) {
+	query := fmt.Sprintf("SELECT id FROM %s WHERE %s = $1 LIMIT 1", table, field)
+
+	var id uint
+	err := pool.QueryRow(ctx, query, value).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
+// parseUint converts string to uint safely.
+func parseUint(s string) (uint, error) {
+	s = normalizeString(s)
+
+	if s == "" {
+		return 0, fmt.Errorf("valor vacío")
+	}
+
+	var v uint64
+	_, err := fmt.Sscan(s, &v)
+	if err != nil {
+		return 0, fmt.Errorf("uint inválido: %s", s)
+	}
+
+	return uint(v), nil
+}
+
+// logParseErrors logs parsing errors without stopping the seeder.
+func logParseErrors(logger *slog.Logger, errs []error) {
+	if len(errs) == 0 {
+		return
+	}
+
+	logger.Warn("errores al parsear registros", "count", len(errs))
+	for _, e := range errs {
+		logger.Debug("parse error", "error", e)
+	}
 }

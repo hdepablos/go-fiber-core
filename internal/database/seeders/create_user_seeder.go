@@ -9,92 +9,48 @@ import (
 	"go-fiber-core/internal/models"
 )
 
-// User seeder constants
-const (
-	defaultUserName     = "test"
-	defaultUserEmail    = "test@test.com"
-	defaultUserPassword = "123456"
-)
+type SeedUser struct {
+	Name     string
+	Email    string
+	Password string
+}
 
-// CreateUserSeeder creates a default test user using dependency injection.
-// This seeder uses the application's DI container to access the UserWriterService.
+var seedUsers = []SeedUser{
+	{"Admin", "admin@gmail.com", "123456"},   // Admin
+	{"Coordinador", "coordinador@gmail.com", "123456"}, // Coordinador
+	{"Supervisor", "supervisor@gmail.com", "123456"}, // Supervisor
+	{"Operador", "operador@gmail.com", "123456"}, // Operador
+}
+
+// SOLO crea usuarios (sin roles)
 func CreateUserSeeder(configPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultSeederTimeout)
 	defer cancel()
 
-	logger := slog.Default().With("seeder", "create_user")
-	logger.Info("iniciando seeder de usuario de prueba")
-
-	// Initialize DI container
-	server, cleanup, err := di.InitializeServer(configPath)
-	if err != nil {
-		return fmt.Errorf("inicializar dependencias: %w", err)
-	}
-	defer cleanup()
-	logger.Debug("dependencias inicializadas correctamente")
-
-	// Get UserWriterService from DI container
-	userService := server.UserWriterService
-	if userService == nil {
-		return fmt.Errorf("UserWriterService no disponible en el contenedor DI")
-	}
-	logger.Debug("servicio de usuario obtenido desde DI container")
-
-	// Create default test user
-	user := &models.User{
-		Name:     defaultUserName,
-		Email:    defaultUserEmail,
-		Password: defaultUserPassword,
-	}
-
-	logger.Info("creando usuario de prueba", "email", user.Email)
-	if err := userService.Create(ctx, user); err != nil {
-		return fmt.Errorf("crear usuario: %w", err)
-	}
-
-	logger.Info("usuario de prueba creado exitosamente",
-		"name", user.Name,
-		"email", user.Email,
-		"id", user.ID)
-
-	return nil
-}
-
-// CreateUserSeederWithCustomData creates a user with custom data.
-// Useful for creating multiple test users with different credentials.
-func CreateUserSeederWithCustomData(configPath string, name, email, password string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultSeederTimeout)
-	defer cancel()
-
-	logger := slog.Default().With("seeder", "create_user_custom")
-	logger.Info("iniciando seeder de usuario personalizado", "email", email)
+	logger := slog.Default().With("seeder", "users")
 
 	server, cleanup, err := di.InitializeServer(configPath)
 	if err != nil {
-		return fmt.Errorf("inicializar dependencias: %w", err)
+		return fmt.Errorf("init DI: %w", err)
 	}
 	defer cleanup()
 
 	userService := server.UserWriterService
-	if userService == nil {
-		return fmt.Errorf("UserWriterService no disponible en el contenedor DI")
+
+	for _, u := range seedUsers {
+		user := &models.User{
+			Name:     u.Name,
+			Email:    u.Email,
+			Password: u.Password,
+		}
+
+		logger.Info("creando usuario", "email", u.Email)
+
+		if err := userService.Create(ctx, user); err != nil {
+			return fmt.Errorf("crear usuario %s: %w", u.Email, err)
+		}
 	}
 
-	user := &models.User{
-		Name:     name,
-		Email:    email,
-		Password: password,
-	}
-
-	logger.Info("creando usuario personalizado", "email", user.Email)
-	if err := userService.Create(ctx, user); err != nil {
-		return fmt.Errorf("crear usuario: %w", err)
-	}
-
-	logger.Info("usuario personalizado creado exitosamente",
-		"name", user.Name,
-		"email", user.Email,
-		"id", user.ID)
-
+	logger.Info("usuarios creados", "total", len(seedUsers))
 	return nil
 }

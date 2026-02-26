@@ -27,6 +27,7 @@ type SessionWriter interface {
 	Create(ctx context.Context, db *gorm.DB, session *models.Session) error
 	Revoke(ctx context.Context, db *gorm.DB, id uuid.UUID) error
 	RevokeAllByUserID(ctx context.Context, db *gorm.DB, userID uint64) error
+	RevokeAll(ctx context.Context, db *gorm.DB) error // 👈 NUEVO
 }
 
 // SessionRepository combina lectura y escritura
@@ -98,6 +99,13 @@ func (w *SessionWriterRepo) RevokeAllByUserID(ctx context.Context, db *gorm.DB, 
 	return db.WithContext(ctx).
 		Model(&models.Session{}).
 		Where("user_id = ? AND is_blocked = ?", userID, false).
+		Update("is_blocked", true).Error
+}
+
+func (w *SessionWriterRepo) RevokeAll(ctx context.Context, db *gorm.DB) error {
+	return db.WithContext(ctx).
+		Model(&models.Session{}).
+		Where("is_blocked = ?", false).
 		Update("is_blocked", true).Error
 }
 
