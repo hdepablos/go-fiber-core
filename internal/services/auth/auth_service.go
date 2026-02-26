@@ -342,10 +342,38 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 }
 
 func (s *authService) RevokeAllSessions(ctx context.Context) error {
+	dbRead := s.TransactionManager.Conn.ConnectGormRead
 	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
+	redisClient := s.TransactionManager.Conn.ConnectRedis
+
+	// 1️⃣ Obtener TODAS las sesiones activas
+	var sessions []models.Session
+	err := dbRead.WithContext(ctx).
+		Where("is_blocked = ? AND expires_at > ?", false, time.Now()).
+		Find(&sessions).Error
+	if err != nil {
+		return err
+	}
+
+	lockService := cache.NewRedisLockService(redisClient)
+
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+
+	// 2️⃣ Blacklist por SID (igual que revoke-user)
+	for _, sess := range sessions {
+		ttl := time.Until(sess.ExpiresAt)
+		if ttl > 0 {
+			key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sess.ID)
+			_ = lockService.Set(ctx, key, "revoked", ttl)
+		}
+	}
+
+	// 3️⃣ Revocar TODO en DB
 	return s.sessionRepo.RevokeAll(ctx, dbWrite)
 }
-
 // ────────────────────────────────────────────────
 // GET ACTIVE SESSIONS PAGINATED
 // ────────────────────────────────────────────────

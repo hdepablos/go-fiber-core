@@ -167,5 +167,6 @@ func (h *authHandler) RevokeAllSessions(c *fiber.Ctx) error {
 	if err := h.authService.RevokeAllSessions(c.Context()); err != nil {
 		return err
 	}
-	return responses.Success(c, "Todas las sesiones fueron revocadas", nil)
+
+	return responses.Success(c, "todas las sesiones fueron revocadas", nil)
 }

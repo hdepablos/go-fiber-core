@@ -35,7 +35,8 @@ func (r *menuReaderRepository) GetMenusByUserID(ctx context.Context, db *gorm.DB
 		Table("menu_user").
 		Select("menu_id").
 		Where("user_id = ?", userID).
-		Where("is_active = ?", true)
+		Where("is_active = ?", true).
+		Where("deleted_at IS NULL") // Asegurarnos de no incluir asignaciones eliminadas
 
 	// 2️⃣ SUB-CONSULTA: Obtener IDs de los padres de esos menús activos
 	parentIDs := db.
