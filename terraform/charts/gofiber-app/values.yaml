@@ -1,0 +1,38 @@
+# Default values for gofiber-app.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ""
+  pullPolicy: IfNotPresent
+  tag: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+env: {}
+#  KEY: "value"
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# KEDA Autoscaling
+autoscaling:
+  enabled: false
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers: []
+    # - type: aws-sqs-queue
+    #   metadata:
+    #     queueURL: ""
+    #     queueLength: "5"
+    #     awsRegion: "us-east-1"
+    #     identityOwner: operator

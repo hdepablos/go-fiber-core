@@ -64,8 +64,13 @@ func main() {
 		// Run as Lambda
 		lambda.Start(Handler)
 	} else {
-		// Run as Local Server
-		log.Println("🚀 Starting in LOCAL mode...")
+		// Detect EKS/K8s Environment
+		if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+			log.Println("🚀 Starting in EKS/K8s Cluster mode...")
+		} else {
+			// Run as Local Server (Air)
+			log.Println("🚀 Starting in LOCAL mode...")
+		}
 
 		// Use the same config path as local development usually runs from root
 		server, cleanup, err := di.InitializeServer("internal/appconfig/config.yml")

@@ -1,0 +1,15 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "gofiber-app.fullname" . }}
+  labels:
+    {{- include "gofiber-app.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "gofiber-app.fullname" . }}
+  minReplicaCount: {{ .Values.autoscaling.minReplicaCount }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicaCount }}
+  triggers:
+    {{- toYaml .Values.autoscaling.triggers | nindent 4 }}
+{{- end }}

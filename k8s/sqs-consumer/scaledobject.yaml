@@ -1,0 +1,38 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: sqs-consumer-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: sqs-consumer
+  minReplicaCount: 0  # Escalar a 0 si no hay mensajes (ahorra recursos)
+  maxReplicaCount: 5  # Máximo de pods concurrentes
+  pollingInterval: 5  # Revisar la cola cada 5 segundos
+  cooldownPeriod: 30  # Esperar 30s antes de bajar replicas después de vaciar la cola
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        # URL de la cola en LocalStack (accesible desde KEDA)
+        queueURL: "http://host.docker.internal:4566/000000000000/gofibercorequeue"
+        awsRegion: "us-east-1"
+        # Identidad: como estamos en local, usamos credenciales fake o identityOwner: pod si KEDA soporta IRSA (pero en local es más simple así)
+        identityOwner: pod
+        queueLength: "5" # Escalar si hay más de 5 mensajes en cola
+      authenticationRef:
+        name: keda-aws-credentials
+---
+# TriggerAuthentication para pasar credenciales fake a KEDA
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-aws-credentials
+  namespace: default
+spec:
+  secretTargetRef:
+    - parameter: awsAccessKeyID
+      name: aws-secrets
+      key: AWS_ACCESS_KEY_ID
+    - parameter: awsSecretAccessKey
+      name: aws-secrets
+      key: AWS_SECRET_ACCESS_KEY

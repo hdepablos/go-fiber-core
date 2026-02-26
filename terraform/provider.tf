@@ -4,6 +4,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.24"
+    }
   }
 }
 
@@ -38,4 +46,16 @@ provider "aws" {
       ManagedBy   = "Terraform"
     }
   }
+}
+
+provider "helm" {
+  kubernetes {
+    config_path = "~/.kube/config"
+    config_context = var.environment == "local" ? "orbstack" : null
+  }
+}
+
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+  config_context = var.environment == "local" ? "orbstack" : null
 }

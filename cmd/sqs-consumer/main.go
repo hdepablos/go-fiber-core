@@ -37,6 +37,69 @@ func init() {
 	appContainer = res
 }
 
+func main() {
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		// Modo Lambda: AWS invoca el Handler
+		lambda.Start(Handler)
+	} else {
+		// Modo Polling (EKS/Local): Nosotros invocamos a SQS
+		runPollingLoop()
+	}
+}
+
+func runPollingLoop() {
+	slog.Info("🚀 Iniciando SQS Consumer en modo POLLING (EKS/Local)...")
+	ctx := context.Background()
+	
+	// Validar que tengamos QueueService
+	if appContainer.QueueService == nil {
+		slog.Error("❌ QueueService no inicializado")
+		os.Exit(1)
+	}
+
+	for {
+		// 1. Recibir mensajes (Long Polling de 20s ya configurado en sqs_service.go)
+		// Pedimos máximo 10 mensajes por lote
+		messages, err := appContainer.QueueService.ReceiveMessages(ctx, 10)
+		if err != nil {
+			slog.Error("❌ Error recibiendo mensajes de SQS", "error", err)
+			// Backoff simple para no saturar logs si SQS está caído
+			continue
+		}
+
+		if len(messages) == 0 {
+			continue
+		}
+
+		// 2. Procesar cada mensaje
+		for _, msg := range messages {
+			// Convertir types.Message (AWS SDK v2) a events.SQSMessage (AWS Lambda Events)
+			// Son estructuras diferentes pero compatibles en datos clave
+			lambdaMsg := events.SQSMessage{
+				MessageId:     *msg.MessageId,
+				ReceiptHandle: *msg.ReceiptHandle,
+				Body:          *msg.Body,
+				// Nota: No copiamos atributos aquí por simplicidad, pero se podría si fuera necesario
+			}
+
+			if err := processMessage(ctx, lambdaMsg); err != nil {
+				slog.Error("❌ Error procesando mensaje en modo polling", "id", lambdaMsg.MessageId, "error", err)
+				// En modo polling, NO borramos el mensaje si falla.
+				// SQS lo volverá a hacer visible después del VisibilityTimeout.
+				continue
+			}
+
+			// 3. Borrar mensaje exitoso
+			if err := appContainer.QueueService.DeleteMessage(ctx, lambdaMsg.ReceiptHandle); err != nil {
+				slog.Error("⚠️ Error borrando mensaje procesado", "id", lambdaMsg.MessageId, "error", err)
+			} else {
+				// Log opcional de borrado exitoso
+				// slog.Debug("✅ Mensaje borrado", "id", lambdaMsg.MessageId)
+			}
+		}
+	}
+}
+
 // Handler usa SQSEventResponse para evitar re-procesar mensajes exitosos
 func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
 	// --- LOGS DE RENDIMIENTO ---
@@ -109,8 +172,4 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 
 	slog.Info("Mensaje procesado con éxito", "msgID", msg.ID)
 	return nil
-}
-
-func main() {
-	lambda.Start(Handler)
 }

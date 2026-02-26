@@ -1,0 +1,42 @@
+FROM golang:1.25rc1-alpine AS builder
+
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apk add --no-cache git make
+
+# Copiar archivos de dependencias
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copiar código fuente
+COPY . .
+
+# Argumento para indicar qué cmd construir (api, sqs-consumer, etc.)
+ARG CMD_PATH=cmd/api
+# Nombre del binario de salida
+ARG BIN_NAME=bootstrap
+
+# Compilar para Linux ARM64 (Compatible con AWS Lambda y OrbStack en Mac M1/M2/M3)
+# Desactivamos CGO para binario estático
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /build/${BIN_NAME} ./${CMD_PATH}
+
+# --- Imagen Final (Distroless o Alpine) ---
+# Usamos Alpine para tener shell básica si necesitamos debug en EKS
+FROM alpine:3.19
+
+WORKDIR /app
+
+# Instalar certificados CA para llamadas HTTPS (AWS SDK)
+RUN apk add --no-cache ca-certificates
+
+# Copiar binario
+COPY --from=builder /build/bootstrap /app/bootstrap
+
+# Copiar configuraciones si son necesarias
+COPY --from=builder /app/internal/appconfig/config.yml /app/internal/appconfig/config.yml
+COPY --from=builder /app/internal/appconfig/config.yml /app/config.yml
+
+# Lambda requiere que el entrypoint sea el ejecutable.
+# En EKS, el CMD por defecto ejecutará lo mismo.
+ENTRYPOINT ["/app/bootstrap"]

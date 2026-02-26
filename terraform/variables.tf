@@ -35,6 +35,17 @@ variable "enable_cloudwatch_in_local" {
   default     = false
 }
 
+# Nueva variable para modo de despliegue
+variable "deploy_mode" {
+  description = "Modo de despliegue: 'lambda' (por defecto) o 'eks'"
+  type        = string
+  default     = "lambda"
+  validation {
+    condition     = contains(["lambda", "eks"], var.deploy_mode)
+    error_message = "El modo de despliegue debe ser 'lambda' o 'eks'."
+  }
+}
+
 locals {
   # Nombre base para recursos
   name_prefix = "gofibercore-${var.environment}"
