@@ -16,16 +16,18 @@ resource "aws_sqs_queue" "main_queue" {
 
 # --- TRIGGER: SQS PRINCIPAL -> SQS CONSUMER ---
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  count                   = var.deploy_mode == "lambda" ? 1 : 0
   event_source_arn        = aws_sqs_queue.main_queue.arn
-  function_name           = module.lambda_sqs_consumer.function_name
+  function_name           = module.lambda_sqs_consumer[0].function_name
   batch_size              = 1
   function_response_types = ["ReportBatchItemFailures"]
 }
 
 # --- TRIGGER: DLQ -> DLQ CONSUMER ---
 resource "aws_lambda_event_source_mapping" "dlq_trigger" {
+  count            = var.deploy_mode == "lambda" ? 1 : 0
   event_source_arn = aws_sqs_queue.dlq.arn
-  function_name    = module.lambda_dlq_consumer.function_name
+  function_name    = module.lambda_dlq_consumer[0].function_name
   batch_size       = 1
 }
 
@@ -33,8 +35,9 @@ resource "aws_lambda_event_source_mapping" "dlq_trigger" {
 
 # 1. API: Necesita enviar mensajes a la cola principal para iniciar procesos
 resource "aws_iam_role_policy" "api_send_msg" {
-  name = "api_send_msg_policy"
-  role = module.lambda_api.role_name
+  count = var.deploy_mode == "lambda" ? 1 : 0
+  name  = "api_send_msg_policy"
+  role  = module.lambda_api[0].role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -50,8 +53,9 @@ resource "aws_iam_role_policy" "api_send_msg" {
 
 # 2. SQS Consumer: Necesita auto-invocarse (re-encolar)
 resource "aws_iam_role_policy" "sqs_consumer_send_msg" {
-  name = "sqs_consumer_send_msg_policy"
-  role = module.lambda_sqs_consumer.role_name
+  count = var.deploy_mode == "lambda" ? 1 : 0
+  name  = "sqs_consumer_send_msg_policy"
+  role  = module.lambda_sqs_consumer[0].role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -67,8 +71,9 @@ resource "aws_iam_role_policy" "sqs_consumer_send_msg" {
 
 # 3. Daily Cron: Tarea programada diaria
 resource "aws_iam_role_policy" "daily_cron_send_msg" {
-  name = "daily_cron_send_msg_policy"
-  role = module.lambda_daily_cron.role_name
+  count = var.deploy_mode == "lambda" ? 1 : 0
+  name  = "daily_cron_send_msg_policy"
+  role  = module.lambda_daily_cron[0].role_name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -84,8 +89,9 @@ resource "aws_iam_role_policy" "daily_cron_send_msg" {
 
 # 4. 1min Cron: Tarea programada cada minuto
 resource "aws_iam_role_policy" "every_1min_cron_send_msg" {
-  name = "every_1min_cron_send_msg_policy"
-  role = module.lambda_every_1min_cron.role_name
+  count = var.deploy_mode == "lambda" ? 1 : 0
+  name  = "every_1min_cron_send_msg_policy"
+  role  = module.lambda_every_1min_cron[0].role_name
 
   policy = jsonencode({
     Version = "2012-10-17"

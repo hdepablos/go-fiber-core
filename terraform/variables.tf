@@ -10,8 +10,8 @@ variable "aws_region" {
 }
 
 # --- ESTA ES LA VARIABLE QUE FALTABA ---
-variable "lambda_env_vars" {
-  description = "Mapa de variables de entorno inyectadas desde .tfvars"
+variable "app_env_vars" {
+  description = "Mapa de variables de entorno de la aplicación (común para Lambda y EKS)"
   type        = map(string)
   default     = {}
 }
@@ -44,6 +44,12 @@ variable "deploy_mode" {
     condition     = contains(["lambda", "eks"], var.deploy_mode)
     error_message = "El modo de despliegue debe ser 'lambda' o 'eks'."
   }
+}
+
+variable "kube_context" {
+  description = "Contexto de Kubernetes a usar (por defecto 'orbstack' en local)"
+  type        = string
+  default     = "orbstack"
 }
 
 locals {

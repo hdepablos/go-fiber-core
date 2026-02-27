@@ -50,12 +50,12 @@ provider "aws" {
 
 provider "helm" {
   kubernetes {
-    config_path = "~/.kube/config"
-    config_context = var.environment == "local" ? "orbstack" : null
+    config_path    = "~/.kube/config"
+    config_context = var.environment == "local" ? var.kube_context : null
   }
 }
 
 provider "kubernetes" {
-  config_path = "~/.kube/config"
-  config_context = var.environment == "local" ? "orbstack" : null
+  config_path    = "~/.kube/config"
+  config_context = var.environment == "local" ? var.kube_context : null
 }

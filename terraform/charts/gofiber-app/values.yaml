@@ -9,6 +9,7 @@ image:
   tag: ""
 
 service:
+  enabled: false
   type: ClusterIP
   port: 80
   targetPort: 3000
@@ -36,3 +37,7 @@ autoscaling:
     #     queueLength: "5"
     #     awsRegion: "us-east-1"
     #     identityOwner: operator
+
+cronjob:
+  enabled: false
+  schedule: "*/1 * * * *"

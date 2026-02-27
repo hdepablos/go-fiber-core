@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../api
+  - ../../sqs-consumer
+
+# En prod, usamos más réplicas y variables reales (inyectadas por Secrets, aquí simuladas)
+patches:
+  - target:
+      kind: Deployment
+      name: api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value # APP_ENV
+        value: "prod"
+
+  - target:
+      kind: Deployment
+      name: sqs-consumer
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+# En prod, estos secretos vendrían de Vault/AWS Secrets Manager, pero aquí dejamos un placeholder
+secretGenerator:
+  - name: aws-secrets
+    literals:
+      - AWS_ACCESS_KEY_ID=prod-key
+      - AWS_SECRET_ACCESS_KEY=prod-secret
+    options:
+      disableNameSuffixHash: true

@@ -3,22 +3,31 @@ package auth
 import (
 	"fmt"
 	"go-fiber-core/internal/dtos/config"
+	"os"
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
-// tokenService es la implementación de la interfaz TokenService.
-type tokenService struct {
+// NewTokenService crea una nueva instancia de TokenService.
+// Decide qué implementación usar basándose en la configuración (Local vs Cognito).
+func NewTokenService(cfg *config.AppConfig) TokenService {
+	// Ejemplo de lógica de selección:
+	// Si AUTH_PROVIDER == "cognito", retornamos la implementación de Cognito.
+	if os.Getenv("AUTH_PROVIDER") == "cognito" {
+		return NewCognitoTokenService(cfg)
+	}
+
+	// Por defecto, usamos la implementación local (HMAC)
+	return &localTokenService{cfg: cfg.JWTConfig}
+}
+
+// localTokenService es la implementación LOCAL (HMAC) de TokenService.
+type localTokenService struct {
 	cfg config.JWTConfig
 }
 
-// NewTokenService crea una nueva instancia de TokenService.
-func NewTokenService(cfg *config.AppConfig) TokenService {
-	return &tokenService{cfg: cfg.JWTConfig}
-}
-
-func (s *tokenService) GenerateTokens(userID, sessionID string) (string, string, error) {
+func (s *localTokenService) GenerateTokens(userID, sessionID string) (string, string, error) {
 	accessTTL := time.Minute * time.Duration(s.cfg.JwtAccessTtlMinutes)
 	accessToken, err := s.createToken(userID, sessionID, accessTTL, s.cfg.JwtAccessSecret, "access")
 	if err != nil {
@@ -34,7 +43,7 @@ func (s *tokenService) GenerateTokens(userID, sessionID string) (string, string,
 	return accessToken, refreshToken, nil
 }
 
-func (s *tokenService) createToken(userID, sessionID string, ttl time.Duration, secret, tokenType string) (string, error) {
+func (s *localTokenService) createToken(userID, sessionID string, ttl time.Duration, secret, tokenType string) (string, error) {
 	if secret == "" {
 		return "", fmt.Errorf("el secreto JWT para '%s' no está configurado", tokenType)
 	}
@@ -49,7 +58,7 @@ func (s *tokenService) createToken(userID, sessionID string, ttl time.Duration, 
 	return token.SignedString([]byte(secret))
 }
 
-func (s *tokenService) ValidateToken(tokenString string) (*jwt.Token, error) {
+func (s *localTokenService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	parser := jwt.Parser{}
 	token, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
@@ -75,7 +84,7 @@ func (s *tokenService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	})
 }
 
-func (s *tokenService) getSecret(tokenType string) (string, error) {
+func (s *localTokenService) getSecret(tokenType string) (string, error) {
 	if tokenType == "access" {
 		return s.cfg.JwtAccessSecret, nil
 	}

@@ -82,5 +82,67 @@ func min(a, b int) int {
 }
 
 func main() {
-	lambda.Start(Handler)
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		lambda.Start(Handler)
+	} else {
+		runPollingLoop()
+	}
+}
+
+func runPollingLoop() {
+	slog.Info("🚀 Iniciando DLQ Consumer en modo POLLING (EKS/Local)...")
+	ctx := context.Background()
+
+	// Validar que tengamos QueueService
+	if appContainer.QueueService == nil {
+		slog.Error("❌ QueueService no inicializado")
+		os.Exit(1)
+	}
+
+	for {
+		// 1. Recibir mensajes (Long Polling de 20s ya configurado en sqs_service.go)
+		// Pedimos máximo 10 mensajes por lote
+		messages, err := appContainer.QueueService.ReceiveMessages(ctx, 10)
+		if err != nil {
+			slog.Error("❌ Error recibiendo mensajes de DLQ", "error", err)
+			continue
+		}
+
+		if len(messages) == 0 {
+			continue
+		}
+
+		// 2. Procesar cada mensaje
+		for _, msg := range messages {
+			// Convertir types.Message (AWS SDK v2) a events.SQSMessage (AWS Lambda Events)
+			lambdaMsg := events.SQSMessage{
+				MessageId:     *msg.MessageId,
+				ReceiptHandle: *msg.ReceiptHandle,
+				Body:          *msg.Body,
+			}
+
+			// Nota: processMessage devuelve events.SQSEventResponse (con BatchItemFailures)
+			// pero aquí procesamos uno a uno.
+			// Si falla, NO borramos el mensaje para que vuelva a la cola (reintento).
+			// PERO processMessage en este archivo devuelve 'nil' error si falla,
+			// y retorna BatchItemFailures. Tenemos que adaptar eso.
+
+			// Vamos a refactorizar processMessage para que devuelva error si falla el procesamiento individual
+			// O mejor, extraemos la lógica de procesamiento real.
+			// Pero processMessage llama a processMessage interno (line 59).
+			// La funcion processMessage en linea 59 devuelve error.
+
+			err := processMessage(ctx, lambdaMsg)
+			if err != nil {
+				slog.Error("❌ Error procesando mensaje DLQ en modo polling", "id", lambdaMsg.MessageId, "error", err)
+				// No borramos -> Reintento
+				continue
+			}
+
+			// 3. Borrar mensaje exitoso
+			if err := appContainer.QueueService.DeleteMessage(ctx, lambdaMsg.ReceiptHandle); err != nil {
+				slog.Error("⚠️ Error borrando mensaje procesado de DLQ", "id", lambdaMsg.MessageId, "error", err)
+			}
+		}
+	}
 }

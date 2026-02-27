@@ -28,7 +28,7 @@ import (
 )
 
 // authService es la implementación de la interfaz AuthService.
-type authService struct {
+type localAuthService struct {
 	services.TransactionManager
 	userReader       userRepo.UserReader
 	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository
@@ -38,6 +38,7 @@ type authService struct {
 }
 
 // NewAuthService crea una nueva instancia del servicio de autenticación.
+// Decide qué implementación usar basándose en la configuración (Local vs Cognito).
 func NewAuthService(
 	userReader userRepo.UserReader,
 	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository,
@@ -46,7 +47,12 @@ func NewAuthService(
 	menuReader menuService.MenuReaderService,
 	connect *connect.ConnectDTO,
 ) AuthService {
-	return &authService{
+	// Si AUTH_PROVIDER == "cognito", retornamos la implementación de Cognito.
+	if os.Getenv("AUTH_PROVIDER") == "cognito" {
+		return NewCognitoAuthService()
+	}
+
+	return &localAuthService{
 		TransactionManager: services.NewTransactionManager(connect),
 		userReader:         userReader,
 		refreshTokenRepo:   refreshTokenRepo,
@@ -56,10 +62,20 @@ func NewAuthService(
 	}
 }
 
+// localAuthService es la implementación LOCAL (Base de datos + JWT) de AuthService.
+type localAuthService struct {
+	services.TransactionManager
+	userReader       userRepo.UserReader
+	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository
+	sessionRepo      sessionRepo.SessionRepository
+	tokenService     TokenService
+	menuReader       menuService.MenuReaderService
+}
+
 // ────────────────────────────────────────────────
 // LOGIN
 // ────────────────────────────────────────────────
-func (s *authService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP string) (*responses.LoginResponse, error) {
+func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP string) (*responses.LoginResponse, error) {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 
 	// 1️⃣ Buscar usuario por email, incluyendo Roles
@@ -150,7 +166,7 @@ func (s *authService) Login(ctx context.Context, req requests.LoginRequest, user
 // ────────────────────────────────────────────────
 // REFRESH TOKEN
 // ────────────────────────────────────────────────
-func (s *authService) Refresh(ctx context.Context, refreshTokenString string) (string, string, error) {
+func (s *localAuthService) Refresh(ctx context.Context, refreshTokenString string) (string, string, error) {
 	// 1. Validar Token Criptográficamente
 	token, err := s.tokenService.ValidateToken(refreshTokenString)
 	if err != nil || !token.Valid {
@@ -250,7 +266,7 @@ func (s *authService) Refresh(ctx context.Context, refreshTokenString string) (s
 // ────────────────────────────────────────────────
 // LOGOUT
 // ────────────────────────────────────────────────
-func (s *authService) Logout(ctx context.Context, userID uint64) error {
+func (s *localAuthService) Logout(ctx context.Context, userID uint64) error {
 	// 1. Revocar sesiones (DB + Redis Blacklist)
 	if err := s.RevokeUserSessions(ctx, userID); err != nil {
 		return err
@@ -271,7 +287,7 @@ func (s *authService) Logout(ctx context.Context, userID uint64) error {
 // ────────────────────────────────────────────────
 // REVOKE SESSION (ADMIN / IMMEDIATE)
 // ────────────────────────────────────────────────
-func (s *authService) RevokeSession(ctx context.Context, sessionIDStr string) error {
+func (s *localAuthService) RevokeSession(ctx context.Context, sessionID string) error {
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		return domain.ErrInvalidArgument
@@ -311,7 +327,7 @@ func (s *authService) RevokeSession(ctx context.Context, sessionIDStr string) er
 	return nil
 }
 
-func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) error {
+func (s *localAuthService) RevokeUserSessions(ctx context.Context, userID uint64) error {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
 	redisClient := s.TransactionManager.Conn.ConnectRedis
@@ -341,7 +357,7 @@ func (s *authService) RevokeUserSessions(ctx context.Context, userID uint64) err
 	return s.sessionRepo.RevokeAllByUserID(ctx, dbWrite, userID)
 }
 
-func (s *authService) RevokeAllSessions(ctx context.Context) error {
+func (s *localAuthService) RevokeAllSessions(ctx context.Context) error {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
 	redisClient := s.TransactionManager.Conn.ConnectRedis
@@ -377,7 +393,7 @@ func (s *authService) RevokeAllSessions(ctx context.Context) error {
 // ────────────────────────────────────────────────
 // GET ACTIVE SESSIONS PAGINATED
 // ────────────────────────────────────────────────
-func (s *authService) GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error) {
+func (s *localAuthService) GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error) {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 	return s.sessionRepo.GetActiveSessionsPaginated(ctx, dbRead, req)
 }

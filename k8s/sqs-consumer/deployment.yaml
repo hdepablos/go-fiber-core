@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: sqs-consumer
-          image: sqs-consumer:local
-          imagePullPolicy: Never # IMPORTANTE: Usa la imagen local de OrbStack
+          image: sqs-consumer
+          imagePullPolicy: IfNotPresent # IMPORTANTE: Usa la imagen local de OrbStack
           resources:
             limits:
               memory: "128Mi"
@@ -82,6 +82,44 @@ spec:
               value: "postgres"
             - name: GORM_READ_DBNAME
               value: "go_fiber_core"
+
+            # PGX Writer
+            - name: PGX_WRITE_HOST
+              value: "host.docker.internal"
+            - name: PGX_WRITE_PORT
+              value: "5432"
+            - name: PGX_WRITE_USER
+              value: "postgres"
+            - name: PGX_WRITE_PASSWORD
+              value: "postgres"
+            - name: PGX_WRITE_DBNAME
+              value: "go_fiber_core"
+            - name: PGX_WRITE_MAX_CONNS
+              value: "15"
+
+            # PGX Reader
+            - name: PGX_READ_HOST
+              value: "host.docker.internal"
+            - name: PGX_READ_PORT
+              value: "5432"
+            - name: PGX_READ_USER
+              value: "postgres"
+            - name: PGX_READ_PASSWORD
+              value: "postgres"
+            - name: PGX_READ_DBNAME
+              value: "go_fiber_core"
+            - name: PGX_READ_MAX_CONNS
+              value: "15"
+
+            # JWT
+            - name: JWT_ACCESS_TTL_MINUTES
+              value: "15m"
+            - name: JWT_REFRESH_TTL_DAYS
+              value: "720h"
+            - name: JWT_ACCESS_SECRET
+              value: "test-secret"
+            - name: JWT_REFRESH_SECRET
+              value: "test-secret"
             - name: GORM_READ_SCHEMA
               value: "public"
             - name: GORM_READ_MAX_OPEN_CONNS

@@ -1,10 +1,13 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"go-fiber-core/internal/appconfig"
 
 	"github.com/spf13/viper"
 )
@@ -101,7 +104,24 @@ type ApiConfig struct {
 // --- 2. LÓGICA DE CARGA DE CONFIGURACIÓN ---
 
 // NewAppConfig carga y retorna la configuración de la aplicación.
+// Soporta múltiples proveedores de secretos (Env, AWS) seleccionados dinámicamente.
 func NewAppConfig(configPath string) (*AppConfig, error) {
+	// 1. Determinar el proveedor de secretos
+	var provider appconfig.SecretProvider
+	ctx := context.Background()
+
+	// Si SECRET_PROVIDER == "aws", usamos Secrets Manager.
+	// De lo contrario, usamos variables de entorno por defecto.
+	if os.Getenv("SECRET_PROVIDER") == "aws" {
+		awsProvider, err := appconfig.NewAWSSecretProvider(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("fallo al inicializar AWS Secret Provider: %w", err)
+		}
+		provider = awsProvider
+	} else {
+		provider = appconfig.NewEnvSecretProvider()
+	}
+
 	v := viper.New()
 
 	// 🔴 ESTO TIENE QUE IR ANTES
@@ -118,11 +138,31 @@ func NewAppConfig(configPath string) (*AppConfig, error) {
 		)
 	}
 
-	// Expandir variables de entorno (${VAR})
+	// Expandir variables usando el Provider seleccionado
+	// Viper soporta os.ExpandEnv nativamente, pero para soportar AWS necesitamos
+	// iterar manualmente o usar una función personalizada de expansión.
+	// Aquí usaremos una estrategia híbrida: Viper carga la estructura base,
+	// y luego sobreescribimos valores sensibles si es necesario.
+	//
+	// Nota: Para simplificar esta implementación inicial, mantenemos la expansión de os.ExpandEnv
+	// para el caso local, y en el futuro se puede extender para llamar a provider.GetSecret()
+	// en claves específicas marcadas (ej: "aws:secret:prod/db/password").
+	
+	// Implementación simple de expansión de variables de entorno (compatible con EnvProvider)
 	for _, key := range v.AllKeys() {
 		value := v.GetString(key)
 		if strings.Contains(value, "${") {
-			v.Set(key, os.ExpandEnv(value))
+			// Expandir usando os.Expand, pero con nuestro provider
+			expanded := os.Expand(value, func(envKey string) string {
+				val, err := provider.GetSecret(ctx, envKey)
+				if err != nil {
+					// Loggear error si es crítico, o retornar vacío
+					fmt.Printf("⚠️ Error obteniendo secreto %s: %v\n", envKey, err)
+					return ""
+				}
+				return val
+			})
+			v.Set(key, expanded)
 		}
 	}
 

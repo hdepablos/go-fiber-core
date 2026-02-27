@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -25,6 +26,19 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fallo al cargar la configuración de AWS: %w", err)
+	}
+
+	// DEBUG: Imprimir configuración cargada para verificar entorno
+	fmt.Printf("AWS Config Loaded - Region: %s, Endpoint: %s\n", cfg.Region, os.Getenv("AWS_ENDPOINT_URL"))
+
+	// Si hay una URL de endpoint personalizada en el entorno (ej: LocalStack), asegurar que se use.
+	// Aunque el SDK v2 moderno soporta AWS_ENDPOINT_URL, a veces es necesario ser explícito con el BaseEndpoint
+	// si la versión del SDK es antigua o hay comportamientos específicos.
+	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+		fmt.Printf("⚠️ Usando Custom Endpoint: %s\n", endpoint)
+		// Forzamos el BaseEndpoint en la configuración si no se cargó automáticamente
+		// Nota: En versiones muy recientes de AWS SDK Go V2, esto es automático, pero esto asegura compatibilidad.
+		cfg.BaseEndpoint = aws.String(endpoint)
 	}
 
 	return &AWSService{

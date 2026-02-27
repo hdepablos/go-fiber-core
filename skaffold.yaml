@@ -1,0 +1,24 @@
+apiVersion: skaffold/v4beta1
+kind: Config
+metadata:
+  name: go-fiber-core
+build:
+  artifacts:
+    - image: api
+      docker:
+        dockerfile: dockerfiles/Dockerfile.universal
+        buildArgs:
+          CMD_PATH: cmd/api
+    - image: sqs-consumer
+      docker:
+        dockerfile: dockerfiles/Dockerfile.universal
+        buildArgs:
+          CMD_PATH: cmd/sqs-consumer
+  local:
+    push: false # Importante para local cluster (OrbStack/Kind/K3d)
+manifests:
+  kustomize:
+    paths:
+      - k8s/overlays/local
+deploy:
+  kubectl: {}

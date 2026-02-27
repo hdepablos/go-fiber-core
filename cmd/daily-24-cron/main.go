@@ -60,5 +60,17 @@ func handleRequest(ctx context.Context, event events.CloudWatchEvent) error {
 }
 
 func main() {
-	lambda.Start(handleRequest)
+	if os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" {
+		lambda.Start(handleRequest)
+	} else {
+		// Modo CLI / K8s CronJob
+		err := handleRequest(context.Background(), events.CloudWatchEvent{
+			ID:     "cli-invocation",
+			Source: "k8s-cronjob",
+		})
+		if err != nil {
+			slog.Error("❌ Error executing cron", "error", err)
+			os.Exit(1)
+		}
+	}
 }

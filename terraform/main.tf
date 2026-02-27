@@ -1,3 +1,17 @@
+locals {
+  eks_env_overrides = {
+      GORM_WRITE_HOST       = "host.docker.internal"
+      GORM_READ_HOST        = "host.docker.internal"
+      PGX_WRITE_HOST        = "host.docker.internal"
+      PGX_READ_HOST         = "host.docker.internal"
+      REDIS_HOST            = "host.docker.internal"
+      AWS_ACCESS_KEY_ID     = "test"
+      AWS_SECRET_ACCESS_KEY = "test"
+      AWS_REGION            = "us-east-1"
+      AWS_ENDPOINT_URL      = "http://host.docker.internal:4566"
+    }
+}
+
 # ==============================================================================
 # 1. Lambdas (Usando el módulo reutilizable)
 # ==============================================================================
@@ -13,7 +27,7 @@ module "lambda_api" {
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-  environment_variables = merge(var.lambda_env_vars, {
+  environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
@@ -44,7 +58,7 @@ module "lambda_dlq_consumer" {
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-  environment_variables = var.lambda_env_vars
+  environment_variables = var.app_env_vars
 }
 
 module "lambda_daily_cron" {
@@ -93,10 +107,10 @@ resource "helm_release" "sqs_consumer" {
       image = {
         repository = "sqs-consumer"
         tag        = "local"
-        pullPolicy = "Never" # Usa la imagen local de OrbStack
+        pullPolicy = "Never"
       }
-      env = merge(var.lambda_env_vars, {
-        SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
+      env = merge(var.app_env_vars, local.eks_env_overrides, {
+        SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
       autoscaling = {
         enabled         = true
@@ -118,149 +132,116 @@ resource "helm_release" "sqs_consumer" {
   ]
 }
 
-# ==============================================================================
-# 3. Otros Recursos (SQS, API Gateway, Events)
-# ==============================================================================
+resource "helm_release" "api" {
+  count      = var.deploy_mode == "eks" ? 1 : 0
+  name       = "api"
+  chart      = "${path.module}/charts/gofiber-app"
+  namespace  = "default"
+  version    = "0.1.0"
 
-# Aquí Terraform buscará los archivos api_gateway.tf, sqs.tf y events.tf
-# en la misma carpeta y los combinará automáticamente al hacer el apply.
-
-# ==============================================================================
-# 4. CloudWatch Log Metric Filters & Alarms for Slow SQL
-#    (Solo se crean si las Lambdas existen, es decir en modo lambda)
-# ==============================================================================
-
-resource "aws_cloudwatch_log_metric_filter" "slow_sql_api" {
-  count          = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  name           = "${local.name_prefix}-slow-sql-api"
-  log_group_name = module.lambda_api[0].log_group_name
-  pattern        = "SLOW SQL"
-
-  metric_transformation {
-    name      = "SlowSQLCount"
-    namespace = var.slow_sql_metric_namespace
-    value     = "1"
-  }
+  values = [
+    yamlencode({
+      image = {
+        repository = "api"
+        tag        = "local"
+        pullPolicy = "Never"
+      }
+      service = {
+        enabled    = true
+        type       = "LoadBalancer"
+        port       = 80
+        targetPort = 3000
+      }
+      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+        SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
+      })
+    })
+  ]
 }
 
-resource "aws_cloudwatch_metric_alarm" "slow_sql_api" {
-  count               = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  alarm_name          = "${local.name_prefix}-slow-sql-api"
-  alarm_description   = "Detecta consultas lentas (SLOW SQL) en la API"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
-  metric_name         = "SlowSQLCount"
-  namespace           = var.slow_sql_metric_namespace
-  period              = var.slow_sql_alarm_period
-  statistic           = "Sum"
-  threshold           = var.slow_sql_alarm_threshold
-  treat_missing_data  = "notBreaching"
+resource "helm_release" "dlq_consumer" {
+  count      = var.deploy_mode == "eks" ? 1 : 0
+  name       = "dlq-consumer"
+  chart      = "${path.module}/charts/gofiber-app"
+  namespace  = "default"
+  version    = "0.1.0"
+
+  values = [
+    yamlencode({
+      image = {
+        repository = "dlq-consumer"
+        tag        = "local"
+        pullPolicy = "Never"
+      }
+      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+        SQS_QUEUE_URL = replace(aws_sqs_queue.dlq.url, "localhost", "host.docker.internal")
+      })
+      autoscaling = {
+        enabled         = true
+        minReplicaCount = 1
+        maxReplicaCount = 5
+        triggers = [
+          {
+            type = "aws-sqs-queue"
+            metadata = {
+              queueURL      = aws_sqs_queue.dlq.url
+              queueLength   = "5"
+              awsRegion     = var.aws_region
+              identityOwner = "operator"
+            }
+          }
+        ]
+      }
+    })
+  ]
 }
 
-resource "aws_cloudwatch_log_metric_filter" "slow_sql_sqs" {
-  count          = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  name           = "${local.name_prefix}-slow-sql-sqs-consumer"
-  log_group_name = module.lambda_sqs_consumer[0].log_group_name
-  pattern        = "SLOW SQL"
+resource "helm_release" "every_1min_cron" {
+  count      = var.deploy_mode == "eks" ? 1 : 0
+  name       = "every-1min-cron"
+  chart      = "${path.module}/charts/gofiber-app"
+  namespace  = "default"
+  version    = "0.1.0"
 
-  metric_transformation {
-    name      = "SlowSQLCount"
-    namespace = var.slow_sql_metric_namespace
-    value     = "1"
-  }
+  values = [
+    yamlencode({
+      image = {
+        repository = "every-1min-cron"
+        tag        = "local"
+        pullPolicy = "Never"
+      }
+      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+        SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
+      })
+      cronjob = {
+        enabled  = true
+        schedule = "*/1 * * * *"
+      }
+    })
+  ]
 }
 
-resource "aws_cloudwatch_metric_alarm" "slow_sql_sqs" {
-  count               = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  alarm_name          = "${local.name_prefix}-slow-sql-sqs-consumer"
-  alarm_description   = "Detecta consultas lentas (SLOW SQL) en el SQS Consumer"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
-  metric_name         = "SlowSQLCount"
-  namespace           = var.slow_sql_metric_namespace
-  period              = var.slow_sql_alarm_period
-  statistic           = "Sum"
-  threshold           = var.slow_sql_alarm_threshold
-  treat_missing_data  = "notBreaching"
-}
+resource "helm_release" "daily_cron" {
+  count      = var.deploy_mode == "eks" ? 1 : 0
+  name       = "daily-cron"
+  chart      = "${path.module}/charts/gofiber-app"
+  namespace  = "default"
+  version    = "0.1.0"
 
-resource "aws_cloudwatch_log_metric_filter" "slow_sql_dlq" {
-  count          = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  name           = "${local.name_prefix}-slow-sql-dlq-consumer"
-  log_group_name = module.lambda_dlq_consumer[0].log_group_name
-  pattern        = "SLOW SQL"
-
-  metric_transformation {
-    name      = "SlowSQLCount"
-    namespace = var.slow_sql_metric_namespace
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "slow_sql_dlq" {
-  count               = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  alarm_name          = "${local.name_prefix}-slow-sql-dlq-consumer"
-  alarm_description   = "Detecta consultas lentas (SLOW SQL) en el DLQ Consumer"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
-  metric_name         = "SlowSQLCount"
-  namespace           = var.slow_sql_metric_namespace
-  period              = var.slow_sql_alarm_period
-  statistic           = "Sum"
-  threshold           = var.slow_sql_alarm_threshold
-  treat_missing_data  = "notBreaching"
-}
-
-resource "aws_cloudwatch_log_metric_filter" "slow_sql_daily" {
-  count          = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  name           = "${local.name_prefix}-slow-sql-daily-cron"
-  log_group_name = module.lambda_daily_cron[0].log_group_name
-  pattern        = "SLOW SQL"
-
-  metric_transformation {
-    name      = "SlowSQLCount"
-    namespace = var.slow_sql_metric_namespace
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "slow_sql_daily" {
-  count               = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  alarm_name          = "${local.name_prefix}-slow-sql-daily-cron"
-  alarm_description   = "Detecta consultas lentas (SLOW SQL) en el Daily Cron"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
-  metric_name         = "SlowSQLCount"
-  namespace           = var.slow_sql_metric_namespace
-  period              = var.slow_sql_alarm_period
-  statistic           = "Sum"
-  threshold           = var.slow_sql_alarm_threshold
-  treat_missing_data  = "notBreaching"
-}
-
-resource "aws_cloudwatch_log_metric_filter" "slow_sql_1min" {
-  count          = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  name           = "${local.name_prefix}-slow-sql-1min-cron"
-  log_group_name = module.lambda_every_1min_cron[0].log_group_name
-  pattern        = "SLOW SQL"
-
-  metric_transformation {
-    name      = "SlowSQLCount"
-    namespace = var.slow_sql_metric_namespace
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "slow_sql_1min" {
-  count               = (var.slow_sql_alarm_enabled && var.deploy_mode == "lambda") ? 1 : 0
-  alarm_name          = "${local.name_prefix}-slow-sql-1min-cron"
-  alarm_description   = "Detecta consultas lentas (SLOW SQL) en el 1min Cron"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
-  metric_name         = "SlowSQLCount"
-  namespace           = var.slow_sql_metric_namespace
-  period              = var.slow_sql_alarm_period
-  statistic           = "Sum"
-  threshold           = var.slow_sql_alarm_threshold
-  treat_missing_data  = "notBreaching"
+  values = [
+    yamlencode({
+      image = {
+        repository = "daily-24-cron"
+        tag        = "local"
+        pullPolicy = "Never"
+      }
+      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+        SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
+      })
+      cronjob = {
+        enabled  = true
+        schedule = "0 0 * * *"
+      }
+    })
+  ]
 }

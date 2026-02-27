@@ -3,7 +3,7 @@ aws_region  = "us-east-1"
 project_name = "GoFiberCore"
 
 
-lambda_env_vars = {
+app_env_vars = {
   APP_ENV              = "local"
   PROJECT_SLUG         = "go-fiber-core"
   APP_NAME             = "go-fiber-core"
