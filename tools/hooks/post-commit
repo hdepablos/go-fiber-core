@@ -1,0 +1,58 @@
+#!/bin/bash
+# .git/hooks/post-commit
+
+# 1. Check if we are in a rebase/merge (optional, but good practice)
+# If .git/rebase-merge exists, skip
+if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
+    exit 0
+fi
+
+# 2. Detect Mode (Lambda vs EKS)
+# We look for a .deploy_mode file or check .env, or default to lambda.
+# Let's assume the user uses the same mechanism as the Makefile: looking at .env or a specific file.
+# For simplicity, let's default to checking .env for DEPLOY_MODE, or just check if "make watch-lambda" was run last?
+# Actually, the user wants to simulate the CI/CD environment variable "DEPLOY_MODE".
+# We can read it from .env if it exists, otherwise default to "lambda".
+
+DEPLOY_MODE="lambda"
+if [ -f .env ]; then
+    # Try to grep DEPLOY_MODE from .env
+    MODE_FROM_ENV=$(grep "^DEPLOY_MODE=" .env | cut -d '=' -f2)
+    if [ ! -z "$MODE_FROM_ENV" ]; then
+        DEPLOY_MODE=$MODE_FROM_ENV
+    fi
+fi
+
+echo "🤖 [Post-Commit Hook] Detectado DEPLOY_MODE=${DEPLOY_MODE}"
+
+# 3. Execute the appropriate Make command in the background (detached)
+# We use nohup to ensure it keeps running even if the git command finishes quickly.
+# But for a local simulation, we might want to see the output.
+# The user said "mandaba a actualizar", implying it happens automatically.
+# We will run it in the foreground for now so the user sees the deployment happening, 
+# or we can spawn a new terminal? 
+# Git hooks run in the same terminal as 'git commit'.
+# Blocking the commit command for deployment might be annoying if it takes long.
+# However, "simulating CI/CD" implies we wait for the build/deploy to know if it passed.
+# So blocking is actually correct for a strict simulation.
+
+echo "🚀 [Post-Commit Hook] Iniciando despliegue automático..."
+
+if [ "$DEPLOY_MODE" = "eks" ]; then
+    # EKS Flow
+    echo "☸️  Actualizando entorno EKS..."
+    # We use a specific target that does build + deploy without re-creating everything if possible
+    # "make watch-eks" does everything.
+    # Let's use "make build-all-images" and "make infra-deploy MODE=eks"
+    make build-all-images > /dev/null 2>&1
+    make infra-deploy MODE=eks > /dev/null 2>&1
+    echo "✅ Entorno EKS actualizado."
+else
+    # Lambda Flow (Default)
+    echo "⚡ Actualizando entorno Lambda..."
+    # "make fast-deploy-all" is the fastest way for code updates
+    make fast-deploy-all
+    echo "✅ Entorno Lambda actualizado."
+fi
+
+echo "🎉 [Post-Commit Hook] Despliegue completado."

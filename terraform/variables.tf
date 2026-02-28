@@ -52,13 +52,7 @@ variable "kube_context" {
   default     = "orbstack"
 }
 
-locals {
-  # Nombre base para recursos
-  name_prefix = "gofibercore-${var.environment}"
 
-  # Ruta de los zips (relativa a la carpeta terraform/)
-  zip_path = "../sam-compile"
-}
 
 variable "slow_sql_alarm_enabled" {
   description = "Habilita creación de Metric Filters y Alarms para 'SLOW SQL' en CloudWatch"

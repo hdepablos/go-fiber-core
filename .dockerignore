@@ -1,0 +1,12 @@
+vendor
+.git
+.idea
+.vscode
+build
+bin
+*.zip
+terraform/.terraform
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+localstack-data
+*.log

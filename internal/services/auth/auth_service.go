@@ -62,16 +62,6 @@ func NewAuthService(
 	}
 }
 
-// localAuthService es la implementación LOCAL (Base de datos + JWT) de AuthService.
-type localAuthService struct {
-	services.TransactionManager
-	userReader       userRepo.UserReader
-	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository
-	sessionRepo      sessionRepo.SessionRepository
-	tokenService     TokenService
-	menuReader       menuService.MenuReaderService
-}
-
 // ────────────────────────────────────────────────
 // LOGIN
 // ────────────────────────────────────────────────
@@ -287,7 +277,7 @@ func (s *localAuthService) Logout(ctx context.Context, userID uint64) error {
 // ────────────────────────────────────────────────
 // REVOKE SESSION (ADMIN / IMMEDIATE)
 // ────────────────────────────────────────────────
-func (s *localAuthService) RevokeSession(ctx context.Context, sessionID string) error {
+func (s *localAuthService) RevokeSession(ctx context.Context, sessionIDStr string) error {
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		return domain.ErrInvalidArgument
@@ -315,7 +305,7 @@ func (s *localAuthService) RevokeSession(ctx context.Context, sessionID string) 
 		if projectPrefix == "" {
 			projectPrefix = "go-fiber-core"
 		}
-		key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sessionID)
+		key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sessionID.String())
 		
 		lockService := cache.NewRedisLockService(redisClient)
 		if err := lockService.Set(ctx, key, "revoked", ttl); err != nil {

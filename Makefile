@@ -38,7 +38,15 @@ SQS_DLQ_URL=${LOCALSTACK_ENDPOINT_BASE}/000000000000/${SQS_DLQ_NAME}
 FUNCTION_NAME_SQS_CONSUMER=${PROJECT_NAME_PASCAL}SqsConsumer
 # Variables de Terraform
 TF_DIR := ./terraform
-TF_VARS := local.tfvars
+TF_VARS := generated.tfvars.json
+
+.PHONY: generate-tfvars
+generate-tfvars: ## 🔄 Genera variables de Terraform dinámicamente según el modo (lambda/eks). Uso: make generate-tfvars MODE=lambda ENV_FILE=.env ENVIRONMENT=local
+	@ENV_FILE=$${ENV_FILE:-.env}; \
+	ENVIRONMENT=$${ENVIRONMENT:-local}; \
+	echo "$(INFO)🔄 Generando variables de Terraform para modo: $(MODE) (Env: $$ENVIRONMENT, File: $$ENV_FILE)...$(RESET)"; \
+	cd tools/env-manager && go run main.go -mode=$(MODE) -env=../../$$ENV_FILE -output=../../terraform/$(TF_VARS) -environment=$$ENVIRONMENT
+
 
 ifeq ($(APP_ENV),local)
     SAM_ENDPOINT_ARG=--endpoint-url $(LOCALSTACK_ENDPOINT_BASE)
@@ -462,12 +470,15 @@ update-url-all: ## ✏️✏️ Sincroniza la URL en .env y Bruno. Uso: make upd
 	@$(MAKE) update-bruno-url-base
 
 .PHONY: watch-lambda
-watch-lambda: check-env infra-up fast-deploy-all infra-deploy update-bruno ## 🚀👀 Actualiza código, infraestructura y bruno (sin bloquear). Uso: make watch-lambda
+watch-lambda: check-env infra-up ## 🚀👀 Actualiza código, infraestructura y bruno (sin bloquear). Uso: make watch-lambda
+	@$(MAKE) fast-deploy-all
+	@$(MAKE) infra-deploy MODE=lambda
+	@$(MAKE) update-bruno-lambda
 	@echo "$(INFO)📺 Ejecuta 'make logs-all' si quieres Observar los logs de las funciones$(RESET)"
 
-.PHONY: update-bruno
-update-bruno: ## 🦁 Actualiza la URL de la API en Bruno. Uso: make update-bruno
-	@echo "$(INFO)🔄 Actualizando URL en Bruno...$(RESET)"
+.PHONY: update-bruno-lambda
+update-bruno-lambda: ## 🦁 Actualiza la URL de la API en Bruno (Lambda). Uso: make update-bruno-lambda
+	@echo "$(INFO)🔄 Actualizando URL en Bruno (Lambda)...$(RESET)"
 	@API_ID=$$(awslocal apigateway get-rest-apis --query "items[0].id" --output text); \
 	if [ -z "$$API_ID" ] || [ "$$API_ID" = "None" ]; then \
 		echo "$(ERROR)❌ No se encontró API Gateway ID.$(RESET)"; \
@@ -475,6 +486,10 @@ update-bruno: ## 🦁 Actualiza la URL de la API en Bruno. Uso: make update-brun
 		sed -i '' "s|urlBase: http://localhost:4566/restapis/[a-z0-9]*/Prod/_user_request_/|urlBase: http://localhost:4566/restapis/$$API_ID/Prod/_user_request_/|g" bruno/environments/lambda.bru; \
 		echo "$(SUCCESS)✅ Bruno actualizado con API ID: $$API_ID$(RESET)"; \
 	fi
+
+.PHONY: update-bruno
+update-bruno: update-bruno-lambda ## 🦁 Alias para update-bruno-lambda.
+
 
 
 .PHONY: write-api-base
@@ -566,10 +581,12 @@ deploy: infra-init ## ⚡ Compila y actualiza una sola función (Uso: make deplo
 
 .PHONY: infra-init
 infra-init: ## 🏁 Inicializa Terraform/LocalStack. Uso: make infra-init
-	@cd $(TF_DIR) && tflocal init
+	@echo "$(INFO)🚀 Inicializando Terraform con Backend S3 (LocalStack)...$(RESET)"
+	@cd $(TF_DIR) && tflocal init -backend-config=backend.local.conf -reconfigure
 
 .PHONY: infra-deploy
-infra-deploy: ## 🚀 Despliega toda la infraestructura en LocalStack. Uso: make infra-deploy
+infra-deploy: generate-tfvars ## 🚀 Despliega toda la infraestructura en LocalStack. Uso: make infra-deploy
+	@if [ ! -d "$(TF_DIR)/.terraform" ]; then $(MAKE) infra-init; fi
 	@cd $(TF_DIR) && tflocal apply -var-file=$(TF_VARS) -auto-approve
 
 .PHONY: infra-destroy
@@ -599,40 +616,68 @@ logs-all: ## 📊 Sigue logs de TODAS las lambdas en vivo (Ctrl+C para salir). U
 	'
 
 
-.PHONY: update-fn
-update-fn: ## 🔄 Actualización rápida de código en LocalStack. Uso: make update-fn FOLDER=api
-	@echo "$(INFO)🏗️ Compilando [$(FOLDER)] de forma nativa...$(RESET)"
+.PHONY: package-lambda
+package-lambda: ## 📦 Empaqueta una función Lambda en ZIP (Nativo). Uso: make package-lambda FOLDER=api
+	@echo "$(INFO)📦 Empaquetando Lambda [$(FOLDER)]...$(RESET)"
 	@# 1. Definir rutas
 	$(eval OUT_DIR := sam-compile/$(FOLDER))
 	@mkdir -p $(OUT_DIR)
 
-	@# 2. Compilar el binario específico (IMPORTANTE: Entra a la subcarpeta cmd/FOLDER)
-	@echo "$(INFO)🔨 Ejecutando go build para cmd/$(FOLDER)/main.go...$(RESET)"
+	@# 2. Compilar el binario específico
+	@echo "$(INFO)🔨 Compilando binario (Go nativo)...$(RESET)"
 	@cd cmd/$(FOLDER) && \
-		GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap main.go
+		GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -mod=mod -tags lambda.norpc -o bootstrap main.go
 
-	@# 3. Mover el binario a la carpeta de salida
+	@# 3. Mover el binario
 	@mv cmd/$(FOLDER)/bootstrap $(OUT_DIR)/bootstrap
 
-	@# 3.1 Copiar archivo de configuración y otros recursos necesarios
-	@echo "$(INFO)📂 Copiando recursos estáticos...$(RESET)"
+	@# 3.1 Copiar recursos
 	@mkdir -p $(OUT_DIR)/internal/appconfig
 	@cp internal/appconfig/config.yml $(OUT_DIR)/internal/appconfig/
 	@mkdir -p $(OUT_DIR)/internal/services/email/templates
 	@cp -r internal/services/email/templates/* $(OUT_DIR)/internal/services/email/templates/ 2>/dev/null || :
 
-	@# 4. Generar el Makefile para SAM (compatibilidad)
+	@# 4. Generar Makefile para SAM (Compatibilidad)
 	@$(eval FUNC_PASCAL := $(shell echo "$(FOLDER)" | awk -F '-' '{for(i=1;i<=NF;i++) printf toupper(substr($$i,1,1)) substr($$i,2)}'))
 	@$(eval LOGICAL_ID := $(PROJECT_NAME_PASCAL)$(FUNC_PASCAL))
 	@printf "build-$(LOGICAL_ID):\n\tcp -r * \$$(ARTIFACTS_DIR)/\n\tchmod +x \$$(ARTIFACTS_DIR)/bootstrap\n" > $(OUT_DIR)/Makefile
 
-	@# 5. 📦 Generar el ZIP
-	@echo "$(INFO)📦 Empaquetando ZIP: sam-compile/$(FOLDER).zip$(RESET)"
+	@# 5. Generar ZIP
+	@echo "$(INFO)🤐 Creando archivo ZIP...$(RESET)"
 	@cd $(OUT_DIR) && \
 		chmod +x bootstrap && \
 		zip -q -r ../$(FOLDER).zip .
+	@echo "$(SUCCESS)✅ ZIP generado: sam-compile/$(FOLDER).zip$(RESET)"
 
-	@echo "$(SUCCESS)🚀 ZIP listo y verificado.$(RESET)"
+.PHONY: update-fn
+update-fn: package-lambda ## 🔄 Actualización rápida (alias de package-lambda).
+
+.PHONY: package-all
+package-all: ## 📦 Empaqueta TODAS las funciones Lambda.
+	@echo "$(INFO)📦 Iniciando empaquetado masivo...$(RESET)"
+	@for folder in $(FOLDERS); do \
+		$(MAKE) package-lambda FOLDER=$$folder; \
+	done
+	@echo "$(SUCCESS)✅ Todas las funciones empaquetadas.$(RESET)"
+
+.PHONY: ci-test
+ci-test: ## 🧪 Ejecuta tests y linter para CI/CD.
+	@echo "$(INFO)🧪 Ejecutando tests unitarios...$(RESET)"
+	@REDIS_HOST=localhost go test -mod=mod ./... -v
+	@echo "$(SUCCESS)✅ Tests completados.$(RESET)"
+
+
+.PHONY: ci-build-lambda
+ci-build-lambda: package-all ## 🏗️📦 CI: Construye artefactos para Lambda (ZIPs).
+	@echo "$(SUCCESS)✅ Artefactos Lambda listos para despliegue.$(RESET)"
+
+.PHONY: ci-build-eks
+ci-build-eks: build-all-images ## 🏗️🐳 CI: Construye imágenes Docker para EKS.
+	@echo "$(SUCCESS)✅ Imágenes EKS listas para despliegue.$(RESET)"
+
+.PHONY: ci-build
+ci-build: ci-build-lambda ci-build-eks ## 🏗️🌍 CI: Construye TODO (Lambda + EKS).
+	@echo "$(SUCCESS)✅ Todos los artefactos construidos.$(RESET)"
 
 .PHONY: fast-deploy
 fast-deploy: ## ⚡🚀 Compilación nativa + actualización directa (Sin Terraform/Docker). Uso: make fast-deploy FOLDER=api
@@ -672,12 +717,27 @@ sam-deploy: ## 🚀 Despliega el stack SAM en LocalStack. Uso: make sam-deploy
 	@sam deploy --profile $(AWS_PROFILE_NAME) --template master-template.yml --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET_NAME) --region $(AWS_DEFAULT_REGION) --no-confirm-changeset --capabilities CAPABILITY_IAM --disable-rollback --force-upload
 
 
+.PHONY: deploy-staging
+deploy-staging: ## 🚀☁️ Despliegue en STAGING (AWS Real). Uso: make deploy-staging
+	@echo "$(WARNING)🚀 Iniciando despliegue en STAGING (AWS Real)...$(RESET)"
+	@# 1. Generar variables usando .env.staging
+	@$(MAKE) generate-tfvars MODE=lambda ENV_FILE=.env.staging ENVIRONMENT=staging
+	@# 2. Compilar funciones
+	@$(MAKE) compile-all
+	@# 3. Desplegar con Terraform
+	@echo "$(INFO)terraform apply...$(RESET)"
+	@cd $(TF_DIR) && terraform init && terraform apply -var-file=$(TF_VARS)
+
 .PHONY: deploy-prod
 deploy-prod: ## 🚀🌍 Despliegue REAL en AWS Producción. Uso: make deploy-prod
-	@echo "$(WARNING)🚀 Iniciando despliegue en PRODUCCIÓN...$(RESET)"
+	@echo "$(WARNING)🚀 Iniciando despliegue en PRODUCCIÓN (AWS Real)...$(RESET)"
+	@# 1. Generar variables usando .env.prod
+	@$(MAKE) generate-tfvars MODE=lambda ENV_FILE=.env.prod ENVIRONMENT=prod
+	@# 2. Compilar funciones
 	@$(MAKE) compile-all
-	@sam build -t master-template.yml
-	@sam deploy --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET) --region $(AWS_DEFAULT_REGION) --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --parameter-overrides S3BucketName=$(S3_BUCKET_NAME) ProjectName=$(PROJECT_NAME_LOWERCASE)
+	@# 3. Desplegar con Terraform
+	@echo "$(INFO)terraform apply...$(RESET)"
+	@cd $(TF_DIR) && terraform init && terraform apply -var-file=$(TF_VARS)
 
 
 .PHONY: watch
@@ -832,6 +892,9 @@ terraform-deploy-lambda: ## 🚀⚡ Despliega la infraestructura en modo Lambda 
 infra-up: ## 🐳 Levanta dependencias (LocalStack) en Docker. (Requiere Postgres/Redis externos o en otro compose)
 	@echo "$(INFO)🚀 Levantando LocalStack...$(RESET)"
 	docker-compose -f docker-compose.localstack.yml up -d
+	@echo "$(INFO)⏳ Esperando a que LocalStack esté listo...$(RESET)"
+	@sleep 5
+	@./tools/init-localstack.sh
 	@echo "$(WARNING)⚠️  Asegúrate de tener Postgres y Redis corriendo (host: 5432/6379).$(RESET)"
 
 .PHONY: infra-down
@@ -939,6 +1002,7 @@ k8s-down: ## 🛑 Detiene el cluster de Kubernetes.
 
 .PHONY: watch-eks
 watch-eks: check-env k8s-up infra-up ## ☸️ Levanta todo el entorno en EKS (LocalStack) compilando imágenes.
+	@$(MAKE) generate-tfvars MODE=eks
 	@echo "$(INFO)🚀 Iniciando despliegue en EKS...$(RESET)"
 	@$(MAKE) build-all-images
 	@echo "$(INFO)terraform apply -var 'deploy_mode=eks'...$(RESET)"
@@ -960,8 +1024,16 @@ update-bruno-eks: ## 📝 Actualiza la IP del entorno EKS en Bruno.
 		echo "$(SUCCESS)✅ IP actualizada en Bruno: http://$$IP/$(RESET)"; \
 	fi
 
+.PHONY: build-image
+build-image: ## 🐳 Construye una imagen Docker (Universal). Uso: make build-image FOLDER=api
+	@echo "$(INFO)🐳 Construyendo imagen para $(FOLDER)...$(RESET)"
+	docker build -t $(FOLDER):local \
+		--build-arg CMD_PATH=cmd/$(FOLDER) \
+		--build-arg BIN_NAME=bootstrap \
+		-f dockerfiles/Dockerfile.universal .
+
 .PHONY: build-all-images
-build-all-images: ## �� Construye todas las imágenes Docker para EKS.
+build-all-images: ##  Construye todas las imágenes Docker para EKS.
 	@echo "$(INFO)🔨 Construyendo imágenes Docker...$(RESET)"
 	@docker build -f dockerfiles/Dockerfile.universal --build-arg CMD_PATH=cmd/api -t api:local .
 	@docker build -f dockerfiles/Dockerfile.universal --build-arg CMD_PATH=cmd/sqs-consumer -t sqs-consumer:local .

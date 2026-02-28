@@ -55,6 +55,15 @@ resource "aws_lambda_function" "this" {
   environment {
     variables = var.environment_variables
   }
+  
+  publish = true
+}
+
+resource "aws_lambda_alias" "prod" {
+  name             = "prod"
+  description      = "Alias de Producción"
+  function_name    = aws_lambda_function.this.function_name
+  function_version = aws_lambda_function.this.version
 }
 
 resource "aws_cloudwatch_log_group" "this" {

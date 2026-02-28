@@ -34,27 +34,51 @@ make dev-local
 
 ---
 
-## Nivel 2: Simulación de Producción (Kubernetes Local)
-**Objetivo:** Validar comportamiento en entorno orquestado (K8s) idéntico a AWS EKS.
-**Herramientas:** `Skaffold`, `OrbStack`/`Kind`, `Kustomize`.
+## Nivel 2: Simulación de Producción (AWS LocalStack)
+**Objetivo:** Validar comportamiento en infraestructura idéntica a AWS (Lambda o EKS) usando LocalStack.
+**Herramientas:** `LocalStack`, `Terraform`, `Docker`, `Make`.
 
-En este modo, tu código corre DENTRO de pods de Kubernetes en tu máquina. Skaffold observa tus cambios y actualiza los pods en segundos (sin push a registro).
+Este nivel es crítico para asegurar que tu código funciona en el entorno de nube antes de subirlo.
 
-*   ✅ Valida configuración de despliegue (Deployment, Service, Ingress).
-*   ✅ Valida conexión entre microservicios en red K8s.
-*   ✅ Valida variables de entorno reales.
-
-### Comandos
+### Opción A: Lambda (Serverless)
+Simula AWS Lambda, API Gateway y SQS localmente.
 ```bash
-# Iniciar desarrollo en modo Cluster
-make dev-k8s
+# Despliega y actualiza todo el entorno Serverless
+make watch-lambda
 ```
-*Presiona `Ctrl+C` para detener y limpiar los recursos.*
+*   ✅ Compila binarios optimizados para Lambda (Linux ARM64).
+*   ✅ Despliega infraestructura con Terraform en LocalStack.
+*   ✅ Actualiza Bruno automáticamente para pruebas inmediatas.
+
+### Opción B: EKS (Kubernetes)
+Simula un cluster EKS completo con LoadBalancers y Nodos.
+```bash
+# Despliega y actualiza todo el entorno Kubernetes
+make watch-eks
+```
+*   ✅ Construye imágenes Docker universales.
+*   ✅ Levanta cluster K8s local (OrbStack/Docker).
+*   ✅ Despliega charts de Helm y servicios.
 
 ---
 
-## Nivel 3: GitOps Local (ArgoCD)
-**Objetivo:** Garantizar que el flujo de despliegue automatizado funciona.
+## Nivel 3: CI/CD y GitOps (Automatización)
+**Objetivo:** Garantizar que el flujo de despliegue automatizado funciona al hacer commit.
+**Herramientas:** `GitHub Actions`, `ArgoCD`.
+
+### Flujo de Integración Continua (CI)
+Al hacer `git commit` y `push`, se dispara automáticamente el pipeline definido en `.github/workflows/deploy.yml`:
+1.  **Test:** Ejecuta pruebas unitarias (`make ci-test`).
+2.  **Build Lambda:** Genera los ZIPs de las funciones (`make ci-build-lambda`).
+3.  **Build EKS:** Construye las imágenes Docker (`make ci-build-eks`).
+4.  **Deploy (Opcional):** Si la rama es `main`, Terraform aplica los cambios en el entorno real.
+
+Esto asegura que **cualquier cambio en el código** sea compatible tanto con Lambda como con EKS, sin importar cuál esté activo en producción.
+
+---
+
+## Nivel 4: GitOps Local (ArgoCD - Opcional)
+**Objetivo:** Sincronización automática de manifiestos K8s.
 **Herramientas:** `ArgoCD`, `Git`.
 
 En este modo, **NO** despliegas manualmente. Haces cambios, los subes a Git, y ArgoCD sincroniza el cluster. Esto es exactamente lo que ocurre en Staging/Producción.

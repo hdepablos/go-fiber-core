@@ -1,16 +1,8 @@
 locals {
-  eks_env_overrides = {
-      GORM_WRITE_HOST       = "host.docker.internal"
-      GORM_READ_HOST        = "host.docker.internal"
-      PGX_WRITE_HOST        = "host.docker.internal"
-      PGX_READ_HOST         = "host.docker.internal"
-      REDIS_HOST            = "host.docker.internal"
-      AWS_ACCESS_KEY_ID     = "test"
-      AWS_SECRET_ACCESS_KEY = "test"
-      AWS_REGION            = "us-east-1"
-      AWS_ENDPOINT_URL      = "http://host.docker.internal:4566"
-    }
+  name_prefix = "gofibercore-${var.environment}"
+  zip_path    = "../sam-compile"
 }
+
 
 # ==============================================================================
 # 1. Lambdas (Usando el módulo reutilizable)
@@ -43,12 +35,13 @@ module "lambda_sqs_consumer" {
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-  environment_variables = merge(var.lambda_env_vars, {
+  environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
 
 module "lambda_dlq_consumer" {
+
   count                 = var.deploy_mode == "lambda" ? 1 : 0
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-dlq-consumer"
@@ -71,7 +64,7 @@ module "lambda_daily_cron" {
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-  environment_variables = merge(var.lambda_env_vars, {
+  environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
@@ -86,7 +79,7 @@ module "lambda_every_1min_cron" {
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-  environment_variables = merge(var.lambda_env_vars, {
+  environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
@@ -109,7 +102,7 @@ resource "helm_release" "sqs_consumer" {
         tag        = "local"
         pullPolicy = "Never"
       }
-      env = merge(var.app_env_vars, local.eks_env_overrides, {
+      env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
       autoscaling = {
@@ -152,7 +145,7 @@ resource "helm_release" "api" {
         port       = 80
         targetPort = 3000
       }
-      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+      env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
     })
@@ -173,7 +166,7 @@ resource "helm_release" "dlq_consumer" {
         tag        = "local"
         pullPolicy = "Never"
       }
-      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+      env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.dlq.url, "localhost", "host.docker.internal")
       })
       autoscaling = {
@@ -210,7 +203,7 @@ resource "helm_release" "every_1min_cron" {
         tag        = "local"
         pullPolicy = "Never"
       }
-      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+      env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
       cronjob = {
@@ -235,7 +228,7 @@ resource "helm_release" "daily_cron" {
         tag        = "local"
         pullPolicy = "Never"
       }
-      env = merge(var.lambda_env_vars, local.eks_env_overrides, {
+      env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
       cronjob = {

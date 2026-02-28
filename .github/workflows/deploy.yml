@@ -1,0 +1,84 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  # 🧪 Job de Testing y Calidad
+  test:
+    name: Run Tests & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Tests
+        run: make ci-test
+
+  # 🏗️ Job Unificado de Construcción (Inteligente)
+  build:
+    name: Build Artifacts
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      # 🅰️ Opción A: Construir para Lambda (Por defecto o si MODE=lambda)
+      - name: Build Lambda Artifacts
+        if: ${{ vars.DEPLOY_MODE == 'lambda' || vars.DEPLOY_MODE == '' }}
+        run: make ci-build-lambda
+
+      - name: Upload Lambda Zips
+        if: ${{ vars.DEPLOY_MODE == 'lambda' || vars.DEPLOY_MODE == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-zips
+          path: sam-compile/*.zip
+
+      # 🅱️ Opción B: Construir para EKS (Si MODE=eks)
+      - name: Build Docker Images (EKS)
+        if: ${{ vars.DEPLOY_MODE == 'eks' }}
+        # Nota: En un entorno real, aquí harías login a ECR y push
+        run: make ci-build-eks
+
+  # 🚀 Job de Despliegue
+  deploy:
+    name: Deploy Infrastructure
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Solo descargamos artefactos si estamos en modo Lambda
+      - name: Download Lambda Artifacts
+        if: ${{ vars.DEPLOY_MODE == 'lambda' || vars.DEPLOY_MODE == '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-zips
+          path: sam-compile/
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      # - name: Terraform Init & Apply
+      #   run: |
+      #     make infra-deploy MODE=${{ vars.DEPLOY_MODE || 'lambda' }}
+      #   env:
+      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

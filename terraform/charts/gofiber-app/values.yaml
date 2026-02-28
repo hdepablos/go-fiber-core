@@ -14,6 +14,20 @@ service:
   port: 80
   targetPort: 3000
 
+# Probes (Liveness/Readiness)
+probes:
+  enabled: false
+  liveness:
+    path: "/api/v1/health"
+    port: 3000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readiness:
+    path: "/api/v1/health"
+    port: 3000
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
 env: {}
 #  KEY: "value"
 
