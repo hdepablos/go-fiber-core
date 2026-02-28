@@ -23,3 +23,4 @@ To install the hooks manually (if not already installed):
 ```bash
 ./tools/install-hooks.sh
 ```
+
