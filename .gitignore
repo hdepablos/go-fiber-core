@@ -59,11 +59,20 @@ output.json
 *.tfstate.backup
 .terraform.lock.hcl
 
+# --- Secrets & Vars (CRITICAL) ---
+# NEVER commit these files
+*.tfvars
+*.tfvars.json
+generated.tfvars.json
+terraform.tfvars
+prod.tfvars
+staging.tfvars
+
 # --- Variables de Entorno (IMPORTANTE) ---
 # No subir credenciales o configuraciones locales
 .env
-# Excepto si tienes un ejemplo:
-# !.env.example
+.env.*
+!.env.example
 
 # --- Docker ---
 # Logs de contenedores si los rediriges a archivos

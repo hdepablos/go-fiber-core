@@ -7,20 +7,28 @@ if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
     exit 0
 fi
 
-# 2. Detect Mode (Lambda vs EKS)
-# We look for a .deploy_mode file or check .env, or default to lambda.
-# Let's assume the user uses the same mechanism as the Makefile: looking at .env or a specific file.
-# For simplicity, let's default to checking .env for DEPLOY_MODE, or just check if "make watch-lambda" was run last?
-# Actually, the user wants to simulate the CI/CD environment variable "DEPLOY_MODE".
-# We can read it from .env if it exists, otherwise default to "lambda".
-
+# 2. Check if Simulation is Enabled (SIMULATE_CICD)
+SIMULATE_CICD="false"
 DEPLOY_MODE="lambda"
+
 if [ -f .env ]; then
+    # Try to grep SIMULATE_CICD from .env
+    CICD_ENABLED=$(grep "^SIMULATE_CICD=" .env | cut -d '=' -f2)
+    if [ ! -z "$CICD_ENABLED" ]; then
+        SIMULATE_CICD=$CICD_ENABLED
+    fi
+    
     # Try to grep DEPLOY_MODE from .env
     MODE_FROM_ENV=$(grep "^DEPLOY_MODE=" .env | cut -d '=' -f2)
     if [ ! -z "$MODE_FROM_ENV" ]; then
         DEPLOY_MODE=$MODE_FROM_ENV
     fi
+fi
+
+if [ "$SIMULATE_CICD" != "true" ]; then
+    # Silently skip if disabled, or echo if user wants to know
+    # echo "⏩ [Post-Commit Hook] Simulación CI/CD desactivada (SIMULATE_CICD!=true)."
+    exit 0
 fi
 
 echo "🤖 [Post-Commit Hook] Detectado DEPLOY_MODE=${DEPLOY_MODE}"

@@ -107,3 +107,61 @@ Instrucciones simples para desplegar el proyecto desde cero y mantenerlo.
 | **EKS** | CPU, RAM, Réplicas | `terraform/charts/gofiber-app/values.yaml` |
 | **CI/CD** | Credenciales AWS | GitHub Secrets (`AWS_...`) |
 | **CI/CD** | Switch Lambda/EKS | GitHub Variables (`DEPLOY_MODE`) |
+
+## 5. Simulación de CI/CD Local (Git Hooks)
+
+Para simular el flujo de "Commit -> Deploy" en tu entorno local (tal cual ocurriría en GitHub Actions), hemos incluido un **Git Hook**.
+
+### Instalación
+Ejecuta una única vez:
+```bash
+./tools/install-hooks.sh
+```
+
+### Uso
+Cada vez que hagas un commit:
+```bash
+git add .
+git commit -m "feat: mi nuevo cambio"
+```
+
+El sistema detectará automáticamente tu `DEPLOY_MODE` en el archivo `.env`:
+- Si `DEPLOY_MODE=lambda`: Recompila y actualiza las funciones Lambda en LocalStack.
+- Si `DEPLOY_MODE=eks`: Reconstruye las imágenes Docker y actualiza el cluster Kubernetes.
+
+### Activación / Desactivación
+Es ideal poder "apagar" esta simulación cuando haces commits pequeños o no quieres esperar el despliegue.
+
+Para controlarlo, usa la variable `SIMULATE_CICD` en tu archivo `.env`:
+
+**Para ACTIVAR (Simulación ON):**
+```env
+SIMULATE_CICD=true
+```
+
+**Para DESACTIVAR (Simulación OFF):**
+```env
+SIMULATE_CICD=false
+```
+
+Si la variable está en `false` o no existe, el hook se saltará silenciosamente y el commit será instantáneo.
+
+## 6. Estrategias de Despliegue (Zero Downtime)
+
+Para garantizar que el servicio **NUNCA** se caiga durante una actualización, hemos implementado estrategias nativas para cada entorno. Estas configuraciones ya están aplicadas en el código y no requieren costo adicional.
+
+### En Lambda (Serverless)
+Usamos **Lambda Aliases & Versioning**.
+- **Cómo funciona:** Cada despliegue crea una nueva **Versión** inmutable de tu código.
+- **Protección:** Terraform actualiza el **Alias** `prod` para que apunte a la nueva versión solo si el despliegue es exitoso.
+- **Rollback:** Si algo falla, el alias sigue apuntando a la versión anterior.
+
+### En EKS (Kubernetes)
+Usamos **Rolling Updates** con **Health Probes**.
+- **Liveness Probe:** Verifica si tu aplicación está viva (`/api/v1/health`). Si falla, reinicia el pod.
+- **Readiness Probe:** Verifica si tu aplicación está lista para recibir tráfico. Kubernetes **NO** enviará usuarios a la nueva versión hasta que este endpoint responda `200 OK`.
+- **Configuración:**
+  - Archivo: `terraform/charts/gofiber-app/values.yaml`
+  - Endpoint: `/api/v1/health`
+  - Delay Inicial: 15 segundos (tiempo para conectar a DB/Redis).
+

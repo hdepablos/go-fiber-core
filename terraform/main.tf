@@ -1,6 +1,24 @@
 locals {
   name_prefix = "gofibercore-${var.environment}"
   zip_path    = "../sam-compile"
+  
+  # Lógica Híbrida de Secretos:
+  # En LOCAL: Usamos las variables pasadas por archivo (var.app_env_vars)
+  # En PROD/STAGING: Deberíamos obtenerlas de SSM (o usarlas vacías y que la app las lea)
+  # Por simplicidad y compatibilidad con el flujo actual del usuario,
+  # mantendremos var.app_env_vars como fuente de verdad inyectada por el CI/CD o Makefile.
+  # 
+  # NOTA: Para implementar lectura directa de SSM en tiempo de ejecución de Lambda,
+  # se requeriría cambiar el código Go para usar AWS SDK SSM.
+  #
+  # Sin embargo, podemos hacer que Terraform busque los valores en SSM y los inyecte.
+  # Pero eso requiere que las claves sean conocidas de antemano.
+  #
+  # La solución más alineada al flujo actual del usuario ("crear en .env y que funcione")
+  # es la que ya tiene: `env-manager` inyecta valores.
+  # 
+  # Para PRODUCCIÓN REAL con SSM, el cambio es en CÓMO se llena `var.app_env_vars`.
+  # No necesitamos cambiar el código de Terraform aquí, sino la fuente de los datos.
 }
 
 
@@ -89,11 +107,14 @@ module "lambda_every_1min_cron" {
 # ==============================================================================
 
 resource "helm_release" "sqs_consumer" {
-  count      = var.deploy_mode == "eks" ? 1 : 0
-  name       = "sqs-consumer"
-  chart      = "${path.module}/charts/gofiber-app"
-  namespace  = "default"
-  version    = "0.1.0"
+  count            = var.deploy_mode == "eks" ? 1 : 0
+  name             = "sqs-consumer"
+  chart            = "${path.module}/charts/gofiber-app"
+  namespace        = "default"
+  version          = "0.1.0"
+  create_namespace = true
+  force_update     = true
+  recreate_pods    = true
 
   values = [
     yamlencode({
@@ -126,11 +147,14 @@ resource "helm_release" "sqs_consumer" {
 }
 
 resource "helm_release" "api" {
-  count      = var.deploy_mode == "eks" ? 1 : 0
-  name       = "api"
-  chart      = "${path.module}/charts/gofiber-app"
-  namespace  = "default"
-  version    = "0.1.0"
+  count            = var.deploy_mode == "eks" ? 1 : 0
+  name             = "api"
+  chart            = "${path.module}/charts/gofiber-app"
+  namespace        = "default"
+  version          = "0.1.0"
+  create_namespace = true
+  force_update     = true
+  recreate_pods    = true
 
   values = [
     yamlencode({
@@ -143,7 +167,7 @@ resource "helm_release" "api" {
         enabled    = true
         type       = "LoadBalancer"
         port       = 80
-        targetPort = 3000
+        targetPort = 9009
       }
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
@@ -153,11 +177,14 @@ resource "helm_release" "api" {
 }
 
 resource "helm_release" "dlq_consumer" {
-  count      = var.deploy_mode == "eks" ? 1 : 0
-  name       = "dlq-consumer"
-  chart      = "${path.module}/charts/gofiber-app"
-  namespace  = "default"
-  version    = "0.1.0"
+  count            = var.deploy_mode == "eks" ? 1 : 0
+  name             = "dlq-consumer"
+  chart            = "${path.module}/charts/gofiber-app"
+  namespace        = "default"
+  version          = "0.1.0"
+  create_namespace = true
+  force_update     = true
+  recreate_pods    = true
 
   values = [
     yamlencode({
@@ -190,11 +217,14 @@ resource "helm_release" "dlq_consumer" {
 }
 
 resource "helm_release" "every_1min_cron" {
-  count      = var.deploy_mode == "eks" ? 1 : 0
-  name       = "every-1min-cron"
-  chart      = "${path.module}/charts/gofiber-app"
-  namespace  = "default"
-  version    = "0.1.0"
+  count            = var.deploy_mode == "eks" ? 1 : 0
+  name             = "1min-cron"
+  chart            = "${path.module}/charts/gofiber-app"
+  namespace        = "default"
+  version          = "0.1.0"
+  create_namespace = true
+  force_update     = true
+  recreate_pods    = true
 
   values = [
     yamlencode({
@@ -215,11 +245,14 @@ resource "helm_release" "every_1min_cron" {
 }
 
 resource "helm_release" "daily_cron" {
-  count      = var.deploy_mode == "eks" ? 1 : 0
-  name       = "daily-cron"
-  chart      = "${path.module}/charts/gofiber-app"
-  namespace  = "default"
-  version    = "0.1.0"
+  count            = var.deploy_mode == "eks" ? 1 : 0
+  name             = "daily-cron"
+  chart            = "${path.module}/charts/gofiber-app"
+  namespace        = "default"
+  version          = "0.1.0"
+  create_namespace = true
+  force_update     = true
+  recreate_pods    = true
 
   values = [
     yamlencode({
