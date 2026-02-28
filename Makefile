@@ -271,18 +271,23 @@ logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch. Uso: make 
 .PHONY: send-message
 send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS. Uso: make send-message
 	@echo "$(INFO)✉️ Enviando mensaje a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
+	@echo "$(INFO)ℹ️ Este mensaje tiene ID='123' y debería ser procesado EXITOSAMENTE.$(RESET)"
+	@DATE=$$(date); \
 	awslocal sqs send-message \
 		--queue-url $(SQS_QUEUE_URL) \
-		--message-body '{"action":"process_data","id":"123","value":"test_payload"}'
-	@echo "$(SUCCESS)✅ Mensaje enviado correctamente.$(RESET)"
+		--message-body "{\"id\":\"123\", \"body\":\"✅ PRUEBA EXITOSA: Procesamiento correcto esperado.\", \"source\":\"Makefile\", \"created\":\"$$DATE\"}"
+	@echo "$(SUCCESS)✅ Mensaje enviado. Revisa los logs de 'sqs-consumer'.$(RESET)"
 
 .PHONY: send-message-error
 send-message-error: ## ✉️⚠️ Envía un mensaje de error a la cola SQS. Uso: make send-message-error
 	@echo "$(INFO)✉️ Enviando mensaje de error a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
+	@echo "$(INFO)⚠️ Este mensaje tiene ID='999'. Forzará un ERROR en el consumidor.$(RESET)"
+	@echo "$(INFO)🔄 Deberías ver 3 intentos fallidos en 'sqs-consumer' y luego el mensaje en 'dlq-consumer'.$(RESET)"
+	@DATE=$$(date); \
 	awslocal sqs send-message \
 		--queue-url $(SQS_QUEUE_URL) \
-		--message-body '{"action":"process_data","id":"999","value":"test_payload"}'
-	@echo "$(SUCCESS)✅ Mensaje de error enviado.$(RESET)"
+		--message-body "{\"id\":\"999\", \"body\":\"❌ PRUEBA FALLIDA: Este mensaje debe ir a DLQ.\", \"source\":\"Makefile\", \"created\":\"$$DATE\"}"
+	@echo "$(SUCCESS)✅ Mensaje de error enviado. Vigila los logs de 'sqs-consumer' y 'dlq-consumer'.$(RESET)"
 
 .PHONY: test-api-aws
 test-api-aws: ## 🧪 Realiza pruebas sobre la API Gateway de LocalStack. Uso: make test-api-aws

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -62,7 +63,29 @@ func processMessage(ctx context.Context, record events.SQSMessage) error {
 	// 2. Enviar una alerta a Slack/Email
 	// 3. Intentar un reprocesamiento manual si aplica
 
-	slog.Info("📥 Analizando mensaje de DLQ", "msgID", record.MessageId, "body_preview", record.Body[:min(len(record.Body), 50)])
+	// Intento de parsear para mostrar mensaje descriptivo
+	type SimpleMsg struct {
+		ID   string `json:"id"`
+		Body string `json:"body"`
+	}
+	var msg SimpleMsg
+	var logBody string
+
+	// Primero desenvovlemos si viene de SNS (opcional, pero buena práctica)
+	// (Aquí asumimos que viene directo de SQS o es compatible)
+	if err := json.Unmarshal([]byte(record.Body), &msg); err == nil && msg.Body != "" {
+		logBody = msg.Body // Usamos el campo 'body' interno si existe
+	} else {
+		logBody = record.Body // Si no, usamos el body crudo
+	}
+
+	// Truncar para log si es muy largo
+	displayBody := logBody
+	if len(displayBody) > 100 {
+		displayBody = displayBody[:100] + "..."
+	}
+
+	slog.Info("💀 Mensaje recibido en DLQ (Dead Letter Queue)", "msgID", record.MessageId, "contenido", displayBody)
 
 	// Simulación de error si el cuerpo es "fail"
 	if record.Body == "fail" {
@@ -70,7 +93,7 @@ func processMessage(ctx context.Context, record events.SQSMessage) error {
 	}
 
 	// Lógica de "Limpieza" o "Rescate" exitosa
-	slog.Info("✔️ Mensaje de DLQ procesado/auditado correctamente", "msgID", record.MessageId)
+	slog.Info("✔️ Mensaje de DLQ auditado/archivado", "msgID", record.MessageId)
 	return nil
 }
 

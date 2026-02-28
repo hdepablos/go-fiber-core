@@ -166,10 +166,14 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 		return nil
 	}
 
+	// Log para ver el contenido descriptivo
+	slog.Info("📥 Procesando mensaje", "id", msg.ID, "body", msg.Body)
+
 	if msg.ID == "999" {
+		slog.Warn("⚠️ Simulando fallo para mensaje ID 999 (destino DLQ)", "id", msg.ID)
 		return fmt.Errorf("simulated failure for DLQ: %s", msg.ID)
 	}
 
-	slog.Info("Mensaje procesado con éxito", "msgID", msg.ID)
+	slog.Info("✅ Mensaje procesado con éxito", "id", msg.ID, "body", msg.Body)
 	return nil
 }
