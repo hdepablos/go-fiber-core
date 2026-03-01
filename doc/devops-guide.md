@@ -165,3 +165,39 @@ Usamos **Rolling Updates** con **Health Probes**.
   - Endpoint: `/api/v1/health`
   - Delay Inicial: 15 segundos (tiempo para conectar a DB/Redis).
 
+---
+
+## 7. 🔄 Guía de Migración de Cómputo (Lambda ↔ EKS)
+
+Este proyecto está diseñado con **Arquitectura Hexagonal**, lo que lo hace altamente portable. Si necesitas cambiar de Lambda a EKS (o viceversa), aquí detallamos el impacto real y los pasos necesarios.
+
+### 1. Lo que NO Cambia (✅)
+Tu código Go y la lógica de negocio son idénticos para ambos entornos.
+- **Aplicación:** El `main.go` detecta automáticamente si está en Lambda o EKS y se comporta acorde (Handler vs Servidor HTTP/Polling).
+- **Datos:** Bases de datos (RDS), Caché (Redis) y Almacenamiento (S3) son externos y persisten independientemente del modo de cómputo.
+
+### 2. Impacto de la Migración (⚠️)
+Al cambiar la variable `DEPLOY_MODE` en Terraform/CI-CD, ocurrirá lo siguiente:
+
+#### A. Infraestructura (Destructivo)
+- Terraform **destruirá** los recursos del modo anterior (ej. borrará las Lambdas) y **creará** los nuevos (ej. creará el Cluster EKS).
+- **Tiempo de caída:** Habrá un tiempo de inactividad durante el despliegue (5-20 minutos dependiendo de si el cluster EKS ya existe).
+
+#### B. Cambio de URL (Crítico 🚨)
+- **Lambda:** Usa API Gateway (`https://xyz.execute-api...`).
+- **EKS:** Usa Load Balancer (`http://k8s-default-api...`).
+- **Acción Requerida:** Debes actualizar tus registros DNS (CNAME) en Route53 para que tu dominio (ej. `api.miapp.com`) apunte al nuevo destino.
+
+#### C. Comportamiento de Consumers (SQS)
+- **Lambda (Push):** AWS empuja los mensajes. Escalado casi instantáneo.
+- **EKS (Pull):** Los pods hacen "polling" a la cola.
+- **Acción Requerida:** Monitorizar la latencia de procesamiento. KEDA se encargará del auto-escalado en EKS, pero puede requerir ajuste de parámetros (`pollingInterval`, `minReplicaCount`).
+
+### 3. Checklist de Migración
+Pasos recomendados para realizar el cambio en Producción:
+
+1.  [ ] **Notificar Mantenimiento:** Avisar de una posible interrupción de servicio.
+2.  [ ] **Cambiar Variable:** Actualizar `DEPLOY_MODE` a `eks` (o `lambda`) en GitHub Variables.
+3.  [ ] **Ejecutar Pipeline:** Lanzar el despliegue vía GitHub Actions.
+4.  [ ] **Actualizar DNS:** Una vez finalizado el despliegue, obtener la nueva URL (Output de Terraform) y actualizar el DNS de tu dominio.
+5.  [ ] **Verificar Logs:** Confirmar que la aplicación arranca y procesa mensajes correctamente en el nuevo entorno.
