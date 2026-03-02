@@ -894,11 +894,14 @@ terraform-deploy-lambda: ## 🚀⚡ Despliega la infraestructura en modo Lambda 
 # NIVEL 1: Desarrollo Local (Air + Docker Compose)
 # ==============================================================================
 .PHONY: infra-up
-infra-up: ## 🐳 Levanta dependencias (LocalStack) en Docker. (Requiere Postgres/Redis externos o en otro compose)
-	@echo "$(INFO)🚀 Levantando LocalStack...$(RESET)"
-	docker-compose -f docker-compose.localstack.yml up -d
-	@echo "$(INFO)⏳ Esperando a que LocalStack esté listo...$(RESET)"
-	@sleep 5
+infra-up: ## 🐳 Verifica si LocalStack está corriendo (Infraestructura Compartida).
+	@if docker ps --format '{{.Names}}' | grep -q "^localstack$$"; then \
+		echo "$(INFO)✅ LocalStack detectado (contenedor 'localstack').$(RESET)"; \
+	else \
+		echo "$(ERROR)❌ LocalStack NO está corriendo.$(RESET)"; \
+		echo "$(INFO)ℹ️  Por favor, levanta la infraestructura compartida antes de continuar.$(RESET)"; \
+		exit 1; \
+	fi
 	@./tools/init-localstack.sh
 	@echo "$(WARNING)⚠️  Asegúrate de tener Postgres y Redis corriendo (host: 5432/6379).$(RESET)"
 
@@ -1006,16 +1009,23 @@ k8s-down: ## 🛑 Detiene el cluster de Kubernetes.
 	@echo "$(SUCCESS)✅ Kubernetes detenido.$(RESET)"
 
 .PHONY: watch-eks
-watch-eks: check-env k8s-up infra-up ## ☸️ Levanta todo el entorno en EKS (LocalStack) compilando imágenes.
+watch-eks: check-env infra-up k8s-up ## ☸️ Levanta todo el entorno en EKS (LocalStack) compilando imágenes.
 	@$(MAKE) generate-tfvars MODE=eks
 	@echo "$(INFO)🚀 Iniciando despliegue en EKS...$(RESET)"
 	@$(MAKE) build-all-images
+	@$(MAKE) clean-k8s-apps
 	@echo "$(INFO)terraform apply -var 'deploy_mode=eks'...$(RESET)"
 	@cd $(TF_DIR) && tflocal apply -var-file=$(TF_VARS) -var "deploy_mode=eks" -auto-approve
 	@echo "$(SUCCESS)✅ Despliegue en EKS completado.$(RESET)"
 	@echo "$(INFO)🔍 Servicios expuestos:$(RESET)"
 	@kubectl get svc
 	@$(MAKE) update-bruno-eks
+
+.PHONY: clean-k8s-apps
+clean-k8s-apps: ## 🧹 Elimina releases de Helm previos para evitar conflictos de estado.
+	@echo "$(INFO)🧹 Limpiando aplicaciones en Kubernetes (Helm)...$(RESET)"
+	@helm uninstall api sqs-consumer dlq-consumer daily-cron 1min-cron 2>/dev/null || true
+	@echo "$(SUCCESS)✅ Limpieza completada (o no había nada que limpiar).$(RESET)"
 
 .PHONY: update-bruno-eks
 update-bruno-eks: ## 📝 Actualiza la IP del entorno EKS en Bruno.
