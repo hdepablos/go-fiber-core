@@ -57,6 +57,7 @@ type AppContainer struct {
 	AuthService       auth.AuthService
 	DatabaseService   *services.DatabaseService
 	QueueService      *queue.SQSService
+	ProcessLifecycleService processlifecycle2.Service
 }
 
 // AWSConfigResponse se mantiene para compatibilidad si lo usas en otros lados

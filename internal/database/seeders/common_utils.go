@@ -176,3 +176,54 @@ func logParseErrors(logger *slog.Logger, errs []error) {
 		logger.Debug("parse error", "error", e)
 	}
 }
+
+// EnsureHistory ensures a history record exists for the given version.
+func EnsureHistory(ctx context.Context, tx pgx.Tx, versionID, typeID int64, comment string, logger *slog.Logger) error {
+	var exists bool
+	err := tx.QueryRow(ctx, 
+		"SELECT EXISTS(SELECT 1 FROM process_version_history WHERE process_version_id = $1)", 
+		versionID,
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("check history: %w", err)
+	}
+
+	if !exists {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO process_version_history (
+				process_version_id, process_type_id, promoted_from_status, promoted_at, promoted_by, comment
+			) VALUES ($1, $2, $3, NOW(), $4, $5)`,
+			versionID, typeID, "DRAFT", 1, comment,
+		)
+		if err != nil {
+			return fmt.Errorf("insert history: %w", err)
+		}
+		logger.Info("Historial insertado", "version_id", versionID)
+	}
+	return nil
+}
+
+// UpsertStep inserts or updates a process step.
+func UpsertStep(ctx context.Context, tx pgx.Tx, versionID int64, order int, name, key, config string) error {
+	cmdTag, err := tx.Exec(ctx,
+		`UPDATE process_steps 
+		 SET step_order = $1, name = $2, config = $3::jsonb, roadmap = 0
+		 WHERE process_version_id = $4 AND execution_key = $5`,
+		order, name, config, versionID, key,
+	)
+	if err != nil {
+		return fmt.Errorf("update step %s: %w", key, err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
+			 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
+			versionID, order, name, key, config,
+		)
+		if err != nil {
+			return fmt.Errorf("insert step %s: %w", key, err)
+		}
+	}
+	return nil
+}

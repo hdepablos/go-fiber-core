@@ -8,11 +8,6 @@ package di
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/google/wire"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 	"go-fiber-core/internal/database/connections/gorm"
 	"go-fiber-core/internal/database/connections/pgx"
 	redis2 "go-fiber-core/internal/database/connections/redis"
@@ -42,6 +37,12 @@ import (
 	user2 "go-fiber-core/internal/services/user"
 	"log"
 	"os"
+
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/google/wire"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 // Injectors from wire.go:
@@ -195,6 +196,7 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
 	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
+	service := processlifecycle.NewService(connectDTO)
 	awsService, err := provideAWSService()
 	if err != nil {
 		cleanup4()
@@ -214,6 +216,7 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 		AuthService:       authService,
 		DatabaseService:   databaseService,
 		QueueService:      sqsService,
+		ProcessLifecycleService: service,
 	}
 	return appContainer, func() {
 		cleanup4()
@@ -281,6 +284,7 @@ type AppContainer struct {
 	AuthService       auth.AuthService
 	DatabaseService   *services.DatabaseService
 	QueueService      *queue.SQSService
+	ProcessLifecycleService processlifecycle.Service
 }
 
 // AWSConfigResponse se mantiene para compatibilidad si lo usas en otros lados

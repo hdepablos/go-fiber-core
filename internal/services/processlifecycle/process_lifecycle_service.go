@@ -627,13 +627,13 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 		defer func() {
 			serviceCtx.Metrics.TotalDurationMs = time.Since(start).Milliseconds()
 			serviceCtx.Metrics.GoroutinesCount = runtime.NumGoroutine() // Actualizar al final
-			
+
 			// Medir memoria
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
 			serviceCtx.Metrics.MemoryUsedMB = float64(m.Alloc) / 1024 / 1024
 		}()
-		
+
 		// Inyectar el ServiceContext en el contexto de Go para que GORM lo vea
 		ctx = context.WithValue(ctx, "db_metrics_collector", serviceCtx)
 		serviceCtx.Ctx = ctx // Actualizar también dentro del struct

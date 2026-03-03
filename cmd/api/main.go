@@ -18,6 +18,8 @@ import (
 	// Importación en blanco para registrar servicios de prueba concurrente
 	_ "go-fiber-core/internal/services/test/steps_concurrent"
 	_ "go-fiber-core/internal/services/test/imputation"
+	// Importación en blanco para registrar servicios de prueba de auto-invoke
+	_ "go-fiber-core/internal/services/test"
 )
 
 var fiberLambda *fiberadapter.FiberLambda

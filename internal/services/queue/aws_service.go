@@ -30,6 +30,11 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 
 	// DEBUG: Imprimir configuración cargada para verificar entorno
 	fmt.Printf("AWS Config Loaded - Region: %s, Endpoint: %s\n", cfg.Region, os.Getenv("AWS_ENDPOINT_URL"))
+	for _, env := range os.Environ() {
+		if len(env) > 4 && env[:4] == "AWS_" {
+			fmt.Println("ENV:", env)
+		}
+	}
 
 	// Si hay una URL de endpoint personalizada en el entorno (ej: LocalStack), asegurar que se use.
 	// Aunque el SDK v2 moderno soporta AWS_ENDPOINT_URL, a veces es necesario ser explícito con el BaseEndpoint

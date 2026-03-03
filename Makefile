@@ -262,32 +262,20 @@ logs-tail-slow-sql-cloudwatch: ## 🐢☁️ Sigue slow SQL en CloudWatch filtra
 	echo "$(INFO)🐢☁️ Tail de SLOW SQL en: $$GROUP (desde $$SINCE)$(RESET)"; \
 	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE" --filter-pattern "SLOW SQL"
 
-.PHONY: logs-groups
-logs-groups: ## 📚 Lista los log groups del proyecto en CloudWatch. Uso: make logs-groups
-	@PREFIX="/app/$(PROJECT_SLUG)"; \
-	echo "$(INFO)📚 Listando log groups con prefijo $$PREFIX$(RESET)"; \
-	aws logs describe-log-groups $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --log-group-name-prefix "$$PREFIX" --query 'logGroups[].logGroupName' --output table
+.PHONY: logs-all
+logs-all: ## 📜 Muestra logs unificados de todos los servicios. Uso: make logs-all
+	@echo "$(INFO)📜 Obteniendo logs de todos los servicios...$(RESET)"
+	@$(DC_BASE) logs -f
 
 .PHONY: send-message
-send-message: ## ✉️ Envía un mensaje de prueba a la cola SQS. Uso: make send-message
-	@echo "$(INFO)✉️ Enviando mensaje a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
-	@echo "$(INFO)ℹ️ Este mensaje tiene ID='123' y debería ser procesado EXITOSAMENTE.$(RESET)"
-	@DATE=$$(date); \
-	awslocal sqs send-message \
-		--queue-url $(SQS_QUEUE_URL) \
-		--message-body "{\"id\":\"123\", \"body\":\"✅ PRUEBA EXITOSA: Procesamiento correcto esperado.\", \"source\":\"Makefile\", \"created\":\"$$DATE\"}"
-	@echo "$(SUCCESS)✅ Mensaje enviado. Revisa los logs de 'sqs-consumer'.$(RESET)"
+send-message: check-env ## 📨 Envía un mensaje de prueba a la cola SQS. Uso: make send-message
+	@echo "$(INFO)🚀 Enviando mensaje de prueba a SQS...$(RESET)"
+	@go run cmd/tools/send_msg/main.go
 
 .PHONY: send-message-error
-send-message-error: ## ✉️⚠️ Envía un mensaje de error a la cola SQS. Uso: make send-message-error
-	@echo "$(INFO)✉️ Enviando mensaje de error a la cola '$(SQS_QUEUE_NAME)'...$(RESET)"
-	@echo "$(INFO)⚠️ Este mensaje tiene ID='999'. Forzará un ERROR en el consumidor.$(RESET)"
-	@echo "$(INFO)🔄 Deberías ver 3 intentos fallidos en 'sqs-consumer' y luego el mensaje en 'dlq-consumer'.$(RESET)"
-	@DATE=$$(date); \
-	awslocal sqs send-message \
-		--queue-url $(SQS_QUEUE_URL) \
-		--message-body "{\"id\":\"999\", \"body\":\"❌ PRUEBA FALLIDA: Este mensaje debe ir a DLQ.\", \"source\":\"Makefile\", \"created\":\"$$DATE\"}"
-	@echo "$(SUCCESS)✅ Mensaje de error enviado. Vigila los logs de 'sqs-consumer' y 'dlq-consumer'.$(RESET)"
+send-message-error: check-env ## 📨 Envía un mensaje de prueba con error a la cola SQS. Uso: make send-message-error
+	@echo "$(INFO)🚀 Enviando mensaje de prueba con error a SQS...$(RESET)"
+	@go run cmd/tools/send_msg/main.go -error=true
 
 .PHONY: test-api-aws
 test-api-aws: ## 🧪 Realiza pruebas sobre la API Gateway de LocalStack. Uso: make test-api-aws
@@ -608,15 +596,29 @@ infra-logs: ## 📜 Muestra logs de una función específica. Uso: make infra-lo
 	@echo "🔍 Siguiendo logs de: gofibercore-local-$(FUNC_NAME)..."
 	@awslocal logs tail /aws/lambda/gofibercore-local-$(FUNC_NAME) --follow
 
-.PHONY: logs-all
-logs-all: ## 📊 Sigue logs de TODAS las lambdas en vivo (Ctrl+C para salir). Uso: make logs-all
-	@echo "📺 Observando logs de las funciones... (Ctrl+C para detener)"
+.PHONY: logs-lambdas
+logs-lambdas: ## 📊 Sigue logs de las funciones Lambda (LocalStack).
+	@echo "📺 Observando logs de las funciones (Lambda)... (Ctrl+C para detener)"
 	@sh -c '\
 		trap "kill 0 2>/dev/null || true; exit 0" INT TERM; \
 		awslocal logs tail /aws/lambda/gofibercore-local-api --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-sqs-consumer --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-1min-cron --follow & \
 		awslocal logs tail /aws/lambda/gofibercore-local-daily-cron --follow & \
+		wait \
+	'
+
+.PHONY: logs-docker
+logs-docker: ## 🐳 Sigue logs de Docker Compose.
+	@$(DC_BASE) logs -f
+
+.PHONY: logs-all
+logs-all: ## 📊 Sigue logs de los pods en K8s (API + Consumers).
+	@echo "📺 Observando logs de pods K8s (api, sqs-consumer)..."
+	@sh -c '\
+		trap "kill 0" INT TERM; \
+		kubectl logs -l app=api -f --prefix=true & \
+		kubectl logs -l app=sqs-consumer -f --prefix=true & \
 		wait \
 	'
 

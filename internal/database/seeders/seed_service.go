@@ -42,6 +42,7 @@ func ListSeedersNames() []string {
 		"menu_user",
 		"process_lifecycle_manager",
 		"test_process_scenarios",
+		"process_lifecycle_auto_invoke",
 		"all_menus",
 	}
 }
@@ -269,6 +270,10 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 
 	service.AddSeeder("test_process_scenarios", func() error {
 		return TestProcessScenariosSeeder(pool)
+	})
+
+	service.AddSeeder("process_lifecycle_auto_invoke", func() error {
+		return ProcessLifecycleAutoInvokeSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {
