@@ -28,13 +28,14 @@ type localTokenService struct {
 }
 
 func (s *localTokenService) GenerateTokens(userID, sessionID string) (string, string, error) {
-	accessTTL := time.Minute * time.Duration(s.cfg.JwtAccessTtlMinutes)
+	// Config values are already time.Duration
+	accessTTL := s.cfg.JwtAccessTtlMinutes
 	accessToken, err := s.createToken(userID, sessionID, accessTTL, s.cfg.JwtAccessSecret, "access")
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshTTL := time.Hour * 24 * time.Duration(s.cfg.JwtRefreshTtlDays)
+	refreshTTL := s.cfg.JwtRefreshTtlDays
 	refreshToken, err := s.createToken(userID, sessionID, refreshTTL, s.cfg.JwtRefreshSecret, "refresh")
 	if err != nil {
 		return "", "", err

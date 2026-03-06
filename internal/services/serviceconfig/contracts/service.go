@@ -13,6 +13,20 @@ type StepResult struct {
 	StepOrder int            `json:"step_order,omitempty"`
 }
 
+// ExecutionPolicy define cómo se ejecuta un paso: modo (Sync/Async), destino (Cola) y recursión (AutoInvoke)
+type ExecutionPolicy struct {
+	Mode        string          `json:"mode"`                  // "SYNC" | "ASYNC"
+	QueueTarget string          `json:"queue_target,omitempty"` // Nombre de la cola destino (opcional)
+	AutoInvoke  AutoInvokeConfig `json:"auto_invoke,omitempty"` // Configuración de recursión
+	NextStep    string          `json:"next_step,omitempty"`    // "AUTO" | "STOP" | "GOTO:X"
+}
+
+type AutoInvokeConfig struct {
+	Enabled       bool   `json:"enabled"`
+	CursorField   string `json:"cursor_field"`   // Campo del output que actualiza el input
+	StopCondition string `json:"stop_condition"` // Campo booleano del output que detiene el loop
+}
+
 type ServiceContext struct {
 	Ctx               context.Context `json:"-"`
 	mu                sync.Mutex

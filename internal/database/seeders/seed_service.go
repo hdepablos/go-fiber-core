@@ -2,7 +2,6 @@ package seeders
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -141,26 +140,36 @@ func (s *SeederService) RunSelected(ctx context.Context, names []string) error {
 	return nil
 }
 
-func SeedDatabase(only ...string) error {
+func SeedDatabase(selected ...string) error {
 	// Setup structured logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
 	// Parse configuration path from flags
-	configPath := flag.String("config", defaultConfigPath, "ruta al archivo de configuración YAML")
-	flag.Parse()
+	// IMPORTANTE: Cobra ya parsea flags. Si llamamos flag.Parse() aquí, puede conflictuar con Cobra.
+	// Además, el valor del flag --config ya debería venir resuelto o usar default.
+	// Asumimos que la config path es la default o la que se pase explícitamente si se refactoriza.
+	// Para simplificar y evitar el error "flag provided but not defined: -config" al usar Cobra:
+	configPath := defaultConfigPath
+	
+	// Si se quiere soportar custom config path desde Cobra, se debería pasar como argumento a SeedDatabase.
+	// Por ahora hardcodeamos el default o leemos de variable de entorno si es necesario.
+	if os.Getenv("CONFIG_PATH") != "" {
+		configPath = os.Getenv("CONFIG_PATH")
+	}
 
-	logger.Info("iniciando proceso de seeding", "config_path", *configPath)
+	logger.Info("iniciando proceso de seeding", "config_path", configPath)
 
+	// Establish database connection pool
 	// Load application configuration
-	appConfig, err := config.NewAppConfig(*configPath)
+	appConfig, err := config.NewAppConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("cargar configuración: %w", err)
 	}
 
 	// Create context with timeout for the entire seeding process
-	ctx, cancel := context.WithTimeout(context.Background(), seedTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute) // Increased timeout
 	defer cancel()
 
 	// Establish database connection pool
@@ -174,9 +183,9 @@ func SeedDatabase(only ...string) error {
 
 	service := NewSeederService(logger)
 
-	registerSeeders(service, dbPool, *configPath)
+	registerSeeders(service, dbPool, configPath)
 
-	if err := service.RunSelected(ctx, only); err != nil {
+	if err := service.RunSelected(ctx, selected); err != nil {
 		logger.Error("error ejecutando seeders", "error", err)
 		return err
 	}

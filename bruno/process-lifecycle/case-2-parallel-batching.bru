@@ -1,0 +1,28 @@
+meta {
+  name: Case 2 - Parallel Batching (Async)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 3,
+    "sede_id": 1,
+    "override_process_version_id": 3,
+    "roadmap": 0,
+    "input": {
+      "partition_id": "A1",
+      "last_id_processed": 0
+    }
+  }
+}

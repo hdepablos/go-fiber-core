@@ -14,12 +14,19 @@ import (
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
 
 	// Importación en blanco para asegurar el registro de servicios Loan Risk
+	"go-fiber-core/internal/services/dispatcher"
 	_ "go-fiber-core/internal/services/loanrisk"
+
 	// Importación en blanco para registrar servicios de prueba concurrente
-	_ "go-fiber-core/internal/services/test/steps_concurrent"
 	_ "go-fiber-core/internal/services/test/imputation"
+	_ "go-fiber-core/internal/services/test/steps_concurrent"
+
 	// Importación en blanco para registrar servicios de prueba de auto-invoke
 	_ "go-fiber-core/internal/services/test"
+
+	// Servicios Reales para Pruebas de Process Lifecycle
+	_ "go-fiber-core/internal/services/test/common"
+	_ "go-fiber-core/internal/services/test/heavy"
 )
 
 var fiberLambda *fiberadapter.FiberLambda
@@ -36,6 +43,14 @@ func initializeLambdaApp() {
 
 	fiberLambda = fiberadapter.New(server.App)
 	log.Println("✅ Fiber Lambda Adapter initialized")
+	
+	// Inject SQS Service into Dispatcher
+	if server.QueueService != nil {
+		dispatcher.DefaultDispatcher.SetQueueService(server.QueueService)
+		log.Println("✅ ProcessDispatcher configurado con QueueService")
+	} else {
+		log.Println("⚠️ QueueService no disponible en FiberServer")
+	}
 }
 
 // Handler is the Lambda entry point

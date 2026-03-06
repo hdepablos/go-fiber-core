@@ -13,10 +13,13 @@ import (
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/services/queue"
+	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
 	// Import services to register them
 	_ "go-fiber-core/internal/services/test"
+	_ "go-fiber-core/internal/services/test/common"
+	_ "go-fiber-core/internal/services/test/heavy"
 
 	"github.com/google/uuid"
 
@@ -173,34 +176,108 @@ func processMessage(ctx context.Context, record events.SQSMessage) error {
 }
 
 func handleBusinessLogic(ctx context.Context, rawData string) error {
+	// 1. Intentar procesar como RunProcessRequest (Proceso Completo)
 	var req requests.RunProcessRequest
+	var processErr error
 
-	// 1. Intentar unmarshal directo
+	// Intentar unmarshal directo
 	if err := json.Unmarshal([]byte(rawData), &req); err != nil || req.ProcessTypeID == 0 {
-		// 2. Si falla o está vacío, intentar como queue.Message
+		processErr = err // Guardar error por si acaso
+
+		// Intentar Unwrap de SQS/SNS si falló el directo
 		var msg queue.Message
 		if err2 := json.Unmarshal([]byte(rawData), &msg); err2 == nil && msg.ID != "" {
-			// Es un queue.Message. Intentamos sacar el request del Body
-			if err3 := json.Unmarshal([]byte(msg.Body), &req); err3 != nil {
-				slog.Error("Failed to unmarshal RunProcessRequest from queue.Message body", "error", err3)
-				return nil
-			}
+			_ = json.Unmarshal([]byte(msg.Body), &req)
 		} else {
-			// Try one more time assuming it might be wrapped in "Message" field from SNS/SQS raw body
 			var snsMsg struct {
 				Message string `json:"Message"`
 			}
-			if err4 := json.Unmarshal([]byte(rawData), &snsMsg); err4 == nil && snsMsg.Message != "" {
-				if err5 := json.Unmarshal([]byte(snsMsg.Message), &req); err5 != nil {
-					slog.Error("Error unmarshalling RunProcessRequest from SNS Message", "error", err5)
-					return nil
-				}
-			} else {
-				slog.Error("Error unmarshalling RunProcessRequest", "error", err)
-				return nil
+			if err3 := json.Unmarshal([]byte(rawData), &snsMsg); err3 == nil && snsMsg.Message != "" {
+				_ = json.Unmarshal([]byte(snsMsg.Message), &req)
 			}
 		}
 	}
+
+	// Si logramos decodificar un RunProcessRequest válido
+	if req.ProcessTypeID != 0 {
+		return executeRunProcessRequest(ctx, req)
+	}
+
+	// 2. Intentar procesar como DispatchStepRequest (Paso Individual - ASYNC)
+	// Estructura usada en dispatcher.go:DispatchStep
+	type DispatchStepRequest struct {
+		ServicePath        string         `json:"service_path"`
+		ProcessExecutionID string         `json:"process_execution_id"`
+		Input              map[string]any `json:"input"`
+		StepOrder          int            `json:"step_order"`
+	}
+
+	var stepReq DispatchStepRequest
+	var stepErr error
+
+	// Intentar unmarshal directo para Step
+	// IMPORTANTE: El mensaje puede venir envuelto en un objeto queue.Message (con id, body, source, created)
+	// aunque no sea un evento SQS puro, porque así lo manda el dispatcher.
+	// Primero intentamos parsear como queue.Message para sacar el body real.
+	var wrapperMsg queue.Message
+	if err := json.Unmarshal([]byte(rawData), &wrapperMsg); err == nil && wrapperMsg.Body != "" {
+		// Es un wrapper, usamos el Body interno
+		if err := json.Unmarshal([]byte(wrapperMsg.Body), &stepReq); err != nil {
+			stepErr = err
+		}
+	} else {
+		// No es wrapper, intentamos directo
+		if err := json.Unmarshal([]byte(rawData), &stepReq); err != nil {
+			stepErr = err
+		}
+	}
+	
+	// Si falló lo anterior, intentamos Unwrap de SNS por si acaso
+	if stepReq.ServicePath == "" {
+		var snsMsg struct {
+			Message string `json:"Message"`
+		}
+		if err := json.Unmarshal([]byte(rawData), &snsMsg); err == nil && snsMsg.Message != "" {
+			_ = json.Unmarshal([]byte(snsMsg.Message), &stepReq)
+		}
+	}
+
+	// Si logramos decodificar un DispatchStepRequest válido
+	if stepReq.ServicePath != "" {
+		slog.Info("🔄 Executing Async Step", "service", stepReq.ServicePath, "order", stepReq.StepOrder)
+		
+		// Reconstruir ServiceContext
+		// Nota: El input viene serializado, necesitamos asegurarnos de que los tipos se respeten.
+		// json.Unmarshal decodifica números como float64, hay que tenerlo en cuenta en los servicios.
+		svcCtx := contracts.NewServiceContextFromInput(ctx, stepReq.Input)
+		
+		// Ejecutar el servicio individual
+		if err := serviceconfig.ExecuteService(ctx, stepReq.ServicePath, svcCtx); err != nil {
+			slog.Error("❌ Error executing async step", "service", stepReq.ServicePath, "error", err)
+			return err
+		}
+		
+		slog.Info("✅ Async Step Completed", "service", stepReq.ServicePath)
+		return nil
+	}
+
+	// 3. Si ninguno funcionó, reportar error detallado
+	slog.Error("❌ Error unmarshalling message: Not a valid RunProcessRequest or DispatchStepRequest", 
+		"raw_data_preview", rawData[:min(len(rawData), 200)], // Preview seguro
+		"process_err", processErr,
+		"step_err", stepErr,
+	)
+	return nil // No reintentar si es basura, o retornar error si queremos DLQ
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func executeRunProcessRequest(ctx context.Context, req requests.RunProcessRequest) error {
 
 	slog.Info("🔄 Executing Process Version", "process_version_id", req.OverrideProcessVersionID, "process_type_id", req.ProcessTypeID, "input", req.Input)
 

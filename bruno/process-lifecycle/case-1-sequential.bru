@@ -1,0 +1,28 @@
+meta {
+  name: Case 1 - Sequential Execution (Sync)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 2,
+    "sede_id": 1,
+    "override_process_version_id": 2,
+    "roadmap": 0,
+    "input": {
+      "age": 25,
+      "email": "test@example.com"
+    }
+  }
+}

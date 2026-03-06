@@ -1,0 +1,28 @@
+meta {
+  name: Case 3 - Hybrid Flow (Sync/Async)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 4,
+    "sede_id": 1,
+    "override_process_version_id": 4,
+    "roadmap": 0,
+    "input": {
+      "file_url": "http://s3.example.com/file.csv",
+      "user_id": 99
+    }
+  }
+}

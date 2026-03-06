@@ -30,8 +30,8 @@ import (
 	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
-	processlifecycle2 "go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/pagination"
+	processlifecycle2 "go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/queue"
 	rol2 "go-fiber-core/internal/services/rol"
 	user2 "go-fiber-core/internal/services/user"
@@ -225,6 +225,9 @@ var repositorySet = wire.NewSet(
 var serviceSet = wire.NewSet(
 	provideTokenService,
 	auth.NewAuthService,
+	
+	provideAWSService, // 👈 Proveedor de AWS
+	provideSQSService, // 👈 Proveedor de SQS
 
 	provideUserPaginationService,
 	provideBankPaginationService,
@@ -252,7 +255,6 @@ var serviceSet = wire.NewSet(
 
 	menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService,
 	processlifecycle2.NewService,
-	provideAWSService, provideSQSService,
 )
 
 var handlerSet = wire.NewSet(

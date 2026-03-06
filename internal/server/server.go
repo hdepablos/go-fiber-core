@@ -6,6 +6,7 @@ import (
 	"go-fiber-core/internal/handlers"
 	"go-fiber-core/internal/middleware"
 	authService "go-fiber-core/internal/services/auth"
+	"go-fiber-core/internal/services/queue"
 	userService "go-fiber-core/internal/services/user"
 	"time"
 
@@ -17,7 +18,8 @@ import (
 type FiberServer struct {
 	*fiber.App
 	AppConfig         *config.AppConfig
-	UserWriterService userService.UserWriterService // 👈 agregado para el comando createUser
+	UserWriterService userService.UserWriterService
+	QueueService      *queue.SQSService // 👈 Nuevo campo para acceso global
 }
 
 // NewFiberServer crea e inicializa el servidor principal.
@@ -34,17 +36,19 @@ func NewFiberServer(
 	dbHandler handlers.DatabaseHandler,
 	processLifecycleHandler handlers.ProcessLifecycleHandler,
 	tokenService authService.TokenService,
-	userWriterService userService.UserWriterService, // 👈 agregado
+	userWriterService userService.UserWriterService,
+	queueService *queue.SQSService, // 👈 Nuevo parámetro
 ) (*FiberServer, func(), error) {
 
 	server := &FiberServer{
 		App: fiber.New(fiber.Config{
 			ServerHeader: appConfig.Server.ServerHeader,
 			AppName:      appConfig.App.AppName,
-			ErrorHandler: middleware.GlobalErrorHandler, // 👈 Registramos el manejador global
+			ErrorHandler: middleware.GlobalErrorHandler,
 		}),
 		AppConfig:         appConfig,
-		UserWriterService: userWriterService, // 👈 guardamos la instancia para uso externo
+		UserWriterService: userWriterService,
+		QueueService:      queueService, // 👈 Asignación
 	}
 
 	// Middleware CORS

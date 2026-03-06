@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/services/dispatcher"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"log"
 	"sort"
@@ -121,7 +122,31 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 		serviceInstance.Init(nil, serviceConfig.Path)
 	}
 
-	// Ejecutar Servicio
+	// --- LÓGICA DE EXECUTION POLICY ---
+	var policy contracts.ExecutionPolicy
+	if rawPolicy, ok := cfg["execution_policy"]; ok {
+		policyBytes, _ := json.Marshal(rawPolicy)
+		_ = json.Unmarshal(policyBytes, &policy)
+	}
+
+	// Si el modo es ASYNC, despachamos a cola y terminamos este paso
+	if policy.Mode == "ASYNC" {
+		// Usar el dispatcher centralizado
+		if err := dispatcher.DefaultDispatcher.DispatchStep(ctx, serviceConfig.Path, serviceConfig.Order, policy, svcCtx); err != nil {
+			return fmt.Errorf("dispatch failed: %w", err)
+		}
+
+		res := contracts.StepResult{
+			Status:  "pending",
+			Message: fmt.Sprintf("Step dispatched to queue: %s", policy.QueueTarget),
+		}
+		if svcCtx != nil {
+			svcCtx.SetResult(serviceConfig.Path, res)
+		}
+		return nil // Terminamos exitosamente el despacho
+	}
+
+	// Ejecutar Servicio (Modo SYNC por defecto)
 	var execErr error
 	if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
 		// ... (código existente de required keys) ...
@@ -171,7 +196,7 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 		if isTrackingTime && svcCtx != nil {
 			// Usamos Microsegundos para mayor precisión en steps rápidos (lógica pura)
 			duration := time.Since(startTime).Microseconds()
-			
+
 			// Recuperamos el resultado actual (que el servicio pudo haber seteado)
 			// O creamos uno nuevo si falló pero queremos registrar el tiempo
 			res, ok := svcCtx.GetResult(serviceConfig.Path)
@@ -190,7 +215,7 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 				res.Data = make(map[string]any)
 			}
 			res.Data["duration_us"] = duration
-			
+
 			// Guardamos de vuelta
 			svcCtx.SetResult(serviceConfig.Path, res)
 		}

@@ -8,6 +8,11 @@ package di
 
 import (
 	"context"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/google/wire"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"go-fiber-core/internal/database/connections/gorm"
 	"go-fiber-core/internal/database/connections/pgx"
 	redis2 "go-fiber-core/internal/database/connections/redis"
@@ -37,12 +42,6 @@ import (
 	user2 "go-fiber-core/internal/services/user"
 	"log"
 	"os"
-
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/google/wire"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
 )
 
 // Injectors from wire.go:
@@ -126,7 +125,16 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
 	service := processlifecycle.NewService(connectDTO)
 	processLifecycleHandler := handlers.NewProcessLifecycleHandler(service)
-	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, tokenService, userWriterService)
+	awsService, err := provideAWSService()
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	sqsService := provideSQSService(awsService)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, tokenService, userWriterService, sqsService)
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -196,7 +204,6 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
 	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
-	service := processlifecycle.NewService(connectDTO)
 	awsService, err := provideAWSService()
 	if err != nil {
 		cleanup4()
@@ -206,16 +213,17 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 		return nil, nil, err
 	}
 	sqsService := provideSQSService(awsService)
+	service := processlifecycle.NewService(connectDTO)
 	appContainer := &AppContainer{
-		Config:            appConfig,
-		Connect:           connectDTO,
-		UserWriterService: userWriterService,
-		UserReaderService: userReaderService,
-		BankWriterService: bankWriterService,
-		BankReaderService: bankReaderService,
-		AuthService:       authService,
-		DatabaseService:   databaseService,
-		QueueService:      sqsService,
+		Config:                  appConfig,
+		Connect:                 connectDTO,
+		UserWriterService:       userWriterService,
+		UserReaderService:       userReaderService,
+		BankWriterService:       bankWriterService,
+		BankReaderService:       bankReaderService,
+		AuthService:             authService,
+		DatabaseService:         databaseService,
+		QueueService:            sqsService,
 		ProcessLifecycleService: service,
 	}
 	return appContainer, func() {
@@ -275,15 +283,15 @@ type PgxReadPool *pgxpool.Pool
 
 // AppContainer contiene la lógica de negocio completa sin el servidor HTTP
 type AppContainer struct {
-	Config            *config.AppConfig
-	Connect           *connect.ConnectDTO
-	UserWriterService user2.UserWriterService
-	UserReaderService user2.UserReaderService
-	BankWriterService bank2.BankWriterService
-	BankReaderService bank2.BankReaderService
-	AuthService       auth.AuthService
-	DatabaseService   *services.DatabaseService
-	QueueService      *queue.SQSService
+	Config                  *config.AppConfig
+	Connect                 *connect.ConnectDTO
+	UserWriterService       user2.UserWriterService
+	UserReaderService       user2.UserReaderService
+	BankWriterService       bank2.BankWriterService
+	BankReaderService       bank2.BankReaderService
+	AuthService             auth.AuthService
+	DatabaseService         *services.DatabaseService
+	QueueService            *queue.SQSService
 	ProcessLifecycleService processlifecycle.Service
 }
 
@@ -387,11 +395,14 @@ var connectionSet = wire.NewSet(
 var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, catalog.NewCatalogRepository)
 
 var serviceSet = wire.NewSet(
-	provideTokenService, auth.NewAuthService, provideUserPaginationService,
+	provideTokenService, auth.NewAuthService, provideAWSService,
+	provideSQSService,
+
+	provideUserPaginationService,
 	provideBankPaginationService,
 	provideMenuUserPaginationService,
 	provideRolPaginationService,
-	provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService, processlifecycle.NewService, provideAWSService, provideSQSService,
+	provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService, processlifecycle.NewService,
 )
 
 var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler, handlers.NewRolHandler, handlers.NewCatalogHandler, handlers.NewProcessLifecycleHandler)
