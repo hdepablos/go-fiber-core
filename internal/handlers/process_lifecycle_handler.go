@@ -8,11 +8,13 @@ import (
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
+	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 type ProcessLifecycleHandler interface {
@@ -56,15 +58,32 @@ func (h *processLifecycleHandler) ReplicateScenario(c *fiber.Ctx) error {
 
 func (h *processLifecycleHandler) PromoteScenario(c *fiber.Ctx) error {
 	ctx := c.UserContext()
+	log := logger.GetLogger("promote_scenario")
 
 	var req requests.PromoteScenarioRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Error("Failed to parse PromoteScenario request", zap.Error(err))
 		return domain.ErrInvalidArgument
 	}
 
+	log.Info("Starting PromoteScenario",
+		zap.Int64("process_version_id", req.ProcessVersionID),
+		zap.String("comment", req.Comment),
+		zap.Int64("promoted_by", req.PromotedBy),
+		zap.String("client_ip", c.IP()),
+	)
+
 	if err := h.service.PromoteProcessVersion(ctx, req.ProcessVersionID, req.PromotedBy, req.Comment); err != nil {
+		log.Error("PromoteScenario failed",
+			zap.Int64("process_version_id", req.ProcessVersionID),
+			zap.Error(err),
+		)
 		return err
 	}
+
+	log.Info("PromoteScenario success",
+		zap.Int64("process_version_id", req.ProcessVersionID),
+	)
 
 	return responses.Success(c, "Escenario promovido a producción exitosamente", nil)
 }
@@ -79,6 +98,7 @@ func (h *processLifecycleHandler) ResolveScenario(c *fiber.Ctx) error {
 
 	resolvedID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, req.OverrideProcessVersionID, *req.Roadmap, true)
 	if err != nil {
+
 		return err
 	}
 
@@ -207,41 +227,41 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 
 		if svcCtx.Results != nil {
 			type orderedResult struct {
-			ServicePath string `json:"service_path"`
-			StepOrder   int    `json:"step_order"`
-		}
+				ServicePath string `json:"service_path"`
+				StepOrder   int    `json:"step_order"`
+			}
 
-		ordered := make([]orderedResult, 0, len(svcCtx.Results))
+			ordered := make([]orderedResult, 0, len(svcCtx.Results))
 
-		for path, raw := range svcCtx.Results {
-			switch v := raw.(type) {
-			case contracts.StepResult:
-				ordered = append(ordered, orderedResult{
-					ServicePath: path,
-					StepOrder:   v.StepOrder,
-				})
-			default:
-				ordered = append(ordered, orderedResult{
-					ServicePath: path,
-					StepOrder:   0,
-				})
+			for path, raw := range svcCtx.Results {
+				switch v := raw.(type) {
+				case contracts.StepResult:
+					ordered = append(ordered, orderedResult{
+						ServicePath: path,
+						StepOrder:   v.StepOrder,
+					})
+				default:
+					ordered = append(ordered, orderedResult{
+						ServicePath: path,
+						StepOrder:   0,
+					})
+				}
+			}
+
+			sort.Slice(ordered, func(i, j int) bool {
+				if ordered[i].StepOrder == ordered[j].StepOrder {
+					return ordered[i].ServicePath < ordered[j].ServicePath
+				}
+				return ordered[i].StepOrder < ordered[j].StepOrder
+			})
+
+			output["execute_ordered"] = ordered
+
+			// Inyectar métricas de rendimiento si existen (solo en modo Test)
+			if svcCtx.Metrics != nil {
+				output["performance"] = svcCtx.Metrics
 			}
 		}
-
-		sort.Slice(ordered, func(i, j int) bool {
-			if ordered[i].StepOrder == ordered[j].StepOrder {
-				return ordered[i].ServicePath < ordered[j].ServicePath
-			}
-			return ordered[i].StepOrder < ordered[j].StepOrder
-		})
-
-		output["execute_ordered"] = ordered
-		
-		// Inyectar métricas de rendimiento si existen (solo en modo Test)
-		if svcCtx.Metrics != nil {
-			output["performance"] = svcCtx.Metrics
-		}
-	}
 	}
 
 	if execErr != nil {

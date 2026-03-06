@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../../private/var/www/go-fiber-core"
+		},
+		{
+			"path": "../../../../../../../private/var/www/localstack"
+		}
+	],
+	"settings": {
+		"php.suggest.basic": false
+	}
+}

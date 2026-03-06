@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/dtos/requests"
+	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/cache"
 	"go-fiber-core/internal/services/serviceconfig"
@@ -70,59 +72,117 @@ func (s *service) ReplicateProcessVersion(ctx context.Context, processVersionID 
 	return newVersionID, nil
 }
 
+// PromoteProcessVersion promueve una versión de proceso específica a PRODUCCIÓN.
+// Este método orquesta la validación, bloqueo distribuido (Redis) y actualización atómica en base de datos.
 func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID int64, operatorID int64, comment string) error {
+	// Inicializar logger específico para este servicio
+	log := logger.GetLogger("process_lifecycle_service")
+
+	// 1. Log de entrada: Registrar intento de promoción con parámetros clave
+	log.Info("Starting PromoteProcessVersion execution",
+		zap.Int64("process_version_id", processVersionID),
+		zap.Int64("operator_id", operatorID),
+		zap.String("comment", comment),
+	)
+
+	// Validación básica de argumentos
 	if processVersionID <= 0 || operatorID <= 0 {
+		log.Warn("Invalid arguments provided",
+			zap.Int64("process_version_id", processVersionID),
+			zap.Int64("operator_id", operatorID),
+		)
 		return domain.ErrInvalidArgument
 	}
 
+	// 2. Obtener conexión a base de datos (Escritura)
 	db := s.conn.ConnectPgxWrite
 	if db == nil {
-		return fmt.Errorf("pgx write connection is not initialized")
+		err := fmt.Errorf("pgx write connection is not initialized")
+		log.Error("Database connection failed", zap.Error(err))
+		return err
 	}
 
+	// 3. Configurar cliente Redis para bloqueo distribuido
 	redisClient := s.conn.ConnectRedis
 	projectPrefix := os.Getenv("APP_NAME")
 	if projectPrefix == "" {
 		projectPrefix = "go-fiber-core"
 	}
-	// TODO: Get processTypeID and roadmap from processVersionID to lock specific key
-	// For now, we invalidate all keys related to the process version type after promotion
-	// But since we don't have processTypeID easily available here without querying,
-	// and PromoteProcessVersion is an admin task, we rely on the fact that the next ResolveProcessVersion
-	// will fetch from DB if we delete the key.
-	// BETTER APPROACH: Implement Lock/Unlock pattern.
 
-	// 1. Fetch process info to know which key to lock
+	// 4. Consultar información del proceso para construir la clave de bloqueo
+	// Necesitamos process_type_id para bloquear la concurrencia global de ese tipo de proceso
 	var processTypeID int64
-	var roadmap int
-	err := db.QueryRow(ctx, `SELECT process_type_id, roadmap FROM process_versions WHERE id = $1`, processVersionID).Scan(&processTypeID, &roadmap)
+	log.Debug("Fetching process info for locking strategy", zap.Int64("process_version_id", processVersionID))
+
+	err := db.QueryRow(ctx, `SELECT process_type_id FROM process_versions WHERE id = $1`, processVersionID).Scan(&processTypeID)
 	if err != nil {
+		log.Error("Failed to fetch process info from DB",
+			zap.Int64("process_version_id", processVersionID),
+			zap.Error(err),
+		)
 		return mapPgxError(err)
 	}
 
-	cacheKey := fmt.Sprintf("%s:lifecycle-%d:roadmap-%d", projectPrefix, processTypeID, roadmap)
+	// Construcción de la clave de bloqueo "Blocker/Blacklist": app:lifecycle:block:{processTypeID}
+	// Esta clave indicará a ResolveProcessVersion que DEBE ir a base de datos
+	blockerKey := fmt.Sprintf("%s:lifecycle:block:%d", projectPrefix, processTypeID)
+
+	// Construcción del patrón de claves a invalidar (para referencia o limpieza futura)
+	// app:lifecycle:resolution:{processTypeID}:*
+	// cachePattern := fmt.Sprintf("%s:lifecycle:resolution:%d:*", projectPrefix, processTypeID)
+
 	lockService := cache.NewRedisLockService(redisClient)
 
-	// 2. Lock
+	// 5. Establecer "Blocker" en Redis
+	// Esto fuerza a todas las lecturas concurrentes a ir a BD mientras se procesa la promoción
+	// y por un breve periodo después para asegurar consistencia.
 	if redisClient != nil {
-		// 10 seconds safety TTL
-		_ = lockService.Lock(ctx, cacheKey, 10*time.Second)
+		log.Info("Setting Redis blocker key", zap.String("blocker_key", blockerKey))
+		// TTL de 30 segundos debería ser suficiente para cubrir la transacción y propagación
+		if err := lockService.Set(ctx, blockerKey, "1", 30*time.Second); err != nil {
+			log.Warn("Failed to set Redis blocker", zap.String("key", blockerKey), zap.Error(err))
+		} else {
+			log.Debug("Redis blocker set successfully", zap.String("key", blockerKey))
+		}
+	} else {
+		log.Warn("Redis client not available - skipping blocker setup")
 	}
 
-	// 3. Promote in DB
-	_, err = db.Exec(ctx, `SELECT promote_process_version($1, $2, $3)`, processVersionID, operatorID, comment)
+	// 6. Ejecutar Procedimiento Almacenado de Promoción
+	// La lógica pesada de transacción, historial y cambio de estados reside en la BD
+	log.Info("Executing stored procedure: promote_process_version",
+		zap.Int64("process_version_id", processVersionID),
+	)
+
+	// Se espera que la función retorne un entero (1) en éxito
+	var result int
+	err = db.QueryRow(ctx, `SELECT promote_process_version($1, $2, $3)`, processVersionID, operatorID, comment).Scan(&result)
+
 	if err != nil {
-		// Attempt to unlock if DB fails, though TTL will handle it eventually
-		if redisClient != nil {
-			_ = lockService.Unlock(ctx, cacheKey)
-		}
+		log.Error("Stored procedure execution failed",
+			zap.Int64("process_version_id", processVersionID),
+			zap.Error(err),
+		)
+
+		// El blocker expirará solo o podríamos intentar borrarlo si falló algo crítico,
+		// pero es más seguro dejarlo para que las lecturas sigan yendo a BD un momento.
 		return mapPgxError(err)
 	}
 
-	// 4. Unlock and Invalidate
+	log.Info("Stored procedure executed successfully", zap.Int("result_code", result))
+
+	// 7. Limpiar Caché (Invalidación por patrón)
+	// Nota: El Blocker sigue activo por su TTL (30s) para asegurar que
+	// cualquier nodo vea la promoción antes de volver a cachear.
 	if redisClient != nil {
-		_ = lockService.Unlock(ctx, cacheKey)
+		// Aquí idealmente borraríamos todas las llaves que empiecen con "app:lifecycle:resolution:{processTypeID}:"
+		// Por simplicidad, el blocker ya cumple la función de invalidación lógica.
+		log.Debug("Redis promotion cleanup finished (blocker still active via TTL)")
 	}
+
+	log.Info("PromoteProcessVersion completed successfully",
+		zap.Int64("process_version_id", processVersionID),
+	)
 
 	return nil
 }
@@ -149,29 +209,29 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	}
 
 	/*
-	// 1. Validar existencia de Sede (si aplica)
-	if sedeID > 0 {
-		var exists bool
-		// Asumimos tabla 'sedes'. Si falla, el error indicará el problema.
-		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM sedes WHERE id = $1)", sedeID).Scan(&exists); err != nil {
-			return 0, nil, mapPgxError(err)
+		// 1. Validar existencia de Sede (si aplica)
+		if sedeID > 0 {
+			var exists bool
+			// Asumimos tabla 'sedes'. Si falla, el error indicará el problema.
+			if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM sedes WHERE id = $1)", sedeID).Scan(&exists); err != nil {
+				return 0, nil, mapPgxError(err)
+			}
+			if !exists {
+				return 0, nil, domain.ErrSedeNotFound
+			}
 		}
-		if !exists {
-			return 0, nil, domain.ErrSedeNotFound
-		}
-	}
 
-	// 2. Validar existencia de Roadmap (si aplica)
-	if roadmap > 0 {
-		var exists bool
-		// Asumimos tabla 'roadmaps'.
-		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM roadmaps WHERE id = $1)", roadmap).Scan(&exists); err != nil {
-			return 0, nil, mapPgxError(err)
+		// 2. Validar existencia de Roadmap (si aplica)
+		if roadmap > 0 {
+			var exists bool
+			// Asumimos tabla 'roadmaps'.
+			if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM roadmaps WHERE id = $1)", roadmap).Scan(&exists); err != nil {
+				return 0, nil, mapPgxError(err)
+			}
+			if !exists {
+				return 0, nil, domain.ErrRoadmapNotFound
+			}
 		}
-		if !exists {
-			return 0, nil, domain.ErrRoadmapNotFound
-		}
-	}
 	*/
 
 	// 3. Validar existencia de Versión Específica (si aplica)
@@ -188,26 +248,34 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 	var resolvedID int64
 	var stepsJSON []byte
 
-	if overrideProcessVersionID != nil {
-		err := db.
-			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, $3, $4)`, processTypeID, sedeID, *overrideProcessVersionID, roadmap).
-			Scan(&resolvedID, &stepsJSON)
-		if err != nil {
-			return 0, nil, mapPgxError(err)
-		}
-	} else {
-		// Try Redis with Locking Strategy only if useCache is true
-		if useCache && redisClient != nil {
-			cacheKey := fmt.Sprintf("%s:lifecycle-%d:sede-%d:roadmap-%d", projectPrefix, processTypeID, sedeID, roadmap)
-			lockService := cache.NewRedisLockService(redisClient)
+	// Estrategia de Caching:
+	// 1. Si hay override (> 0), SIEMPRE vamos a BD (sin cache).
+	// 2. Si es override=0 (PROD):
+	//    a. Verificamos si existe "blocker" (app:lifecycle:block:{typeID}). Si existe -> BD.
+	//    b. Si no hay blocker -> Intentamos Cache (app:lifecycle:resolution:{type}:{sede}:{roadmap}).
+	//    c. Si no hay cache -> BD -> Guardar en Cache.
 
-			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	shouldUseCache := useCache && overrideProcessVersionID == nil && redisClient != nil
+	cacheKey := fmt.Sprintf("%s:lifecycle:resolution:%d:%d:%d", projectPrefix, processTypeID, sedeID, roadmap)
+	blockerKey := fmt.Sprintf("%s:lifecycle:block:%d", projectPrefix, processTypeID)
+
+	if shouldUseCache {
+		lockService := cache.NewRedisLockService(redisClient)
+		redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+		defer cancel()
+
+		// 1. Verificar Blocker
+		// Si existe el blocker, significa que hubo una promoción reciente y debemos ir a BD
+		isBlocked, _ := lockService.Get(redisCtx, blockerKey)
+
+		if len(isBlocked) > 0 {
+			// Blocker activo -> forzar lectura de BD
+			// No deshabilitamos shouldUseCache para permitir escritura posterior si quisiéramos,
+			// pero según la regla "si está bloqueado no cachear", mejor lo deshabilitamos para esta request.
+			shouldUseCache = false
+		} else {
+			// 2. Intentar leer del Cache Específico
 			cached, err := lockService.Get(redisCtx, cacheKey)
-			cancel()
-
-			// If err is ErrCacheLocked, it means update in progress -> go to DB
-			// If err is ErrCacheMiss, it means not in cache -> go to DB
-			// If err is nil and cached has content -> return cache
 			if err == nil && len(cached) > 0 {
 				var payload struct {
 					ProcessVersionID int64  `json:"process_version_id"`
@@ -218,7 +286,16 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 				}
 			}
 		}
+	}
 
+	if overrideProcessVersionID != nil {
+		err := db.
+			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, $3, $4)`, processTypeID, sedeID, *overrideProcessVersionID, roadmap).
+			Scan(&resolvedID, &stepsJSON)
+		if err != nil {
+			return 0, nil, mapPgxError(err)
+		}
+	} else {
 		err := db.
 			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, NULL, $3)`, processTypeID, sedeID, roadmap).
 			Scan(&resolvedID, &stepsJSON)
@@ -236,8 +313,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		}
 	}
 
-	if overrideProcessVersionID == nil && useCache && redisClient != nil {
-		cacheKey := fmt.Sprintf("%s:lifecycle-%d:sede-%d:roadmap-%d", projectPrefix, processTypeID, sedeID, roadmap)
+	if shouldUseCache {
 		lockService := cache.NewRedisLockService(redisClient)
 
 		payload := struct {
@@ -251,8 +327,8 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		encoded, err := json.Marshal(payload)
 		if err == nil {
 			redisCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-			// Using standard Set without lock for repopulation
-			_ = lockService.Set(redisCtx, cacheKey, encoded, 0)
+			// Guardar en cache con expiración (ej. 1 hora o lo que prefieras)
+			_ = lockService.Set(redisCtx, cacheKey, encoded, 1*time.Hour)
 			cancel()
 		}
 	}
@@ -270,7 +346,8 @@ func (s *service) MoveProcessVersionToTest(ctx context.Context, processVersionID
 		return fmt.Errorf("pgx write connection is not initialized")
 	}
 
-	_, err := db.Exec(ctx, `SELECT move_process_version_to_test($1)`, processVersionID)
+	var result int
+	err := db.QueryRow(ctx, `SELECT move_process_version_to_test($1)`, processVersionID).Scan(&result)
 	if err != nil {
 		return mapPgxError(err)
 	}

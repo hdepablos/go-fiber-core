@@ -88,7 +88,7 @@ CREATE OR REPLACE FUNCTION promote_process_version(
     p_operator_id BIGINT,
     p_comment VARCHAR
 )
-RETURNS VOID
+RETURNS INTEGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
@@ -160,6 +160,8 @@ BEGIN
         p_operator_id,
         p_comment
     );
+
+    RETURN 1;
 
 END;
 $$;
@@ -328,7 +330,7 @@ $$;
 CREATE OR REPLACE FUNCTION move_process_version_to_test(
     p_process_version_id BIGINT
 )
-RETURNS VOID
+RETURNS INTEGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
@@ -354,6 +356,8 @@ BEGIN
     SET status = 'TEST',
         updated_at = NOW()
     WHERE id = p_process_version_id;
+
+    RETURN 1;
 
 END;
 $$;

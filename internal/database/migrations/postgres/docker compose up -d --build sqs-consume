@@ -1,0 +1,3 @@
+docker compose up -d --build sqs-consumer
+
+make fast-deploy FOLDER=sqs-consumer
