@@ -109,9 +109,6 @@ func runPollingLoop() {
 			// 3. Borrar mensaje exitoso
 			if err := appContainer.QueueService.DeleteMessage(ctx, lambdaMsg.ReceiptHandle); err != nil {
 				slog.Error("⚠️ Error borrando mensaje procesado", "id", lambdaMsg.MessageId, "error", err)
-			} else {
-				// Log opcional de borrado exitoso
-				// slog.Debug("✅ Mensaje borrado", "id", lambdaMsg.MessageId)
 			}
 		}
 	}

@@ -15,7 +15,7 @@ import (
 
 	// Importación en blanco para asegurar el registro de servicios Loan Risk
 	"go-fiber-core/internal/services/dispatcher"
-	_ "go-fiber-core/internal/services/loanrisk"
+	_ "go-fiber-core/internal/services/test/loanrisk"
 
 	// Importación en blanco para registrar servicios de prueba concurrente
 	_ "go-fiber-core/internal/services/test/imputation"
@@ -43,7 +43,7 @@ func initializeLambdaApp() {
 
 	fiberLambda = fiberadapter.New(server.App)
 	log.Println("✅ Fiber Lambda Adapter initialized")
-	
+
 	// Inject SQS Service into Dispatcher
 	if server.QueueService != nil {
 		dispatcher.DefaultDispatcher.SetQueueService(server.QueueService)

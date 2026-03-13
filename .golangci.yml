@@ -10,6 +10,7 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  uniq-by-line: true
   exclude-files:
     - "cmd/api/di/wire_gen\\.go"
   exclude-rules:
@@ -24,7 +25,6 @@ issues:
 output:
   formats: colored-line-number
   print-issued-lines: true
-  uniq-by-line: true
   sort-results: true
 skip-files:
   - "mocks/"

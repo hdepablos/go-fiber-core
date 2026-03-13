@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go-fiber-core/internal/contextkeys"
 	"go-fiber-core/internal/dtos/config"
 
 	"gorm.io/driver/mysql"
@@ -91,28 +92,49 @@ func createGormConnection(cfg config.GormConnectionConfig) (*gorm.DB, *sql.DB, e
 
 func registerPerformanceHooks(db *gorm.DB) {
 	// Start timer before any operation
-	db.Callback().Create().Before("gorm:create").Register("perf:before_create", startTimer)
-	db.Callback().Query().Before("gorm:query").Register("perf:before_query", startTimer)
-	db.Callback().Update().Before("gorm:update").Register("perf:before_update", startTimer)
-	db.Callback().Delete().Before("gorm:delete").Register("perf:before_delete", startTimer)
-	db.Callback().Row().Before("gorm:row").Register("perf:before_row", startTimer)
-	db.Callback().Raw().Before("gorm:raw").Register("perf:before_raw", startTimer)
+	if err := db.Callback().Create().Before("gorm:create").Register("perf:before_create", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_create: %v", err)
+	}
+	if err := db.Callback().Query().Before("gorm:query").Register("perf:before_query", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_query: %v", err)
+	}
+	if err := db.Callback().Update().Before("gorm:update").Register("perf:before_update", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_update: %v", err)
+	}
+	if err := db.Callback().Delete().Before("gorm:delete").Register("perf:before_delete", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_delete: %v", err)
+	}
+	if err := db.Callback().Row().Before("gorm:row").Register("perf:before_row", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_row: %v", err)
+	}
+	if err := db.Callback().Raw().Before("gorm:raw").Register("perf:before_raw", startTimer); err != nil {
+		log.Printf("❌ Error registrando hook perf:before_raw: %v", err)
+	}
 
 	// Measure duration after operation
-	db.Callback().Create().After("gorm:create").Register("perf:after_create", endTimerWrite)
-	db.Callback().Query().After("gorm:query").Register("perf:after_query", endTimerRead)
-	db.Callback().Update().After("gorm:update").Register("perf:after_update", endTimerWrite)
-	db.Callback().Delete().After("gorm:delete").Register("perf:after_delete", endTimerWrite)
-	db.Callback().Row().After("gorm:row").Register("perf:after_row", endTimerRead)
-	db.Callback().Raw().After("gorm:raw").Register("perf:after_raw", endTimerRead)
+	if err := db.Callback().Create().After("gorm:create").Register("perf:after_create", endTimerWrite); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_create: %v", err)
+	}
+	if err := db.Callback().Query().After("gorm:query").Register("perf:after_query", endTimerRead); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_query: %v", err)
+	}
+	if err := db.Callback().Update().After("gorm:update").Register("perf:after_update", endTimerWrite); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_update: %v", err)
+	}
+	if err := db.Callback().Delete().After("gorm:delete").Register("perf:after_delete", endTimerWrite); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_delete: %v", err)
+	}
+	if err := db.Callback().Row().After("gorm:row").Register("perf:after_row", endTimerRead); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_row: %v", err)
+	}
+	if err := db.Callback().Raw().After("gorm:raw").Register("perf:after_raw", endTimerRead); err != nil {
+		log.Printf("❌ Error registrando hook perf:after_raw: %v", err)
+	}
 }
 
 func startTimer(db *gorm.DB) {
 	if db.Statement.Context != nil {
-		// SHORT-CIRCUIT: Verificar PRIMERO si existe el colector de métricas en el contexto.
-		// Si no existe (99% de los casos en Producción), retornamos inmediatamente.
-		// Esto evita llamar a time.Now() y allocar memoria innecesariamente.
-		if db.Statement.Context.Value("db_metrics_collector") == nil {
+		if db.Statement.Context.Value(contextkeys.DBMetricsCollectorKey) == nil {
 			return
 		}
 		
@@ -144,7 +166,7 @@ func endTimer(db *gorm.DB, isWrite bool) {
 
 	// Check for a specific key in the context that holds the metrics collector
 	if db.Statement.Context != nil {
-		if collector, ok := db.Statement.Context.Value("db_metrics_collector").(interface {
+		if collector, ok := db.Statement.Context.Value(contextkeys.DBMetricsCollectorKey).(interface {
 			AddDBMetric(int64, bool)
 		}); ok {
 			collector.AddDBMetric(duration, isWrite)
@@ -236,7 +258,9 @@ func NewGormConnectService(cfg config.MultiDatabaseConfig) (*GormConnectService,
 
 	dbRead, sqlDBRead, err := createGormConnection(cfg.Gorm.Read)
 	if err != nil {
-		sqlDBWrite.Close()
+		if closeErr := sqlDBWrite.Close(); closeErr != nil {
+			log.Printf("❌ Error cerrando la conexión de escritura GORM: %v", closeErr)
+		}
 		return nil, nil, err
 	}
 

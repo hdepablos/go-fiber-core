@@ -1,0 +1,6 @@
+TRUNCATE TABLE
+  process_types,
+  process_versions,
+  process_steps,
+  process_version_history
+RESTART IDENTITY CASCADE;

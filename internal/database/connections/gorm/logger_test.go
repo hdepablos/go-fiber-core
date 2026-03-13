@@ -16,8 +16,8 @@ func TestLoggerBehavior(t *testing.T) {
 	origAppEnv := os.Getenv("APP_ENV")
 	origDbLogLevel := os.Getenv("DB_LOG_LEVEL")
 	defer func() {
-		os.Setenv("APP_ENV", origAppEnv)
-		os.Setenv("DB_LOG_LEVEL", origDbLogLevel)
+		_ = os.Setenv("APP_ENV", origAppEnv)
+		_ = os.Setenv("DB_LOG_LEVEL", origDbLogLevel)
 	}()
 
 	tests := []struct {
@@ -66,8 +66,12 @@ func TestLoggerBehavior(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("APP_ENV", tt.appEnv)
-			os.Setenv("DB_LOG_LEVEL", tt.dbLogLevel)
+			if err := os.Setenv("APP_ENV", tt.appEnv); err != nil {
+				t.Fatalf("set APP_ENV: %v", err)
+			}
+			if err := os.Setenv("DB_LOG_LEVEL", tt.dbLogLevel); err != nil {
+				t.Fatalf("set DB_LOG_LEVEL: %v", err)
+			}
 
 			// Buffer para capturar la salida
 			var buf bytes.Buffer

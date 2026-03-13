@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"go-fiber-core/internal/contextkeys"
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
@@ -459,7 +460,7 @@ func (s *service) ListProcessVersions(ctx context.Context, req dtos.PaginationRe
 
 	offset := (req.Page - 1) * req.RowsPerPage
 
-	var rows []models.ProcessVersionRow
+	var items []models.ProcessVersionListItem
 	if err := base.
 		Select(`
 			pv.id AS id,
@@ -474,24 +475,8 @@ func (s *service) ListProcessVersions(ctx context.Context, req dtos.PaginationRe
 		).
 		Limit(req.RowsPerPage).
 		Offset(offset).
-		Scan(&rows).Error; err != nil {
+		Scan(&items).Error; err != nil {
 		return nil, err
-	}
-
-	items := make([]models.ProcessVersionListItem, 0, len(rows))
-	for _, r := range rows {
-		item := models.ProcessVersionListItem{
-			ID:                   r.ID,
-			ProcessTypeName:      r.ProcessTypeName,
-			ProcessTypeIsVisible: r.ProcessTypeIsVisible,
-			VersionNumber:        r.VersionNumber,
-			SedeID:               r.SedeID,
-			Status:               r.Status,
-			OperatorEmail:        r.OperatorEmail,
-			ValidFrom:            r.ValidFrom,
-			ValidTo:              r.ValidTo,
-		}
-		items = append(items, item)
 	}
 
 	totalPages := 0
@@ -712,7 +697,7 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 		}()
 
 		// Inyectar el ServiceContext en el contexto de Go para que GORM lo vea
-		ctx = context.WithValue(ctx, "db_metrics_collector", serviceCtx)
+		ctx = context.WithValue(ctx, contextkeys.DBMetricsCollectorKey, serviceCtx)
 		serviceCtx.Ctx = ctx // Actualizar también dentro del struct
 	}
 

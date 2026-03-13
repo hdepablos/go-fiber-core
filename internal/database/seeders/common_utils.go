@@ -22,8 +22,6 @@ const (
 	csvDelimiter = ';'
 
 	// Batch sizes for bulk operations
-	defaultBatchSize = 100
-
 	// File paths base
 	seedersFilesPath = "internal/database/seeders/files"
 )
@@ -34,7 +32,9 @@ func parseCSV(filename string) ([][]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	reader := csv.NewReader(file)
 	reader.Comma = csvDelimiter
@@ -88,8 +88,8 @@ func executeInTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(conte
 	}
 
 	defer func() {
-		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			// Log rollback errors but don't override the original error
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
+			_ = rollbackErr
 		}
 	}()
 
@@ -135,18 +135,6 @@ func buildFilePath(filename string) string {
 	return fmt.Sprintf("%s/%s", seedersFilesPath, filename)
 }
 
-
-func getIDByField(ctx context.Context, pool *pgxpool.Pool, table, field string, value any) (uint, error) {
-	query := fmt.Sprintf("SELECT id FROM %s WHERE %s = $1 LIMIT 1", table, field)
-
-	var id uint
-	err := pool.QueryRow(ctx, query, value).Scan(&id)
-	if err != nil {
-		return 0, err
-	}
-
-	return id, nil
-}
 
 // parseUint converts string to uint safely.
 func parseUint(s string) (uint, error) {

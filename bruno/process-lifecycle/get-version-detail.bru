@@ -1,15 +1,15 @@
 meta {
   name: get version detail
   type: http
-  seq: 5
+  seq: 1
 }
 
 get {
   url: {{urlBase}}api/v1/process-lifecycle/versions/1
+  body: none
   auth: bearer
 }
 
 auth:bearer {
   token: {{access_token}}
 }
-

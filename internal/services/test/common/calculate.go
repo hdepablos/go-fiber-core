@@ -24,7 +24,7 @@ func (s *CalculateService) Execute() error {
 	fmt.Printf("🧮 Ejecutando CalculateService: %s\n", s.servicePath)
 	
 	age, _ := s.ctx.GetInputValue("age")
-	var result float64 = 0
+	var result float64
 	
 	// Lógica de cálculo real
 	if val, ok := age.(float64); ok {

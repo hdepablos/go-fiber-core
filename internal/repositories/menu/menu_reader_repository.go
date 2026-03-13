@@ -27,8 +27,10 @@ func NewMenuReaderRepository(conn *connect.ConnectDTO) MenuReader {
 // GetMenusByUserID implementa la lógica SQL para obtener la lista plana de menús
 // (ítems asignados y sus padres), filtrando por 'is_active' en la tabla pivote.
 func (r *menuReaderRepository) GetMenusByUserID(ctx context.Context, db *gorm.DB, userID uint64) ([]models.Menu, error) {
-	// Usamos el DB inyectado en la struct, no el pasado como argumento (si se inyecta con ConnectDTO)
-	db = r.db.WithContext(ctx)
+	if db == nil {
+		db = r.db
+	}
+	db = db.WithContext(ctx)
 
 	// 1️⃣ SUB-CONSULTA: Obtener IDs de menús DIRECTAMENTE asignados y ACTIVOS
 	userMenuIDs := db.
@@ -37,7 +39,6 @@ func (r *menuReaderRepository) GetMenusByUserID(ctx context.Context, db *gorm.DB
 		Where("user_id = ?", userID).
 		Where("is_active = ?", true).
 		Where("deleted_at IS NULL") // Asegurarnos de no incluir asignaciones eliminadas
-		
 
 	// 2️⃣ SUB-CONSULTA: Obtener IDs de los padres de esos menús activos
 	parentIDs := db.

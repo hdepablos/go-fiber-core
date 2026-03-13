@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,15 +41,15 @@ func seedConcurrentProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) 
 	// 1. Crear o Buscar Process Type
 	var processTypeID int64
 	const processTypeName = "Test Proceso de steps concurrente"
-	
+
 	err := tx.QueryRow(ctx, "SELECT id FROM process_types WHERE name = $1", processTypeName).Scan(&processTypeID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			// No existe, insertar
 			err = tx.QueryRow(ctx,
 				`INSERT INTO process_types (name, description, is_visible)
-				 VALUES ($1, $2, $3)
-				 RETURNING id`,
+				VALUES ($1, $2, $3)
+				RETURNING id`,
 				processTypeName,
 				"Proceso para demostrar ejecución concurrente de pasos",
 				true,
@@ -67,8 +67,8 @@ func seedConcurrentProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) 
 
 	// 2. Crear o Buscar Versión Global en PROD
 	var versionID int64
-	err = tx.QueryRow(ctx, 
-		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 1 AND sede_id IS NULL", 
+	err = tx.QueryRow(ctx,
+		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 1 AND sede_id IS NULL",
 		processTypeID,
 	).Scan(&versionID)
 
@@ -77,8 +77,8 @@ func seedConcurrentProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) 
 			// No existe, insertar
 			err = tx.QueryRow(ctx,
 				`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
-				 VALUES ($1, $2, $3, $4, NULL)
-				 RETURNING id`,
+				VALUES ($1, $2, $3, $4, NULL)
+				RETURNING id`,
 				processTypeID,
 				1,
 				"PROD",
@@ -129,14 +129,14 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 	// 1. Crear o Buscar Process Type
 	var processTypeID int64
 	const processTypeName = "Test Multi-Sede Logic"
-	
+
 	err := tx.QueryRow(ctx, "SELECT id FROM process_types WHERE name = $1", processTypeName).Scan(&processTypeID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			err = tx.QueryRow(ctx,
 				`INSERT INTO process_types (name, description, is_visible)
-				 VALUES ($1, $2, $3)
-				 RETURNING id`,
+				VALUES ($1, $2, $3)
+				RETURNING id`,
 				processTypeName,
 				"Proceso para demostrar resolución de versiones (Global vs Sede)",
 				true,
@@ -156,8 +156,8 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 	// CASO A: Versión Global (Sede NULL) -> Estándar
 	// ============================================================
 	var globalVersionID int64
-	err = tx.QueryRow(ctx, 
-		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 1 AND sede_id IS NULL", 
+	err = tx.QueryRow(ctx,
+		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 1 AND sede_id IS NULL",
 		processTypeID,
 	).Scan(&globalVersionID)
 
@@ -165,8 +165,8 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 		if err == pgx.ErrNoRows {
 			err = tx.QueryRow(ctx,
 				`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
-				 VALUES ($1, $2, $3, $4, NULL)
-				 RETURNING id`,
+				VALUES ($1, $2, $3, $4, NULL)
+				RETURNING id`,
 				processTypeID,
 				1,
 				"PROD",
@@ -186,7 +186,11 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 	}
 
 	// Steps Globales (Reusamos concurrent steps solo como placeholders)
-	globalSteps := []struct{Order int; Name string; Key string}{
+	globalSteps := []struct {
+		Order int
+		Name  string
+		Key   string
+	}{
 		{1, "Standard Step A", "test/concurrent/step1"},
 		{2, "Standard Step B", "test/concurrent/step2"},
 	}
@@ -201,8 +205,8 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 	// ============================================================
 	targetSedeID := 2
 	var customVersionID int64
-	err = tx.QueryRow(ctx, 
-		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 2 AND sede_id = $2", 
+	err = tx.QueryRow(ctx,
+		"SELECT id FROM process_versions WHERE process_type_id = $1 AND version_number = 2 AND sede_id = $2",
 		processTypeID, targetSedeID,
 	).Scan(&customVersionID)
 
@@ -210,8 +214,8 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 		if err == pgx.ErrNoRows {
 			err = tx.QueryRow(ctx,
 				`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
-				 VALUES ($1, $2, $3, $4, $5)
-				 RETURNING id`,
+				VALUES ($1, $2, $3, $4, $5)
+				RETURNING id`,
 				processTypeID,
 				2, // Version 2 (arbitrario, podría ser 1 pero con sede_id)
 				"PROD",
@@ -232,7 +236,11 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 	}
 
 	// Steps Custom (Más pasos o diferentes)
-	customSteps := []struct{Order int; Name string; Key string}{
+	customSteps := []struct {
+		Order int
+		Name  string
+		Key   string
+	}{
 		{1, "Custom Step A", "test/concurrent/step1"},
 		{2, "Custom Step B", "test/concurrent/step2"},
 		{3, "Custom Step C (Extra)", "test/concurrent/step3"},
@@ -250,8 +258,8 @@ func seedMultiSedeProcess(ctx context.Context, tx pgx.Tx, logger *slog.Logger) e
 
 func ensureHistory(ctx context.Context, tx pgx.Tx, versionID, typeID int64, comment string, logger *slog.Logger) error {
 	var exists bool
-	err := tx.QueryRow(ctx, 
-		"SELECT EXISTS(SELECT 1 FROM process_version_history WHERE process_version_id = $1)", 
+	err := tx.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM process_version_history WHERE process_version_id = $1)",
 		versionID,
 	).Scan(&exists)
 	if err != nil {
@@ -275,9 +283,9 @@ func ensureHistory(ctx context.Context, tx pgx.Tx, versionID, typeID int64, comm
 
 func upsertStep(ctx context.Context, tx pgx.Tx, versionID int64, order int, name, key, config string) error {
 	cmdTag, err := tx.Exec(ctx,
-		`UPDATE process_steps 
-		 SET step_order = $1, name = $2, config = $3::jsonb, roadmap = 0
-		 WHERE process_version_id = $4 AND execution_key = $5`,
+		`UPDATE process_steps
+		SET step_order = $1, name = $2, config = $3::jsonb, roadmap = 0
+		WHERE process_version_id = $4 AND execution_key = $5`,
 		order, name, config, versionID, key,
 	)
 	if err != nil {
@@ -287,7 +295,7 @@ func upsertStep(ctx context.Context, tx pgx.Tx, versionID int64, order int, name
 	if cmdTag.RowsAffected() == 0 {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
-			 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
+			VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
 			versionID, order, name, key, config,
 		)
 		if err != nil {

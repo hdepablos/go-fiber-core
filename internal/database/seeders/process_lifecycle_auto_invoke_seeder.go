@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -26,8 +26,8 @@ func ProcessLifecycleAutoInvokeSeeder(pool *pgxpool.Pool) error {
 			if err == pgx.ErrNoRows {
 				err = tx.QueryRow(ctx,
 					`INSERT INTO process_types (name, description, is_visible)
-                     VALUES ($1, $2, $3)
-                     RETURNING id`,
+					VALUES ($1, $2, $3)
+					RETURNING id`,
 					processTypeName,
 					"Process to demonstrate auto-invoke/recursion capabilities",
 					true,
@@ -54,8 +54,8 @@ func ProcessLifecycleAutoInvokeSeeder(pool *pgxpool.Pool) error {
 			if err == pgx.ErrNoRows {
 				err = tx.QueryRow(ctx,
 					`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
-                     VALUES ($1, $2, $3, $4, NULL)
-                     RETURNING id`,
+					VALUES ($1, $2, $3, $4, NULL)
+					RETURNING id`,
 					processTypeID,
 					1,
 					"PROD",

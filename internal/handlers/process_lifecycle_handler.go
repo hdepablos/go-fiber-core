@@ -265,7 +265,7 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 	}
 
 	if execErr != nil {
-		statusCode := fiber.StatusInternalServerError
+		var statusCode int
 
 		errorPayload := map[string]any{
 			"message": execErr.Error(),

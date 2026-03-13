@@ -10,6 +10,8 @@ type contextKey string
 // del context.Context.
 const UserIDKey contextKey = "userID"
 
+const DBMetricsCollectorKey contextKey = "dbMetricsCollector"
+
 // --- Helpers Opcionales (Recomendado) ---
 
 // SetUserID enriquece un contexto con el ID de usuario.

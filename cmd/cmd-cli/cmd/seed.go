@@ -21,11 +21,17 @@ var seedCmd = &cobra.Command{
 			fmt.Println("Seeders disponibles:")
 			all := seeders.ListSeedersNames()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NOMBRE\tCOMANDO")
-			for _, name := range all {
-				fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
+			if _, err := fmt.Fprintln(w, "NOMBRE\tCOMANDO"); err != nil {
+				return err
 			}
-			w.Flush()
+			for _, name := range all {
+				if _, err := fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name); err != nil {
+					return err
+				}
+			}
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		}
 
@@ -33,11 +39,17 @@ var seedCmd = &cobra.Command{
 			fmt.Println("Seeders disponibles:")
 			all := seeders.ListSeedersNames()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NOMBRE\tCOMANDO")
-			for _, name := range all {
-				fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name)
+			if _, err := fmt.Fprintln(w, "NOMBRE\tCOMANDO"); err != nil {
+				return err
 			}
-			w.Flush()
+			for _, name := range all {
+				if _, err := fmt.Fprintf(w, "%s\tmake seed-one name=%s\n", name, name); err != nil {
+					return err
+				}
+			}
+			if err := w.Flush(); err != nil {
+				return err
+			}
 		}
 
 		fmt.Println("\nEjecutando los seeders...")

@@ -27,10 +27,10 @@ func main() {
 
 	// El último elemento es el nombre del servicio (archivo)
 	serviceName := parts[len(parts)-1]
-	
+
 	// Todo lo anterior es la ruta de carpetas
 	folderPath := strings.Join(parts[:len(parts)-1], "/")
-	
+
 	// El nombre del paquete será el nombre de la última carpeta contenedora
 	packageName := parts[len(parts)-2]
 
@@ -94,7 +94,7 @@ func toCamelCase(s string) string {
 
 func generateContent(folderPath, packageName, serviceName string) string {
 	structName := toCamelCase(serviceName)
-	
+
 	return fmt.Sprintf(`package %s
 
 import (
@@ -135,7 +135,7 @@ func (s *%s) Execute() error {
 			"executed": true,
 		},
 	}
-	
+
 	s.ctx.SetResult(s.servicePath, result)
 	return nil
 }
@@ -164,25 +164,25 @@ func injectImport(filePath, folder string) {
 	// Buscar bloque de imports con blank identifiers
 	// Estrategia simple: buscar el último import y añadirlo después
 	// O mejor, buscar un marcador conocido o el final del bloque import
-	
+
 	// Vamos a buscar la línea `_ "go-fiber-core/internal/services/` existente para añadirlo cerca
 	// Si no, lo metemos en el bloque import general
-	
+
 	lines := strings.Split(fileStr, "\n")
 	newLines := make([]string, 0, len(lines)+1)
 	injected := false
-	
+
 	// Regex para detectar imports de servicios
 	serviceImportRegex := regexp.MustCompile(`_ "go-fiber-core/internal/services/.*"`)
-	
+
 	lastImportIdx := -1
-	
+
 	for i, line := range lines {
 		if serviceImportRegex.MatchString(line) {
 			lastImportIdx = i
 		}
 	}
-	
+
 	if lastImportIdx != -1 {
 		// Insertar después del último import de servicio encontrado
 		for i, line := range lines {

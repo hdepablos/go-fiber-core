@@ -18,10 +18,6 @@ func main() {
 	ctx := context.TODO()
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("us-east-1"),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{URL: "http://localhost:4566"}, nil
-			})),
 		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
 			return aws.Credentials{
 				AccessKeyID:     "test",
@@ -32,6 +28,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	cfg.BaseEndpoint = aws.String("http://127.0.0.1:4566")
 
 	client := sqs.NewFromConfig(cfg)
 	// queueUrl := "http://localhost:4566/000000000000/gofibercorequeue"

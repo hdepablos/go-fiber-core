@@ -18,3 +18,8 @@ Actualizar sqs-consumer para:
 Aplicar lógica de validación en age como el de salary
 
 modificar el registre que sea igual al de la ruta del archivo
+
+
+
+Que este por el .env
+secret := "tu_super_secreto_para_access_tokens" // Valor real de .env

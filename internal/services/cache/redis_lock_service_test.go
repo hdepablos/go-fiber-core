@@ -3,13 +3,13 @@ package cache_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"go-fiber-core/internal/services/cache"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,25 +17,12 @@ import (
 // TestRedisRaceCondition simula un escenario de actualización crítica
 // y verifica que el bloqueo impida lecturas de caché durante la ventana vulnerable.
 func TestRedisRaceCondition(t *testing.T) {
-	// Configuración de Redis (leyendo de variables de entorno si están disponibles, o defaults)
-	// Para este test, asumiremos los valores por defecto del docker-compose o entorno local
-	host := os.Getenv("REDIS_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	port := os.Getenv("REDIS_PORT")
-	if port == "" {
-		port = "6379"
-	}
-	password := os.Getenv("REDIS_PASSWORD")
-	// Si no hay password en env, intentamos "redis" que es común en dev, o vacío.
-	if password == "" {
-		password = "redis" 
-	}
+	mr, err := miniredis.Run()
+	assert.NoError(t, err)
+	defer mr.Close()
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Password: password,
+		Addr: mr.Addr(),
 	})
 	ctx := context.Background()
 
@@ -48,7 +35,7 @@ func TestRedisRaceCondition(t *testing.T) {
 	lockService := cache.NewRedisLockService(rdb)
 
 	// 1. Estado Inicial: Caché con valor "OLD"
-	err := lockService.Set(ctx, key, "OLD_VALUE", 0)
+	err = lockService.Set(ctx, key, "OLD_VALUE", 0)
 	assert.NoError(t, err)
 
 	// Canales para sincronizar la simulación
