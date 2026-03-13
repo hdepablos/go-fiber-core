@@ -28,7 +28,7 @@ PROJECT_NAME_LOWERCASE := $(shell echo $(PROJECT_NAME_LOWERCASE) | tr -d ' ' | t
 PROJECT_NAME_PASCAL := $(shell echo $(PROJECT_SLUG) | awk -F '[-_]' '{for(i=1;i<=NF;i++){printf "%s", toupper(substr($$i,1,1)) tolower(substr($$i,2))}}')
 STACK_NAME := $(PROJECT_NAME_LOWERCASE)-stack-$(APP_ENV)
 FOLDERS := $(shell echo "$(FUNCTIONS)" | tr ',' ' ')
-LOCALSTACK_ENDPOINT_BASE ?= http://localhost:4566
+LOCALSTACK_ENDPOINT_BASE ?= http://127.0.0.1:4566
 S3_BUCKET_NAME=${PROJECT_NAME_LOWERCASE}-app-data
 S3_BUCKET=${PROJECT_NAME_LOWERCASE}-bucket
 SQS_QUEUE_NAME=${PROJECT_NAME_LOWERCASE}queue
@@ -262,8 +262,8 @@ logs-tail-slow-sql-cloudwatch: ## 🐢☁️ Sigue slow SQL en CloudWatch filtra
 	echo "$(INFO)🐢☁️ Tail de SLOW SQL en: $$GROUP (desde $$SINCE)$(RESET)"; \
 	aws logs tail "$$GROUP" $(AWS_ENDPOINT_ARG) $(AWS_PROFILE_ARG) --follow --since "$$SINCE" --filter-pattern "SLOW SQL"
 
-.PHONY: logs-all
-logs-all: ## 📜 Muestra logs unificados de todos los servicios. Uso: make logs-all
+.PHONY: logs-all-docker
+logs-all-docker: ## 📜 Muestra logs unificados de Docker Compose. Uso: make logs-all-docker
 	@echo "$(INFO)📜 Obteniendo logs de todos los servicios...$(RESET)"
 	@$(DC_BASE) logs -f
 
@@ -612,8 +612,11 @@ logs-lambdas: ## 📊 Sigue logs de las funciones Lambda (LocalStack).
 logs-docker: ## 🐳 Sigue logs de Docker Compose.
 	@$(DC_BASE) logs -f
 
-.PHONY: logs-all
-logs-all: ## 📊 Sigue logs de los pods en K8s (API + Consumers).
+.PHONY: logs-all-lambda
+logs-all-lambda: logs-lambdas ## 📊 Sigue logs de Lambda (LocalStack). Uso: make logs-all-lambda
+
+.PHONY: logs-all-k8s
+logs-all-k8s: ## 📊 Sigue logs de los pods en K8s (API + Consumers). Uso: make logs-all-k8s
 	@echo "📺 Observando logs de pods K8s (api, sqs-consumer)..."
 	@sh -c '\
 		trap "kill 0" INT TERM; \
@@ -621,6 +624,25 @@ logs-all: ## 📊 Sigue logs de los pods en K8s (API + Consumers).
 		kubectl logs -l app=sqs-consumer -f --prefix=true & \
 		wait \
 	'
+
+.PHONY: logs-all
+logs-all: ## 📊 Logs unificados (auto-detecta: k8s | lambda | docker). Uso: make logs-all MODE=eks|lambda|docker
+	@MODE_IN="$(MODE)"; \
+	if [ -z "$$MODE_IN" ]; then \
+		if command -v kubectl >/dev/null 2>&1 && kubectl get pods >/dev/null 2>&1; then \
+			MODE_IN="eks"; \
+		elif command -v awslocal >/dev/null 2>&1; then \
+			MODE_IN="lambda"; \
+		else \
+			MODE_IN="docker"; \
+		fi; \
+	fi; \
+	case "$$MODE_IN" in \
+		eks) $(MAKE) logs-all-k8s ;; \
+		lambda) $(MAKE) logs-all-lambda ;; \
+		docker|local) $(MAKE) logs-all-docker ;; \
+		*) echo "$(ERROR)❌ MODE inválido: $$MODE_IN (usa eks|lambda|docker)$(RESET)"; exit 1 ;; \
+	esac
 
 
 .PHONY: package-lambda
@@ -897,13 +919,14 @@ terraform-deploy-lambda: ## 🚀⚡ Despliega la infraestructura en modo Lambda 
 # ==============================================================================
 .PHONY: infra-up
 infra-up: ## 🐳 Verifica si LocalStack está corriendo (Infraestructura Compartida).
-	@if docker ps --format '{{.Names}}' | grep -q "^localstack$$"; then \
-		echo "$(INFO)✅ LocalStack detectado (contenedor 'localstack').$(RESET)"; \
-	else \
-		echo "$(ERROR)❌ LocalStack NO está corriendo.$(RESET)"; \
-		echo "$(INFO)ℹ️  Por favor, levanta la infraestructura compartida antes de continuar.$(RESET)"; \
+	@echo "$(INFO)🔍 Verificando LocalStack en $(LOCALSTACK_ENDPOINT_BASE)...$(RESET)"
+	@curl -s -f "$(LOCALSTACK_ENDPOINT_BASE)/_localstack/health" >/dev/null 2>&1 || ( \
+		echo "$(ERROR)❌ LocalStack NO respondió en $(LOCALSTACK_ENDPOINT_BASE).$(RESET)"; \
+		echo "$(INFO)ℹ️  Este proyecto asume LocalStack como infraestructura compartida (externa).$(RESET)"; \
+		echo "$(INFO)ℹ️  Levántalo aparte y reintenta (por ejemplo, en tu repo de localstack).$(RESET)"; \
 		exit 1; \
-	fi
+	)
+	@echo "$(SUCCESS)✅ LocalStack OK (infraestructura compartida).$(RESET)"
 	@./tools/init-localstack.sh
 	@echo "$(WARNING)⚠️  Asegúrate de tener Postgres y Redis corriendo (host: 5432/6379).$(RESET)"
 
@@ -1016,6 +1039,7 @@ watch-eks: check-env infra-up k8s-up ## ☸️ Levanta todo el entorno en EKS (L
 	@echo "$(INFO)🚀 Iniciando despliegue en EKS...$(RESET)"
 	@$(MAKE) build-all-images
 	@$(MAKE) clean-k8s-apps
+	@$(MAKE) infra-init
 	@echo "$(INFO)terraform apply -var 'deploy_mode=eks'...$(RESET)"
 	@cd $(TF_DIR) && tflocal apply -var-file=$(TF_VARS) -var "deploy_mode=eks" -auto-approve
 	@echo "$(SUCCESS)✅ Despliegue en EKS completado.$(RESET)"
@@ -1027,6 +1051,11 @@ watch-eks: check-env infra-up k8s-up ## ☸️ Levanta todo el entorno en EKS (L
 clean-k8s-apps: ## 🧹 Elimina releases de Helm previos para evitar conflictos de estado.
 	@echo "$(INFO)🧹 Limpiando aplicaciones en Kubernetes (Helm)...$(RESET)"
 	@helm uninstall api sqs-consumer dlq-consumer daily-cron 1min-cron 2>/dev/null || true
+	@echo "$(INFO)🧹 Limpiando recursos legacy (no-Helm) que pueden chocar con LoadBalancer...$(RESET)"
+	@kubectl delete svc api -n default --ignore-not-found >/dev/null 2>&1 || true
+	@kubectl delete deploy api -n default --ignore-not-found >/dev/null 2>&1 || true
+	@kubectl delete rs -n default -l app=api --ignore-not-found >/dev/null 2>&1 || true
+	@kubectl delete pods -n default -l app=api --ignore-not-found >/dev/null 2>&1 || true
 	@echo "$(SUCCESS)✅ Limpieza completada (o no había nada que limpiar).$(RESET)"
 
 .PHONY: update-bruno-eks

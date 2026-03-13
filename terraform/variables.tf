@@ -9,6 +9,18 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "localstack_endpoint_base" {
+  description = "Endpoint base de LocalStack para Terraform (host)"
+  type        = string
+  default     = "http://127.0.0.1:4566"
+}
+
+variable "localstack_s3_endpoint" {
+  description = "Endpoint S3 de LocalStack (virtual-host) para Terraform (host)"
+  type        = string
+  default     = "http://s3.127.0.0.1.localstack.cloud:4566"
+}
+
 # --- ESTA ES LA VARIABLE QUE FALTABA ---
 variable "app_env_vars" {
   description = "Mapa de variables de entorno de la aplicación (común para Lambda y EKS)"

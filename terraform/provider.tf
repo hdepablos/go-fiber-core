@@ -27,16 +27,16 @@ provider "aws" {
   dynamic "endpoints" {
     for_each = var.environment == "local" ? [1] : []
     content {
-      apigateway     = "http://localhost:4566"
-      cloudwatch     = "http://localhost:4566"
-      lambda         = "http://localhost:4566"
-      s3             = "http://s3.localhost.localstack.cloud:4566"
-      sqs            = "http://localhost:4566"
-      eventbridge    = "http://localhost:4566"
-      iam            = "http://localhost:4566"
-      cloudwatchlogs = "http://localhost:4566"
-      sts            = "http://localhost:4566"
-      dynamodb       = "http://localhost:4566"
+      apigateway     = var.localstack_endpoint_base
+      cloudwatch     = var.localstack_endpoint_base
+      lambda         = var.localstack_endpoint_base
+      s3             = var.localstack_s3_endpoint
+      sqs            = var.localstack_endpoint_base
+      eventbridge    = var.localstack_endpoint_base
+      iam            = var.localstack_endpoint_base
+      cloudwatchlogs = var.localstack_endpoint_base
+      sts            = var.localstack_endpoint_base
+      dynamodb       = var.localstack_endpoint_base
     }
   }
 

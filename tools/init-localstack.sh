@@ -4,7 +4,7 @@ set -e
 # Configuración
 BUCKET_NAME="terraform-state"
 TABLE_NAME="terraform-lock"
-ENDPOINT="http://localhost:4566"
+ENDPOINT="${LOCALSTACK_ENDPOINT_BASE:-http://127.0.0.1:4566}"
 REGION="us-east-1"
 PROFILE="default" # Usa perfil por defecto o configura uno dummy
 
