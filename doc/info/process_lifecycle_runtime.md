@@ -115,13 +115,13 @@ loanSteps := []stepDef{
     {
         Order:        1,
         Name:         "Age validation",
-        ExecutionKey: "loanrisk/NewAgeService",
+        ExecutionKey: "loanrisk/age",
         Config:       `{"error_tolerance":"inherit","required_keys":["age"],"min_age":40}`,
     },
     {
         Order:        3,
         Name:         "Salary validation",
-        ExecutionKey: "loanrisk/NewSalaryService",
+        ExecutionKey: "loanrisk/salary",
         Config:       `{"error_tolerance":"critical","required_keys":["salary"],"min_salary":2500000}`,
     },
     // ...
@@ -138,7 +138,7 @@ Campos relevantes:
 - `required_keys`:
   - Arreglo de strings.
   - Lista de claves que deben existir en `ServiceContext.Input` antes de ejecutar el servicio.
-  - Si falta alguna, el executor genera un `ErrCritical` y no llama al servicio.
+  - Si falta alguna, el executor genera `domain.ErrMissingRequiredKey` y no llama al servicio.
 
 - Otros campos específicos del servicio:
   - `min_age`, `min_salary`, etc.
@@ -153,25 +153,21 @@ Archivo: `internal/services/serviceconfig/executor.go`
 Antes de ejecutar un servicio, el executor valida las `RequiredKeys`:
 
 ```go
-if len(serviceConfig.RequiredKeys) > 0 && svcCtx != nil {
-    for _, key := range serviceConfig.RequiredKeys {
-        if _, ok := svcCtx.GetInputValue(key); !ok {
-            execErr = fmt.Errorf(
-                "missing required key '%s' for service '%s': %w",
-                key,
-                serviceConfig.Path,
-                domain.ErrCritical,
-            )
-            break
-        }
+var missing []string
+for _, key := range serviceConfig.RequiredKeys {
+    if _, ok := svcCtx.GetInputValue(key); !ok {
+        missing = append(missing, key)
     }
+}
+if len(missing) > 0 {
+    execErr = fmt.Errorf("%w: claves faltantes %v para el servicio '%s'", domain.ErrMissingRequiredKey, missing, serviceConfig.Path)
 }
 ```
 
 Comportamiento:
 
 - Si falta una clave requerida:
-  - Se genera un error envuelto con `domain.ErrCritical`.
+  - Se genera un error envuelto con `domain.ErrMissingRequiredKey`.
   - Se aplica la política de errores (ver siguiente sección).
   - El servicio **no se ejecuta**.
 
@@ -179,7 +175,49 @@ Esto permite parametrizar qué datos de entrada son obligatorios para cada step 
 
 ---
 
-## 4. Ejecución y Caché (Run)
+## 5. Keys requeridas por escenario (scenarios seed de ejemplo)
+
+En este motor, una key “requerida” es una clave que debe existir en `ServiceContext.Input` al momento de ejecutar el step, declarada en `process_steps.config.required_keys` y validada por el executor.
+
+Fuente de escenarios de ejemplo: `internal/database/seeders/process_lifecycle_manager_seeder.go`.
+
+### 5.1 Keys del request (siempre requeridas)
+
+El endpoint de ejecución parsea `requests.RunProcessRequest`:
+
+- `process_type_id`
+- `sede_id`
+- `override_process_version_id`
+- `roadmap`
+- `input`
+
+Además, el handler inyecta `operator_id` (no viene por JSON).
+
+### 5.2 Keys inyectadas automáticamente en Input
+
+En `Run`, antes de ejecutar steps, el motor inyecta en `Input`:
+
+- `sede_id` (desde `req.SedeID`)
+- `roadmap` (desde `req.Roadmap`)
+- `operator_id` (si existe y es > 0)
+
+Esto significa que estas keys pueden usarse como `required_keys` sin pedirlas al cliente dentro de `input`.
+
+### 5.3 Tabla por escenario
+
+| Escenario (seed) | Steps | Keys requeridas (por step) | Keys mínimas que debe traer `input` |
+| :--- | :--- | :--- | :--- |
+| Caso 1: Sequential Execution | `common/validate` → `common/calculate` → `common/notify` | `common/validate`: `["age"]` | `["age"]` |
+| Caso 2: Parallel Batch Processing | `batch/processor` (x4, ASYNC) → `batch/consolidate` | `batch/processor`: `["partition_id","last_id_processed","is_last_batch"]` | `["partition_id","last_id_processed","is_last_batch"]` |
+| Caso 3: Hybrid Flow | `common/validate` → `heavy/process` (ASYNC) → `common/notify` | Sin `required_keys` en el seed | `[]` |
+| Loan risk lifecycle | `loanrisk/age` → `loanrisk/validation` → `loanrisk/salary` → `loanrisk/is_renovation` → `loanrisk/risk_level` | `loanrisk/age`: `["age"]`<br>`loanrisk/salary`: `["salary"]`<br>`loanrisk/is_renovation`: `["min_salary","salary_bracket_k_usd","salary_checked"]`<br>`loanrisk/risk_level`: `["is_renovation"]` | `["age","salary"]` |
+
+Notas importantes:
+
+- Las keys “mínimas” son las que deben estar presentes en `input` al inicio del flujo para que se cumplan las validaciones del executor. Keys requeridas por steps posteriores pueden ser agregadas por steps anteriores mediante `SetInputValue`.
+- Actualmente `required_keys` se valida solo en ejecución SYNC. Si un step está configurado como `execution_policy.mode = "ASYNC"`, el motor despacha a la cola y finaliza el step sin validar `required_keys` en este proceso.
+
+## 6. Ejecución y Caché (Run)
 
 El método `Run` (`/api/v1/process-lifecycle/run`) implementa una estrategia inteligente de caché para equilibrar rendimiento y consistencia:
 
@@ -192,7 +230,7 @@ El método `Run` (`/api/v1/process-lifecycle/run`) implementa una estrategia int
     - Consulta siempre directamente a PostgreSQL (`resolve_process_version`).
     - Garantiza que al probar una versión específica (DRAFT o TEST), siempre se ejecute la configuración más reciente de la base de datos, sin interferencia de cachés antiguas.
 
-## 5. Manejo de errores en la cadena de servicios
+## 7. Manejo de errores en la cadena de servicios
 
 Archivo: `internal/services/serviceconfig/executor.go`
 
@@ -253,7 +291,7 @@ El campo `mode` ha sido eliminado del motor; toda la política se expresa median
 
 ---
 
-## 6. Servicios Loan Risk y uso de config
+## 8. Servicios Loan Risk y uso de config
 
 Ejemplos de servicios que usan tanto `Input` como `CurrentStepConfig`.
 
@@ -367,7 +405,7 @@ func (s *Salary) Execute() error {
 
 ---
 
-## 8. Modo Test y Métricas de Rendimiento
+## 9. Modo Test y Métricas de Rendimiento
 
 El motor incluye un modo especial de **Test / Diagnóstico** que se activa cuando se solicita explícitamente ejecutar una versión específica (override) en lugar de la versión productiva vigente.
 
@@ -453,7 +491,7 @@ Cuando el modo test está activo, la respuesta JSON se enriquece con métricas d
 
 ---
 
-## 9. Comandos CLI relevantes
+## 10. Comandos CLI relevantes
 
 ### 7.1. Seeder de Process Lifecycle
 
@@ -539,4 +577,3 @@ Con este diseño:
   - Aplica políticas de error expresadas por:
     - Tipo de error (`ErrCritical` / `ErrTolerable`).
     - `error_tolerance` configurado por step.
-

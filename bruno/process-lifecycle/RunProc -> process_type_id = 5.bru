@@ -1,7 +1,7 @@
 meta {
-  name: Case 3 - Hybrid Flow (Sync/Async)
+  name: RunProc -> process_type_id = 5
   type: http
-  seq: 7
+  seq: 8
 }
 
 post {
@@ -16,13 +16,13 @@ auth:bearer {
 
 body:json {
   {
-    "process_type_id": 4,
+    "process_type_id": 5,
     "sede_id": 1,
-    "override_process_version_id": 4,
+    "override_process_version_id": 6,
     "roadmap": 0,
     "input": {
-      "file_url": "http://s3.example.com/file.csv",
-      "user_id": 99
+      "age": 0,
+      "salary": 2500000
     }
   }
 }

@@ -33,8 +33,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		var processTypeID int64
 		if err := tx.QueryRow(ctx,
 			`INSERT INTO process_types (name, description, is_visible)
-             VALUES ($1, $2, $3)
-             RETURNING id`,
+			VALUES ($1, $2, $3)
+			RETURNING id`,
 			"Order process lifecycle",
 			"Base process type for order lifecycle testing",
 			true,
@@ -45,8 +45,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		var baseVersionID int64
 		if err := tx.QueryRow(ctx,
 			`INSERT INTO process_versions (process_type_id, version_number, status, operator_id)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id`,
+            VALUES ($1, $2, $3, $4)
+            RETURNING id`,
 			processTypeID,
 			1,
 			"DRAFT",
@@ -71,7 +71,7 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		for _, s := range steps {
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
-                 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
+                VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
 				baseVersionID,
 				s.Order,
 				s.Name,
@@ -187,7 +187,7 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		).Scan(&case3ProcessTypeID); err != nil {
 			return fmt.Errorf("insert case 3 process_types: %w", err)
 		}
-		
+
 		var case3VersionID int64
 		if err := tx.QueryRow(ctx,
 			`INSERT INTO process_versions (process_type_id, version_number, status, operator_id) VALUES ($1, $2, $3, $4) RETURNING id`,
@@ -228,8 +228,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		var loanProcessTypeID int64
 		if err := tx.QueryRow(ctx,
 			`INSERT INTO process_types (name, description, is_visible)
-             VALUES ($1, $2, $3)
-             RETURNING id`,
+			VALUES ($1, $2, $3)
+			RETURNING id`,
 			"Loan risk lifecycle",
 			"Lifecycle configurado para servicios de loanrisk",
 			true,
@@ -240,8 +240,8 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		var loanBaseVersionID int64
 		if err := tx.QueryRow(ctx,
 			`INSERT INTO process_versions (process_type_id, version_number, status, operator_id)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id`,
+			VALUES ($1, $2, $3, $4)
+			RETURNING id`,
 			loanProcessTypeID,
 			1,
 			"DRAFT",
@@ -286,7 +286,7 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 		for _, s := range loanSteps {
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO process_steps (process_version_id, step_order, name, execution_key, config, roadmap)
-                 VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
+                VALUES ($1, $2, $3, $4, $5::jsonb, 0)`,
 				loanBaseVersionID,
 				s.Order,
 				s.Name,

@@ -9,14 +9,16 @@ import (
 
 // ConcurrentStepService simulates a process step with a configurable delay.
 type ConcurrentStepService struct {
-	Name  string
-	Delay time.Duration
-	Ctx   *contracts.ServiceContext
+	Name        string
+	Delay       time.Duration
+	Ctx         *contracts.ServiceContext
+	ServicePath string
 }
 
 // Init initializes the service with context and path.
 func (s *ConcurrentStepService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.Ctx = ctx
+	s.ServicePath = servicePath
 	// Ensure delay is set, default to 1s if not configured
 	if s.Delay == 0 {
 		s.Delay = 1 * time.Second
@@ -28,7 +30,7 @@ func (s *ConcurrentStepService) Execute() error {
 	select {
 	case <-time.After(s.Delay):
 		// Guardamos un resultado en el contexto para verificar luego
-		s.Ctx.SetResult(s.Name, contracts.StepResult{
+		s.Ctx.SetResult(s.ServicePath, contracts.StepResult{
 			Status:  "completed",
 			Message: fmt.Sprintf("Ejecutado en %v", s.Delay),
 			// Limpiamos el Data para evitar ensuciar la respuesta en producción

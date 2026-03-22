@@ -1,7 +1,7 @@
 meta {
-  name: run process
+  name: RunProc -> process_type_id = 7
   type: http
-  seq: 3
+  seq: 10
 }
 
 post {
@@ -16,9 +16,9 @@ auth:bearer {
 
 body:json {
   {
-    "process_type_id": 1,
+    "process_type_id": 6,
     "sede_id": 1,
-    "override_process_version_id": 1,
+    "override_process_version_id": 8,
     "roadmap": 0,
     "input": {
       "age": 0,

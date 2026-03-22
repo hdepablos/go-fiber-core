@@ -9,6 +9,10 @@ El comportamiento de cada paso se define en la sección `execution_policy` del J
 - **`mode`**: `"SYNC"` (por defecto) o `"ASYNC"`.
 - **`required_keys`**: Lista de claves obligatorias en el input.
 - **`error_tolerance`**: `"critical"` (detiene proceso) o `"tolerable"` (continúa).
+- **`queue_target` (opcional)**:
+  - Permite **personalizar la cola destino** por step cuando `mode = "ASYNC"`.
+  - Si no se envía, el despachador usa la cola por defecto configurada en `SQS_QUEUE_NAME` (archivo `.env`).
+  - La cola indicada (sea `queue_target` o `SQS_QUEUE_NAME`) **debe existir** en SQS/LocalStack; si no existe, el runtime falla con `AWS.SimpleQueueService.NonExistentQueue`.
 
 ---
 
@@ -49,7 +53,7 @@ El comportamiento de cada paso se define en la sección `execution_policy` del J
 ```json
 {
   "batch_size": 500,
-  "required_keys": ["partition_id"],
+  "required_keys": ["partition_id", "last_id_processed", "is_last_batch"],
   "execution_policy": {
     "mode": "ASYNC",                 // Enviar a cola SQS
     "queue_target": "batch-queue",   // Cola específica (opcional)
@@ -57,8 +61,8 @@ El comportamiento de cada paso se define en la sección `execution_policy` del J
     // Lógica de Recursión (Auto-Invoke)
     "auto_invoke": {
       "enabled": true,               // Activar loop
-      "cursor_field": "last_id",     // Output -> Input para la siguiente vuelta
-      "stop_condition": "is_last"    // Freno del loop
+      "cursor_field": "last_id_processed", // Output -> Input para la siguiente vuelta
+      "stop_condition": "is_last_batch"    // Freno del loop
     }
   }
 }
@@ -67,9 +71,9 @@ El comportamiento de cada paso se define en la sección `execution_policy` del J
 **Flujo de Auto-Invoke:**
 1. El motor manda el mensaje inicial a la cola.
 2. El worker procesa 500 registros.
-3. El worker detecta `auto_invoke: true` y `is_last: false`.
-4. El worker actualiza `last_id` en el input y se envía un **nuevo mensaje a sí mismo**.
-5. Repite hasta que `is_last: true`.
+3. El worker detecta `auto_invoke: true` y `is_last_batch: false`.
+4. El worker actualiza `last_id_processed` en el input y se envía un **nuevo mensaje a sí mismo**.
+5. Repite hasta que `is_last_batch: true`.
 
 ---
 
@@ -99,7 +103,7 @@ El comportamiento de cada paso se define en la sección `execution_policy` del J
 | Key | Tipo | Descripción |
 | :--- | :--- | :--- |
 | `execution_policy.mode` | string | `"SYNC"` (memoria) o `"ASYNC"` (cola SQS). |
-| `execution_policy.queue_target` | string | Nombre de la cola destino (opcional). |
+| `execution_policy.queue_target` | string | Nombre de la cola destino (opcional). Si no existe, falla el dispatch. Si se omite, usa `SQS_QUEUE_NAME`. |
 | `execution_policy.auto_invoke.enabled` | bool | Activa la recursión del paso. |
 | `execution_policy.auto_invoke.cursor_field` | string | Campo del output que actualiza el input. |
 | `execution_policy.auto_invoke.stop_condition` | string | Campo booleano del output que detiene el loop. |

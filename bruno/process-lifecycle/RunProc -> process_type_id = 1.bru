@@ -1,7 +1,7 @@
 meta {
-  name: Case 1 - Sequential Execution (Sync)
+  name: RunProc -> process_type_id = 1
   type: http
-  seq: 5
+  seq: 4
 }
 
 post {
@@ -16,13 +16,13 @@ auth:bearer {
 
 body:json {
   {
-    "process_type_id": 2,
+    "process_type_id": 1,
     "sede_id": 1,
-    "override_process_version_id": 2,
+    "override_process_version_id": 1,
     "roadmap": 0,
     "input": {
-      "age": 25,
-      "email": "test@example.com"
+      "age": 0,
+      "salary": 2500000
     }
   }
 }

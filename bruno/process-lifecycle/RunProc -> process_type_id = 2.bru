@@ -1,7 +1,7 @@
 meta {
-  name: Case 2 - Parallel Batching (Async)
+  name: RunProc -> process_type_id = 2
   type: http
-  seq: 6
+  seq: 5
 }
 
 post {
@@ -16,13 +16,13 @@ auth:bearer {
 
 body:json {
   {
-    "process_type_id": 3,
+    "process_type_id": 2,
     "sede_id": 1,
-    "override_process_version_id": 3,
+    "override_process_version_id": 2,
     "roadmap": 0,
     "input": {
-      "partition_id": "A1",
-      "last_id_processed": 0
+      "age": 0,
+      "salary": 2500000
     }
   }
 }

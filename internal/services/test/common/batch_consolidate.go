@@ -24,7 +24,7 @@ func (s *BatchConsolidateService) Execute() error {
 	fmt.Printf("✅ Ejecutando BatchConsolidateService: %s\n", s.servicePath)
 
 	data := map[string]any{
-		"status": "success",
+		"status":          "success",
 		"consolidated_at": "now",
 	}
 
@@ -32,7 +32,7 @@ func (s *BatchConsolidateService) Execute() error {
 		Status: "completed",
 		Data:   data,
 	}
-	
+
 	if s.ctx != nil {
 		s.ctx.SetResult(s.servicePath, result)
 	}
