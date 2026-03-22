@@ -3,6 +3,7 @@ package processlifecycle
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"go-fiber-core/internal/contextkeys"
 	"go-fiber-core/internal/domain"
@@ -20,6 +22,7 @@ import (
 	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/cache"
+	"go-fiber-core/internal/services/processlifecyclemanager"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -43,34 +46,26 @@ type Step struct {
 }
 
 type service struct {
-	conn *connect.ConnectDTO
+	conn          *connect.ConnectDTO
+	replicateSvc  processlifecyclemanager.ReplicateService
+	promoteSvc    processlifecyclemanager.PromoteService
+	resolveSvc    processlifecyclemanager.ResolveService
+	moveToTestSvc processlifecyclemanager.MoveToTestService
 }
 
 func NewService(conn *connect.ConnectDTO) Service {
+	resolveSvc := processlifecyclemanager.NewResolveService(conn)
 	return &service{
-		conn: conn,
+		conn:          conn,
+		replicateSvc:  processlifecyclemanager.NewReplicateService(conn),
+		promoteSvc:    processlifecyclemanager.NewPromoteService(conn),
+		resolveSvc:    resolveSvc,
+		moveToTestSvc: processlifecyclemanager.NewMoveToTestService(conn),
 	}
 }
 
 func (s *service) ReplicateProcessVersion(ctx context.Context, processVersionID int64, operatorID int64) (int64, error) {
-	if processVersionID <= 0 || operatorID <= 0 {
-		return 0, domain.ErrInvalidArgument
-	}
-
-	db := s.conn.ConnectPgxWrite
-	if db == nil {
-		return 0, fmt.Errorf("pgx write connection is not initialized")
-	}
-
-	var newVersionID int64
-	err := db.
-		QueryRow(ctx, `SELECT replicate_process_version($1, $2)`, processVersionID, operatorID).
-		Scan(&newVersionID)
-	if err != nil {
-		return 0, mapPgxError(err)
-	}
-
-	return newVersionID, nil
+	return s.replicateSvc.ReplicateProcessVersion(ctx, processVersionID, operatorID)
 }
 
 // PromoteProcessVersion promueve una versión de proceso específica a PRODUCCIÓN.
@@ -96,9 +91,9 @@ func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID in
 	}
 
 	// 2. Obtener conexión a base de datos (Escritura)
-	db := s.conn.ConnectPgxWrite
-	if db == nil {
-		err := fmt.Errorf("pgx write connection is not initialized")
+	dbRead := s.conn.ConnectGormRead
+	if dbRead == nil {
+		err := fmt.Errorf("gorm read connection is not initialized")
 		log.Error("Database connection failed", zap.Error(err))
 		return err
 	}
@@ -115,14 +110,22 @@ func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID in
 	var processTypeID int64
 	log.Debug("Fetching process info for locking strategy", zap.Int64("process_version_id", processVersionID))
 
-	err := db.QueryRow(ctx, `SELECT process_type_id FROM process_versions WHERE id = $1`, processVersionID).Scan(&processTypeID)
+	var pv processlifecyclemanager.ProcessVersion
+	err := dbRead.WithContext(ctx).
+		Select("process_type_id").
+		Where("id = ? AND archived_at IS NULL", processVersionID).
+		First(&pv).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.ErrNotFound
+		}
 		log.Error("Failed to fetch process info from DB",
 			zap.Int64("process_version_id", processVersionID),
 			zap.Error(err),
 		)
-		return mapPgxError(err)
+		return err
 	}
+	processTypeID = pv.ProcessTypeID
 
 	// Construcción de la clave de bloqueo "Blocker/Blacklist": app:lifecycle:block:{processTypeID}
 	// Esta clave indicará a ResolveProcessVersion que DEBE ir a base de datos
@@ -149,28 +152,18 @@ func (s *service) PromoteProcessVersion(ctx context.Context, processVersionID in
 		log.Warn("Redis client not available - skipping blocker setup")
 	}
 
-	// 6. Ejecutar Procedimiento Almacenado de Promoción
-	// La lógica pesada de transacción, historial y cambio de estados reside en la BD
-	log.Info("Executing stored procedure: promote_process_version",
+	log.Info("Executing PromoteProcessVersion (GORM transaction)",
 		zap.Int64("process_version_id", processVersionID),
 	)
 
-	// Se espera que la función retorne un entero (1) en éxito
-	var result int
-	err = db.QueryRow(ctx, `SELECT promote_process_version($1, $2, $3)`, processVersionID, operatorID, comment).Scan(&result)
-
+	err = s.promoteSvc.PromoteProcessVersion(ctx, processVersionID, operatorID, comment)
 	if err != nil {
-		log.Error("Stored procedure execution failed",
+		log.Error("PromoteProcessVersion failed",
 			zap.Int64("process_version_id", processVersionID),
 			zap.Error(err),
 		)
-
-		// El blocker expirará solo o podríamos intentar borrarlo si falló algo crítico,
-		// pero es más seguro dejarlo para que las lecturas sigan yendo a BD un momento.
-		return mapPgxError(err)
+		return err
 	}
-
-	log.Info("Stored procedure executed successfully", zap.Int("result_code", result))
 
 	// 7. Limpiar Caché (Invalidación por patrón)
 	// Nota: El Blocker sigue activo por su TTL (30s) para asegurar que
@@ -204,50 +197,8 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		projectPrefix = "go-fiber-core"
 	}
 
-	db := s.conn.ConnectPgxWrite
-	if db == nil {
-		return 0, nil, fmt.Errorf("pgx write connection is not initialized")
-	}
-
-	/*
-		// 1. Validar existencia de Sede (si aplica)
-		if sedeID > 0 {
-			var exists bool
-			// Asumimos tabla 'sedes'. Si falla, el error indicará el problema.
-			if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM sedes WHERE id = $1)", sedeID).Scan(&exists); err != nil {
-				return 0, nil, mapPgxError(err)
-			}
-			if !exists {
-				return 0, nil, domain.ErrSedeNotFound
-			}
-		}
-
-		// 2. Validar existencia de Roadmap (si aplica)
-		if roadmap > 0 {
-			var exists bool
-			// Asumimos tabla 'roadmaps'.
-			if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM roadmaps WHERE id = $1)", roadmap).Scan(&exists); err != nil {
-				return 0, nil, mapPgxError(err)
-			}
-			if !exists {
-				return 0, nil, domain.ErrRoadmapNotFound
-			}
-		}
-	*/
-
-	// 3. Validar existencia de Versión Específica (si aplica)
-	if overrideProcessVersionID != nil && *overrideProcessVersionID > 0 {
-		var exists bool
-		if err := db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM process_versions WHERE id = $1)", *overrideProcessVersionID).Scan(&exists); err != nil {
-			return 0, nil, mapPgxError(err)
-		}
-		if !exists {
-			return 0, nil, domain.ErrOverrideVersionNotFound
-		}
-	}
-
 	var resolvedID int64
-	var stepsJSON []byte
+	var steps []Step
 
 	// Estrategia de Caching:
 	// 1. Si hay override (> 0), SIEMPRE vamos a BD (sin cache).
@@ -289,29 +240,19 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 		}
 	}
 
-	if overrideProcessVersionID != nil {
-		err := db.
-			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, $3, $4)`, processTypeID, sedeID, *overrideProcessVersionID, roadmap).
-			Scan(&resolvedID, &stepsJSON)
-		if err != nil {
-			return 0, nil, mapPgxError(err)
-		}
-	} else {
-		err := db.
-			QueryRow(ctx, `SELECT process_version_id, process_steps FROM resolve_process_version($1, $2, NULL, $3)`, processTypeID, sedeID, roadmap).
-			Scan(&resolvedID, &stepsJSON)
-		if err != nil {
-			return 0, nil, mapPgxError(err)
-		}
+	managerResolvedID, managerSteps, err := s.resolveSvc.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideProcessVersionID, roadmap)
+	if err != nil {
+		return 0, nil, err
 	}
-
-	var steps []Step
-	if len(stepsJSON) == 0 {
-		steps = []Step{}
-	} else {
-		if err := json.Unmarshal(stepsJSON, &steps); err != nil {
-			return 0, nil, domain.ErrInternal
-		}
+	resolvedID = managerResolvedID
+	steps = make([]Step, 0, len(managerSteps))
+	for _, st := range managerSteps {
+		steps = append(steps, Step{
+			Name:         st.Name,
+			ExecutionKey: st.ExecutionKey,
+			Config:       st.Config,
+			StepOrder:    st.StepOrder,
+		})
 	}
 
 	if shouldUseCache {
@@ -338,22 +279,7 @@ func (s *service) ResolveProcessVersion(ctx context.Context, processTypeID int64
 }
 
 func (s *service) MoveProcessVersionToTest(ctx context.Context, processVersionID int64) error {
-	if processVersionID <= 0 {
-		return domain.ErrInvalidArgument
-	}
-
-	db := s.conn.ConnectPgxWrite
-	if db == nil {
-		return fmt.Errorf("pgx write connection is not initialized")
-	}
-
-	var result int
-	err := db.QueryRow(ctx, `SELECT move_process_version_to_test($1)`, processVersionID).Scan(&result)
-	if err != nil {
-		return mapPgxError(err)
-	}
-
-	return nil
+	return s.moveToTestSvc.MoveProcessVersionToTest(ctx, processVersionID)
 }
 
 func (s *service) ListProcessVersions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.ProcessVersionListItem], error) {
@@ -708,29 +634,4 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 	return processVersionID, serviceCtx, nil
 }
 
-func mapPgxError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	msg := err.Error()
-
-	switch {
-	case strings.Contains(msg, "Process version not found or archived"):
-		return domain.ErrNotFound
-	case strings.Contains(msg, "Process type does not exist or is archived"):
-		return domain.ErrNotFound
-	case strings.Contains(msg, "No active version found"):
-		return domain.ErrNotFound
-	case strings.Contains(msg, "Override version invalid"):
-		return domain.ErrInvalidArgument
-	case strings.Contains(msg, "Only DRAFT versions can be moved to TEST"):
-		return domain.ErrInvalidArgument
-	case strings.Contains(msg, "Cannot promote version without steps"),
-		strings.Contains(msg, "Promotion comment exceeds 300 characters"),
-		strings.Contains(msg, "Only TEST or HISTORY versions can be promoted to PROD"):
-		return domain.ErrInvalidArgument
-	default:
-		return domain.ErrInternal
-	}
-}
+ 
