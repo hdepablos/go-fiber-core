@@ -15,10 +15,11 @@ type StepResult struct {
 
 // ExecutionPolicy define cómo se ejecuta un paso: modo (Sync/Async), destino (Cola) y recursión (AutoInvoke)
 type ExecutionPolicy struct {
-	Mode        string          `json:"mode"`                  // "SYNC" | "ASYNC"
-	QueueTarget string          `json:"queue_target,omitempty"` // Nombre de la cola destino (opcional)
-	AutoInvoke  AutoInvokeConfig `json:"auto_invoke,omitempty"` // Configuración de recursión
-	NextStep    string          `json:"next_step,omitempty"`    // "AUTO" | "STOP" | "GOTO:X"
+	Mode        string           `json:"mode"`                   // "SYNC" | "ASYNC"
+	QueueTarget string           `json:"queue_target,omitempty"` // Nombre de la cola destino (opcional)
+	AutoInvoke  AutoInvokeConfig `json:"auto_invoke,omitempty"`  // Configuración de recursión
+	NextStep    string           `json:"next_step,omitempty"`    // "AUTO" | "STOP" | "GOTO:X"
+	Label       string           `json:"label,omitempty"`
 }
 
 type AutoInvokeConfig struct {

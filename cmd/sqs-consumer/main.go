@@ -203,10 +203,11 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 	// 2. Intentar procesar como DispatchStepRequest (Paso Individual - ASYNC)
 	// Estructura usada en dispatcher.go:DispatchStep
 	type DispatchStepRequest struct {
-		ServicePath        string         `json:"service_path"`
-		ProcessExecutionID string         `json:"process_execution_id"`
-		Input              map[string]any `json:"input"`
-		StepOrder          int            `json:"step_order"`
+		ServicePath        string                  `json:"service_path"`
+		ProcessExecutionID string                  `json:"process_execution_id"`
+		Input              map[string]any          `json:"input"`
+		StepOrder          int                     `json:"step_order"`
+		ExecutionPolicy    contracts.ExecutionPolicy `json:"execution_policy,omitempty"`
 	}
 
 	var stepReq DispatchStepRequest
@@ -255,6 +256,171 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 		}
 		
 		slog.Info("✅ Async Step Completed", "service", stepReq.ServicePath)
+
+		policy := stepReq.ExecutionPolicy
+		if policy.AutoInvoke.Enabled {
+			if policy.Label != "" {
+				slog.Info("🏷️ AutoInvoke Process", "label", policy.Label)
+			}
+			if stepReq.Input == nil {
+				stepReq.Input = make(map[string]any)
+			}
+
+			cursorField := policy.AutoInvoke.CursorField
+			if cursorField == "" {
+				cursorField = "last_id_processed"
+			}
+			stopField := policy.AutoInvoke.StopCondition
+			if stopField == "" {
+				stopField = "is_last_batch"
+			}
+
+			var nextCursor any
+			var shouldStop bool
+			var processedCount int
+			var found bool
+
+			extractFromMap := func(m map[string]any) {
+				if m == nil {
+					return
+				}
+
+				cursorVal, hasCursor := m[cursorField]
+				stopVal, hasStop := m[stopField]
+				if !hasCursor || !hasStop {
+					return
+				}
+
+				nextCursor = cursorVal
+				switch b := stopVal.(type) {
+				case bool:
+					shouldStop = b
+					found = true
+				case string:
+					if b == "true" {
+						shouldStop = true
+						found = true
+					} else if b == "false" {
+						shouldStop = false
+						found = true
+					}
+				}
+
+				if val, ok := m["processed_count"]; ok {
+					switch n := val.(type) {
+					case int:
+						processedCount = n
+					case int64:
+						processedCount = int(n)
+					case float64:
+						processedCount = int(n)
+					}
+				}
+			}
+
+			if stepRes, ok := svcCtx.GetResult(stepReq.ServicePath); ok && stepRes.Data != nil {
+				extractFromMap(stepRes.Data)
+			} else {
+				for _, res := range svcCtx.Results {
+					if stepRes, ok := res.(contracts.StepResult); ok {
+						if stepRes.Data != nil {
+							extractFromMap(stepRes.Data)
+							if found {
+								break
+							}
+						}
+					} else if resMap, ok := res.(map[string]any); ok {
+						if data, ok := resMap["data"]; ok {
+							if dataMap, ok := data.(map[string]any); ok {
+								extractFromMap(dataMap)
+								if found {
+									break
+								}
+							}
+						}
+						extractFromMap(resMap)
+						if found {
+							break
+						}
+					}
+				}
+			}
+
+			if found {
+				totalProcessed := 0
+				if val, ok := stepReq.Input["total_processed"]; ok {
+					switch n := val.(type) {
+					case int:
+						totalProcessed = n
+					case int64:
+						totalProcessed = int(n)
+					case float64:
+						totalProcessed = int(n)
+					}
+				}
+				totalProcessed += processedCount
+				stepReq.Input["total_processed"] = totalProcessed
+
+				if !shouldStop {
+					slog.Info("🔄 [Auto-Invoke] Async step completed. Re-queuing next batch...", "cursor_field", cursorField, "cursor", nextCursor)
+
+					stepReq.Input[cursorField] = nextCursor
+					stepReq.Input[stopField] = false
+
+					stepBytes, err := json.Marshal(stepReq)
+					if err != nil {
+						slog.Error("❌ Error marshaling auto-invoke step request", "error", err)
+						return err
+					}
+
+					newMessage := &queue.Message{
+						ID:      uuid.New().String(),
+						Body:    string(stepBytes),
+						Source:  "auto-invoke-step",
+						Created: time.Now().Format(time.RFC3339),
+					}
+
+					if err := appContainer.QueueService.SendMessage(ctx, newMessage); err != nil {
+						slog.Error("❌ Failed to re-queue auto-invoke step message", "error", err)
+						return err
+					}
+					slog.Info("✅ [Auto-Invoke] Step message re-queued successfully")
+				} else {
+					slog.Info("✅ [Auto-Invoke] All batches finished (stop_condition=true)", "stop_field", stopField, "cursor", nextCursor)
+
+					if policy.NextStep != "" {
+						finalReq := DispatchStepRequest{
+							ServicePath:        policy.NextStep,
+							ProcessExecutionID: stepReq.ProcessExecutionID,
+							Input:              stepReq.Input,
+							StepOrder:          stepReq.StepOrder + 1,
+						}
+
+						finalBytes, err := json.Marshal(finalReq)
+						if err != nil {
+							slog.Error("❌ Error marshaling finalize step request", "error", err)
+							return err
+						}
+
+						finalMsg := &queue.Message{
+							ID:      uuid.New().String(),
+							Body:    string(finalBytes),
+							Source:  "auto-invoke-finalize",
+							Created: time.Now().Format(time.RFC3339),
+						}
+
+						if err := appContainer.QueueService.SendMessage(ctx, finalMsg); err != nil {
+							slog.Error("❌ Failed to queue finalize step message", "error", err)
+							return err
+						}
+						slog.Info("✅ [Auto-Invoke] Finalize step message queued", "service", policy.NextStep, "total_processed", stepReq.Input["total_processed"])
+					}
+				}
+			} else {
+				slog.Warn("⚠️ [Auto-Invoke] Could not find cursor/stop fields in async step results", "cursor_field", cursorField, "stop_field", stopField)
+			}
+		}
+
 		return nil
 	}
 

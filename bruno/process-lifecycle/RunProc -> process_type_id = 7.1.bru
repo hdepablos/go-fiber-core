@@ -1,0 +1,28 @@
+meta {
+  name: RunProc -> process_type_id = 7.1
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 7,
+    "sede_id": 2,
+    "override_process_version_id": 0,
+    "roadmap": 0,
+    "input": {
+      "age": 0,
+      "salary": 2500000
+    }
+  }
+}

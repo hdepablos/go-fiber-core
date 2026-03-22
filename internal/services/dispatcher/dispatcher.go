@@ -71,8 +71,9 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 	payload := map[string]any{
 		"service_path":         servicePath,
 		"process_execution_id": "TODO-UUID", // Deberíamos pasar esto desde arriba si estuviera disponible
-		"input":                svcCtx.GetAll(),
+		"input":                svcCtx.SnapshotInput(),
 		"step_order":           order,
+		"execution_policy":     policy,
 	}
 
 	payloadBytes, err := json.Marshal(payload)

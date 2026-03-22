@@ -27,10 +27,6 @@ func (s *TestAutoInvoke) Init(ctx *contracts.ServiceContext, servicePath string)
 
 // Execute contains the business logic for the simulation.
 func (s *TestAutoInvoke) Execute() error {
-	fmt.Printf("🚀 Executing TestAutoInvoke Service: %s\n", s.servicePath)
-
-	// 1. Get Inputs
-	fmt.Printf("🔍 TestAutoInvoke Inputs: %v\n", s.ctx.Input)
 	lastID := 0
 	if val, ok := s.ctx.GetInputValue("last_id_processed"); ok {
 		switch v := val.(type) {
@@ -43,47 +39,48 @@ func (s *TestAutoInvoke) Execute() error {
 		}
 	}
 
-	fmt.Printf("🔄 Current last_id_processed: %d\n", lastID)
-
 	// 2. Logic based on user requirements
 	var newLastID int
 	var isLastBatch bool
-
-	// Simular tiempo de procesamiento aleatorio (3 a 10 segundos)
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	processTime := rng.Intn(8) + 3 // (0-7) + 3 = 3-10
-	fmt.Printf("⏳ Simulando procesamiento del lote... (Tiempo estimado: %d segundos)\n", processTime)
-
-	// Logs detallados de progreso (1/3, 2/3...)
-	for i := 1; i <= 3; i++ {
-		time.Sleep(time.Duration(processTime) * time.Second / 3)
-		fmt.Printf("... Progreso %d/3 completado\n", i)
-	}
+	var batchLabel string
+	var batchConsoleMessage string
+	var processedCount int
 
 	switch lastID {
 	case 0:
-		fmt.Println("🔹 Ejecutando Lote 1/4 (Inicio)")
+		batchLabel = "Ejecutando Lote 1/4"
+		batchConsoleMessage = "Proceso de 1/4 Inicio (simulando lógica de negocio)"
 		newLastID = 500
 		isLastBatch = false
 	case 500:
-		fmt.Println("🔹 Ejecutando Lote 2/4")
+		batchLabel = "Ejecutando Lote 2/4"
+		batchConsoleMessage = "Proceso de 2/4 Inicio (simulando lógica de negocio)"
 		newLastID = 1500
 		isLastBatch = false
 	case 1500:
-		fmt.Println("🔹 Ejecutando Lote 3/4")
+		batchLabel = "Ejecutando Lote 3/4"
+		batchConsoleMessage = "Proceso de 3/4 Inicio (simulando lógica de negocio)"
 		newLastID = 2500
 		isLastBatch = false
 	case 2500:
-		fmt.Println("🔹 Ejecutando Lote 4/4 (Final)")
+		batchLabel = "Ejecutando Lote 4/4"
+		batchConsoleMessage = "Proceso de 4/4 Fin (simulando lógica de negocio)"
 		newLastID = 3500
 		isLastBatch = true
-		fmt.Println("✅ 🎉 Todos los lotes han finalizado correctamente.")
 	default:
 		// Safety fallback
-		fmt.Printf("⚠️ Lote desconocido (last_id=%d). Asumiendo finalización.\n", lastID)
+		batchLabel = "Ejecutando Lote desconocido"
+		batchConsoleMessage = "Proceso de lote desconocido (simulando lógica de negocio)"
 		newLastID = lastID
 		isLastBatch = true
 	}
+	processedCount = newLastID - lastID
+
+	fmt.Println(batchConsoleMessage)
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	processTime := rng.Intn(4) + 2 // (0-3) + 2 = 2-5
+	time.Sleep(time.Duration(processTime) * time.Second)
 
 	// 3. Check for autoInvoke config and propagate to Input
 	// This ensures the SQS Consumer can see the flag even if it wasn't in the original request input
@@ -95,8 +92,11 @@ func (s *TestAutoInvoke) Execute() error {
 	// 4. Set Result
 	// We put the data in Data, which the consumer will read to update the Input for the next run
 	result := contracts.StepResult{
-		Status: "success",
+		Status:  "success",
+		Message: batchLabel,
 		Data: map[string]any{
+			"batch_label":       batchLabel,
+			"processed_count":   processedCount,
 			"last_id_processed": newLastID,
 			"is_last_batch":     isLastBatch,
 		},
