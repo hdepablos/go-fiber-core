@@ -42,6 +42,8 @@ func ListSeedersNames() []string {
 		"process_lifecycle_manager",
 		"test_process_scenarios",
 		"process_lifecycle_auto_invoke",
+		"multi_queue_batch_one_table_process_lifecycle",
+		"multi_queue_batch_one_table_recreate_records",
 		"all_menus",
 	}
 }
@@ -283,6 +285,14 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 
 	service.AddSeeder("process_lifecycle_auto_invoke", func() error {
 		return ProcessLifecycleAutoInvokeSeeder(pool)
+	})
+
+	service.AddSeeder("multi_queue_batch_one_table_process_lifecycle", func() error {
+		return MultiQueueBatchOneTableProcessLifecycleSeeder(pool)
+	})
+
+	service.AddSeeder("multi_queue_batch_one_table_recreate_records", func() error {
+		return MultiQueueBatchOneTableRecreateRecordsSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {

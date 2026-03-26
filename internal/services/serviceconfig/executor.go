@@ -72,6 +72,14 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		if err := g.Wait(); err != nil {
 			return err
 		}
+
+		if svcCtx != nil {
+			if v, ok := svcCtx.GetInputValue("__stop_chain"); ok {
+				if b, ok := v.(bool); ok && b {
+					return nil
+				}
+			}
+		}
 	}
 
 	fmt.Println("\n✅ Cadena de servicios completada.")

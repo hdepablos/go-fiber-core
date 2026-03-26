@@ -1,20 +1,29 @@
 locals {
   name_prefix = "gofibercore-${var.environment}"
   zip_path    = "../sam-compile"
-
-  # ----------------------------------------------------------------------------
-  # NOTA IMPORTANTE SOBRE VARIABLES DE ENTORNO
-  # ----------------------------------------------------------------------------
-  # Se mantiene var.app_env_vars como fuente única de verdad.
-  # Esto permite:
-  # - Local: .env
-  # - CI/CD: inyección automática
-  # - Futuro: SSM sin cambiar Terraform
-  # ----------------------------------------------------------------------------
+  
+  # Lógica Híbrida de Secretos:
+  # En LOCAL: Usamos las variables pasadas por archivo (var.app_env_vars)
+  # En PROD/STAGING: Deberíamos obtenerlas de SSM (o usarlas vacías y que la app las lea)
+  # Por simplicidad y compatibilidad con el flujo actual del usuario,
+  # mantendremos var.app_env_vars como fuente de verdad inyectada por el CI/CD o Makefile.
+  # 
+  # NOTA: Para implementar lectura directa de SSM en tiempo de ejecución de Lambda,
+  # se requeriría cambiar el código Go para usar AWS SDK SSM.
+  #
+  # Sin embargo, podemos hacer que Terraform busque los valores en SSM y los inyecte.
+  # Pero eso requiere que las claves sean conocidas de antemano.
+  #
+  # La solución más alineada al flujo actual del usuario ("crear en .env y que funcione")
+  # es la que ya tiene: `env-manager` inyecta valores.
+  # 
+  # Para PRODUCCIÓN REAL con SSM, el cambio es en CÓMO se llena `var.app_env_vars`.
+  # No necesitamos cambiar el código de Terraform aquí, sino la fuente de los datos.
 }
 
+
 # ==============================================================================
-# 1. Lambdas (CONTROL DE CONCURRENCIA + MEJOR THROUGHPUT)
+# 1. Lambdas (Usando el módulo reutilizable)
 # ==============================================================================
 
 module "lambda_api" {
@@ -24,15 +33,10 @@ module "lambda_api" {
   zip_path              = "${local.zip_path}/api.zip"
   memory_size           = 1769
   architectures         = ["arm64"]
-
   project_name          = var.project_name
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-
-  # 🔥 CONTROL CLAVE: evita que Lambda sature DB o APIs externas
-  reserved_concurrent_executions = 100
-
   environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
@@ -45,35 +49,26 @@ module "lambda_sqs_consumer" {
   zip_path              = "${local.zip_path}/sqs-consumer.zip"
   memory_size           = 1769
   architectures         = ["arm64"]
-
   project_name          = var.project_name
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-
-  # 🔥 MUY IMPORTANTE: límite real de consumo desde SQS
-  reserved_concurrent_executions = 100
-
   environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
 
 module "lambda_dlq_consumer" {
+
   count                 = var.deploy_mode == "lambda" ? 1 : 0
   source                = "./modules/lambda_function"
   function_name         = "${local.name_prefix}-dlq-consumer"
   zip_path              = "${local.zip_path}/dlq-consumer.zip"
   architectures         = ["arm64"]
-
   project_name          = var.project_name
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-
-  # 🔒 DLQ suele ser más sensible → menor concurrencia
-  reserved_concurrent_executions = 20
-
   environment_variables = var.app_env_vars
 }
 
@@ -83,15 +78,10 @@ module "lambda_daily_cron" {
   function_name         = "${local.name_prefix}-daily-cron"
   zip_path              = "${local.zip_path}/daily-24-cron.zip"
   architectures         = ["arm64"]
-
   project_name          = var.project_name
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-
-  # 🧠 Cron → no necesita alta concurrencia
-  reserved_concurrent_executions = 5
-
   environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
@@ -103,38 +93,17 @@ module "lambda_every_1min_cron" {
   function_name         = "${local.name_prefix}-1min-cron"
   zip_path              = "${local.zip_path}/every-1min-cron.zip"
   architectures         = ["arm64"]
-
   project_name          = var.project_name
   environment           = var.environment
   retention_in_days     = var.log_retention_in_days
   enable_cw_in_local    = var.enable_cloudwatch_in_local
-
-  reserved_concurrent_executions = 10
-
   environment_variables = merge(var.app_env_vars, {
     SQS_QUEUE_URL = aws_sqs_queue.main_queue.url
   })
 }
 
 # ==============================================================================
-# ⚠️ IMPORTANTE (LAMBDA + SQS)
-# ------------------------------------------------------------------------------
-# Asegúrate que en tu módulo lambda_function tengas configurado:
-#
-# aws_lambda_event_source_mapping:
-#
-# batch_size                         = 10
-# maximum_batching_window_in_seconds = 5
-# scaling_config {
-#   maximum_concurrency = 100
-# }
-#
-# 👉 Esto define el throughput real.
-# ==============================================================================
-
-
-# ==============================================================================
-# 2. Kubernetes / Helm (KEDA AUTOSCALING OPTIMIZADO)
+# 2. Kubernetes / Helm Deployments (Solo si deploy_mode == "eks")
 # ==============================================================================
 
 resource "helm_release" "sqs_consumer" {
@@ -143,7 +112,6 @@ resource "helm_release" "sqs_consumer" {
   chart            = "${path.module}/charts/gofiber-app"
   namespace        = "default"
   version          = "0.1.0"
-
   create_namespace = true
   force_update     = true
   recreate_pods    = true
@@ -155,27 +123,19 @@ resource "helm_release" "sqs_consumer" {
         tag        = "local"
         pullPolicy = "Never"
       }
-
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
-
       autoscaling = {
-        enabled = true
-
-        # 🔥 Ajustado para producción
+        enabled         = true
         minReplicaCount = 1
-        maxReplicaCount = 50   # ⬅️ antes 5 (CUELLO DE BOTELLA)
-
+        maxReplicaCount = 5
         triggers = [
           {
             type = "aws-sqs-queue"
             metadata = {
               queueURL      = aws_sqs_queue.main_queue.url
-
-              # 🔥 Más realista para throughput
-              queueLength   = "10"
-
+              queueLength   = "5"
               awsRegion     = var.aws_region
               identityOwner = "operator"
             }
@@ -192,7 +152,6 @@ resource "helm_release" "api" {
   chart            = "${path.module}/charts/gofiber-app"
   namespace        = "default"
   version          = "0.1.0"
-
   create_namespace = true
   force_update     = true
   recreate_pods    = true
@@ -204,14 +163,12 @@ resource "helm_release" "api" {
         tag        = "local"
         pullPolicy = "Never"
       }
-
       service = {
         enabled    = true
         type       = "LoadBalancer"
         port       = 80
         targetPort = 9009
       }
-
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
@@ -225,7 +182,6 @@ resource "helm_release" "dlq_consumer" {
   chart            = "${path.module}/charts/gofiber-app"
   namespace        = "default"
   version          = "0.1.0"
-
   create_namespace = true
   force_update     = true
   recreate_pods    = true
@@ -237,18 +193,13 @@ resource "helm_release" "dlq_consumer" {
         tag        = "local"
         pullPolicy = "Never"
       }
-
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.dlq.url, "localhost", "host.docker.internal")
       })
-
       autoscaling = {
-        enabled = true
-
-        # 🔒 DLQ más conservador
+        enabled         = true
         minReplicaCount = 1
-        maxReplicaCount = 20
-
+        maxReplicaCount = 5
         triggers = [
           {
             type = "aws-sqs-queue"
@@ -271,7 +222,6 @@ resource "helm_release" "every_1min_cron" {
   chart            = "${path.module}/charts/gofiber-app"
   namespace        = "default"
   version          = "0.1.0"
-
   create_namespace = true
   force_update     = true
   recreate_pods    = true
@@ -283,11 +233,9 @@ resource "helm_release" "every_1min_cron" {
         tag        = "local"
         pullPolicy = "Never"
       }
-
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
-
       cronjob = {
         enabled  = true
         schedule = "*/1 * * * *"
@@ -302,7 +250,6 @@ resource "helm_release" "daily_cron" {
   chart            = "${path.module}/charts/gofiber-app"
   namespace        = "default"
   version          = "0.1.0"
-
   create_namespace = true
   force_update     = true
   recreate_pods    = true
@@ -314,11 +261,9 @@ resource "helm_release" "daily_cron" {
         tag        = "local"
         pullPolicy = "Never"
       }
-
       env = merge(var.app_env_vars, {
         SQS_QUEUE_URL = replace(aws_sqs_queue.main_queue.url, "localhost", "host.docker.internal")
       })
-
       cronjob = {
         enabled  = true
         schedule = "0 0 * * *"
@@ -326,23 +271,3 @@ resource "helm_release" "daily_cron" {
     })
   ]
 }
-
-# ==============================================================================
-# 🧠 RESUMEN IMPORTANTE
-# ------------------------------------------------------------------------------
-# LAMBDA:
-# - Controlado con reserved_concurrent_executions
-# - Máximo real: scaling_config.maximum_concurrency (en mapping)
-#
-# EKS (KEDA):
-# - Controlado con maxReplicaCount
-# - Fórmula: mensajes / queueLength
-#
-# DIFERENCIA CLAVE:
-# - Lambda escala SOLO (rápido)
-# - EKS escala CONTROLADO (más estable)
-#
-# RECOMENDACIÓN:
-# - Usa Lambda para picos
-# - Usa EKS para carga constante
-# ==============================================================================

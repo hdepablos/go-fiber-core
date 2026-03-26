@@ -33,6 +33,7 @@ import (
 	// - internal/services/test: test/auto_invoke (y otros helpers de prueba)
 	"go-fiber-core/internal/services/dispatcher"
 	_ "go-fiber-core/internal/services/test/loanrisk"
+	_ "go-fiber-core/internal/services/test/mqb1t"
 
 	// Servicios de prueba concurrente (no pertenecen al seed principal de Process Lifecycle)
 	_ "go-fiber-core/internal/services/test/imputation"

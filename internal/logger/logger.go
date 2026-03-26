@@ -45,6 +45,17 @@ func GetLogger(name string) *zap.Logger {
 	return newLogger
 }
 
+func GetLoggerToFile(name string, filePath string) *zap.Logger {
+	key := fmt.Sprintf("%s|file:%s", name, filePath)
+	if logger, ok := loggers.Load(key); ok {
+		return logger.(*zap.Logger)
+	}
+
+	newLogger := createLoggerToFile(name, filePath)
+	loggers.Store(key, newLogger)
+	return newLogger
+}
+
 func createLogger(name string) *zap.Logger {
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {
@@ -137,6 +148,82 @@ func createLogger(name string) *zap.Logger {
 	// pero para evitar líos de scope en este bloque, simplemente verificamos os.Getenv directo o reutilizamos sin :=
 
 	// La variable appEnv ya existe en la función createLogger (línea 48).
+	if Developer != "" && (strings.ToLower(os.Getenv("APP_ENV")) == "local" || os.Getenv("APP_ENV") == "") {
+		initialFields = append(initialFields, zap.String("developer", Developer))
+	}
+
+	return zap.New(core, zap.AddCaller()).With(initialFields...)
+}
+
+func createLoggerToFile(name string, filePath string) *zap.Logger {
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "" {
+		appEnv = "local"
+	}
+
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "timestamp",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "message",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.MillisDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	mode := strings.ToLower(os.Getenv("LOG_OUTPUT"))
+	stdoutNeeded := mode == "stdout" || mode == "both" || (mode == "" && strings.ToLower(appEnv) != "local")
+
+	dir := filepath.Dir(filePath)
+	var writers []zapcore.WriteSyncer
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating log directory %s: %v. Falling back to Stdout.\n", dir, err)
+		writers = append(writers, zapcore.AddSync(os.Stdout))
+	} else {
+		writers = append(writers, zapcore.AddSync(&lumberjack.Logger{
+			Filename:   filePath,
+			MaxSize:    50,
+			MaxBackups: 7,
+			MaxAge:     30,
+			Compress:   true,
+		}))
+	}
+	if stdoutNeeded {
+		writers = append(writers, zapcore.Lock(os.Stdout))
+	}
+	if len(writers) == 0 {
+		writers = append(writers, zapcore.Lock(os.Stdout))
+	}
+
+	logLevelStr := os.Getenv("LOG_LEVEL")
+	var logLevel zapcore.Level
+	if logLevelStr != "" {
+		if err := logLevel.UnmarshalText([]byte(logLevelStr)); err != nil {
+			logLevel = zapcore.InfoLevel
+		}
+	} else {
+		if strings.ToLower(appEnv) == "local" {
+			logLevel = zapcore.DebugLevel
+		} else {
+			logLevel = zapcore.InfoLevel
+		}
+	}
+
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(encoderConfig),
+		zapcore.NewMultiWriteSyncer(writers...),
+		logLevel,
+	)
+
+	initialFields := []zap.Field{
+		zap.String("service", ServiceName),
+		zap.String("version", Version),
+	}
+
 	if Developer != "" && (strings.ToLower(os.Getenv("APP_ENV")) == "local" || os.Getenv("APP_ENV") == "") {
 		initialFields = append(initialFields, zap.String("developer", Developer))
 	}

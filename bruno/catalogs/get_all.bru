@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{urlBase}}api/v1/catalogs/
+  url: {{urlBase}}api/v1/catalogs/?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzM3NjkzNDQsImlhdCI6MTc3Mzc2ODQ0NCwic2lkIjoiZjVhOWYzYjYtYjkwNy00MzYxLTkyOTYtYzRhODgxN2RmY2E4Iiwic3ViIjoiMSIsInR5cCI6ImFjY2VzcyJ9.2CXfDkS_1xlhqJUmk1rVesPnqTGgFlSB4hY2PCb881E
   body: none
   auth: bearer
+}
+
+query {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzM3NjkzNDQsImlhdCI6MTc3Mzc2ODQ0NCwic2lkIjoiZjVhOWYzYjYtYjkwNy00MzYxLTkyOTYtYzRhODgxN2RmY2E4Iiwic3ViIjoiMSIsInR5cCI6ImFjY2VzcyJ9.2CXfDkS_1xlhqJUmk1rVesPnqTGgFlSB4hY2PCb881E
 }
 
 auth:bearer {

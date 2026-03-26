@@ -13,6 +13,16 @@ variable "memory_size" {
   default = 128
 }
 
+variable "reserved_concurrent_executions" {
+  type    = number
+  default = null
+
+  validation {
+    condition     = var.reserved_concurrent_executions == null || var.reserved_concurrent_executions >= -1
+    error_message = "reserved_concurrent_executions must be null or >= -1."
+  }
+}
+
 variable "project_name" {
   type    = string
   default = "GoFiberCore"
@@ -51,11 +61,12 @@ resource "aws_lambda_function" "this" {
   role             = aws_iam_role.lambda_exec.arn
   timeout          = 30 # Aumentado a 30s para conexiones a DB/Redis
   memory_size      = var.memory_size
+  reserved_concurrent_executions = var.reserved_concurrent_executions
 
   environment {
     variables = var.environment_variables
   }
-  
+
   publish = true
 }
 

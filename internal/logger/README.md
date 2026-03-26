@@ -18,6 +18,9 @@ El comportamiento se define mediante variables de entorno:
 | :--- | :--- | :--- |
 | `APP_ENV` | `local` | Escribe en archivos rotativos en `./pkg/logs/`. |
 | `APP_ENV` | `production`, `dev`, etc. | Escribe JSON en `os.Stdout` (Cloud Native). |
+| `LOG_OUTPUT` | `file` | Fuerza escritura a archivo en `./pkg/logs/` (rotación por día). |
+| `LOG_OUTPUT` | `stdout` | Fuerza escritura a `stdout` (Cloud Native). |
+| `LOG_OUTPUT` | `both` | Escribe a archivo y `stdout`. |
 | `LOG_LEVEL` | `info` | (Opcional) Nivel mínimo de log (`debug`, `info`, `warn`, `error`). Default: `debug` en local, `info` en prod. |
 | `SERVICE_NAME` | `mi-servicio` | (Opcional) Nombre del servicio inyectado en cada log. |
 | `VERSION` | `1.0.0` | (Opcional) Versión del servicio inyectada en cada log. |
@@ -38,6 +41,31 @@ import "go-fiber-core/internal/logger"
 // ... dentro de tu función o struct
 log := logger.GetLogger("payment-service")
 ```
+
+### 1.1 Forzar salida a archivo (recomendado para entornos no-local)
+
+Si estás en un entorno donde `APP_ENV != local`, el comportamiento por defecto es escribir en `stdout`.
+Para forzar archivos en `pkg/logs/`, define:
+
+- `LOG_OUTPUT=file`
+
+Esto aplica a todo el proyecto sin tener que cambiar el código.
+
+### 1.2 Escribir a un archivo específico (casos puntuales)
+
+Cuando necesitas un archivo fijo (por ejemplo, para depurar un proceso con un nombre estable), usa:
+
+```go
+import "go-fiber-core/internal/logger"
+
+log := logger.GetLoggerToFile(
+    "MultiQueueBatchProcessorOneTable",
+    "pkg/logs/MultiQueueBatchProcessorOneTable.log",
+)
+defer func() { _ = log.Sync() }()
+```
+
+Esto reutiliza el mismo formato, nivel y campos base del logger del proyecto, pero fija el `filePath`.
 
 ### 2. Logging Básico (Info, Error, Debug)
 

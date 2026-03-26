@@ -1,11 +1,11 @@
 meta {
-  name: resolve scenario
+  name: RunProc -> process_type_id = 11
   type: http
-  seq: 3
+  seq: 26
 }
 
 post {
-  url: {{urlBase}}api/v1/process-lifecycle/resolve
+  url: {{urlBase}}api/v1/process-lifecycle/run
   body: json
   auth: bearer
 }
@@ -19,6 +19,7 @@ body:json {
     "process_type_id": 11,
     "sede_id": 0,
     "override_process_version_id": 16,
-    "roadmap": 1
+    "roadmap": 1,
+    "input": {}
   }
 }
