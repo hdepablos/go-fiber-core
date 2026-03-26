@@ -27,8 +27,7 @@ func (s *Salary) Init(ctx *contracts.ServiceContext, servicePath string) {
 
 // Execute contiene la lógica para devolver un error crítico.
 func (s *Salary) Execute() error {
-	fmt.Println("💰 Ejecutando servicio Salary")
-
+	// Servicio de ejemplo: valida salario mínimo y propaga datos al input.
 	salary := utils.GetIntInput(s.ctx, "salary")
 	minSalary := utils.GetIntConfig(s.ctx.CurrentStepConfig, "min_salary", 1)
 

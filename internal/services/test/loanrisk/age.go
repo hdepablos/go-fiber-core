@@ -28,8 +28,7 @@ func (a *Age) Init(ctx *contracts.ServiceContext, servicePath string) {
 
 // Execute contiene la lógica específica de este servicio.
 func (a *Age) Execute() error {
-	fmt.Println("🧮 Ejecutando servicio Age")
-
+	// Servicio de ejemplo: valida edad mínima y expone flags derivados.
 	age := utils.GetIntInput(a.ctx, "age")
 	minAge := utils.GetIntConfig(a.ctx.CurrentStepConfig, "min_age", 18)
 	data := map[string]any{

@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -21,6 +20,7 @@ func (s *TestAutoInvokeFinalize) Init(ctx *contracts.ServiceContext, servicePath
 }
 
 func (s *TestAutoInvokeFinalize) Execute() error {
+	// Lee el total acumulado (propagado por la cadena de ejecución) para exponerlo como resultado final.
 	var totalProcessed int
 	if s.ctx != nil {
 		if v, ok := s.ctx.GetInputValue("total_processed"); ok {
@@ -34,8 +34,6 @@ func (s *TestAutoInvokeFinalize) Execute() error {
 			}
 		}
 	}
-
-	fmt.Printf("🏁 Ejecutado luego de finalizar todo el proceso de lote. Total registros procesados: %d\n", totalProcessed)
 
 	result := contracts.StepResult{
 		Status: "success",

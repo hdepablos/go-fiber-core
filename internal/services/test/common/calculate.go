@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -21,11 +20,10 @@ func (s *CalculateService) Init(ctx *contracts.ServiceContext, servicePath strin
 }
 
 func (s *CalculateService) Execute() error {
-	fmt.Printf("🧮 Ejecutando CalculateService: %s\n", s.servicePath)
-	
+	// Servicio de ejemplo: calcula un valor simple en base a "age".
 	age, _ := s.ctx.GetInputValue("age")
 	var result float64
-	
+
 	// Lógica de cálculo real
 	if val, ok := age.(float64); ok {
 		result = val * 1.5
@@ -34,9 +32,9 @@ func (s *CalculateService) Execute() error {
 	} else {
 		result = 37.5 // Default para el test case
 	}
-	
+
 	data := map[string]any{
-		"result": result,
+		"result":        result,
 		"calculated_at": "now",
 	}
 
@@ -44,7 +42,7 @@ func (s *CalculateService) Execute() error {
 		Status: "completed",
 		Data:   data,
 	}
-	
+
 	s.ctx.SetResult(s.servicePath, res)
 	return nil
 }

@@ -1,7 +1,6 @@
 package imputation
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -25,8 +24,8 @@ func (s *CapitalInterest) Init(ctx *contracts.ServiceContext, servicePath string
 
 // Execute contiene la lógica de negocio.
 func (s *CapitalInterest) Execute() error {
-	// TODO: Implementar lógica aquí
-	fmt.Printf("🚀 Ejecutando servicio: %s\n", s.servicePath)
+	// Servicio de ejemplo para pruebas: en un caso real aquí se calcularía capital/interés,
+	// leyendo inputs del contexto y escribiendo resultados en StepResult.
 
 	// Ejemplo de lectura de input
 	// val, ok := s.ctx.GetInputValue("some_key")

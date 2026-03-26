@@ -1,7 +1,6 @@
 package heavy
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"time"
@@ -22,13 +21,11 @@ func (s *ProcessService) Init(ctx *contracts.ServiceContext, servicePath string)
 }
 
 func (s *ProcessService) Execute() error {
-	fmt.Printf("🏗️ Ejecutando HeavyProcessService: %s\n", s.servicePath)
-	
 	// Simular carga de trabajo real
 	time.Sleep(500 * time.Millisecond)
-	
+
 	data := map[string]any{
-		"processed": true,
+		"processed":    true,
 		"heavy_result": "done",
 	}
 
@@ -36,7 +33,7 @@ func (s *ProcessService) Execute() error {
 		Status: "completed",
 		Data:   data,
 	}
-	
+
 	s.ctx.SetResult(s.servicePath, result)
 	return nil
 }

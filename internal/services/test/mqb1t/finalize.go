@@ -5,11 +5,8 @@ import (
 	"os"
 	"time"
 
-	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
-
-	"go.uber.org/zap"
 )
 
 type FinalizeService struct {
@@ -32,8 +29,10 @@ type statusCountRow struct {
 }
 
 func (s *FinalizeService) Execute() error {
-	const baseLoggerName = "MultiQueueBatchProcessorOneTable"
-
+	// Este step se ejecuta una sola vez al final del procesamiento:
+	// - Calcula conteos por status dentro del run_id
+	// - Calcula duración total usando started_at_ms (seteado por organize.go)
+	// - Limpia keys de Redis usadas para coordinación
 	db, rdb, err := getDeps(s.ctx.Ctx)
 	if err != nil {
 		return err
@@ -45,24 +44,7 @@ func (s *FinalizeService) Execute() error {
 		return fmt.Errorf("run_id missing")
 	}
 
-	wd, _ := os.Getwd()
-	logOutput := os.Getenv("LOG_OUTPUT")
-	appEnv := os.Getenv("APP_ENV")
-
-	base := logger.GetLoggerToFile(baseLoggerName, "pkg/logs/MultiQueueBatchProcessorOneTable.log")
-	defer func() { _ = base.Sync() }()
-
-	log := base.With(
-		zap.String("component", "mqb1t"),
-		zap.String("step", "finalize"),
-		zap.String("service_path", s.servicePath),
-		zap.String("cwd", wd),
-		zap.String("app_env", appEnv),
-		zap.String("log_output", logOutput),
-		zap.String("log_file", "pkg/logs/MultiQueueBatchProcessorOneTable.log"),
-		zap.String("run_id", runID),
-	)
-
+	// Seguridad: este flujo solo permite operar sobre la tabla esperada.
 	table := "multi_queue_batch_one_table"
 	if v, ok := s.ctx.GetInputValue("table"); ok {
 		if str, ok := v.(string); ok && str != "" {
@@ -112,26 +94,7 @@ func (s *FinalizeService) Execute() error {
 	_ = rdb.Del(s.ctx.Ctx, totalKey, doneKey, startedAtKey).Err()
 	_ = rdb.Expire(s.ctx.Ctx, finalizeKey, 24*time.Hour).Err()
 
-	log.Info("final stats",
-		zap.String("table", table),
-		zap.Int64("total_to_process", total),
-		zap.Int64("total_processed", stats["processed"]),
-		zap.Int64("total_processed_with_detail", stats["processed_with_details"]),
-		zap.Float64("duration_seconds", durationSeconds),
-		zap.Int64("duration_ms", durationMS),
-		zap.String("duration", fmt.Sprintf("%.3fs", durationSeconds)),
-	)
-
-	fmt.Printf(
-		"mqb1t finalize run_id=%s total_to_process=%d total_processed=%d total_processed_with_detail=%d duration=%.3fs duration_ms=%d\n",
-		runID,
-		total,
-		stats["processed"],
-		stats["processed_with_details"],
-		durationSeconds,
-		durationMS,
-	)
-
+	// El resultado queda persistido en el ServiceContext para inspección desde el engine.
 	s.ctx.SetResult(s.servicePath, contracts.StepResult{
 		Status: "completed",
 		Data: map[string]any{
@@ -140,7 +103,9 @@ func (s *FinalizeService) Execute() error {
 			"total_to_process":       total,
 			"total_processed":        stats["processed"],
 			"total_processed_with_detail": stats["processed_with_details"],
+			"duration_seconds":       durationSeconds,
 			"duration_ms":            durationMS,
+			"duration":               fmt.Sprintf("%.3fs", durationSeconds),
 		},
 	})
 	return nil

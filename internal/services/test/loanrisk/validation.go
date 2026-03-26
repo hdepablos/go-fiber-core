@@ -26,8 +26,7 @@ func (v *Validation) Init(ctx *contracts.ServiceContext, servicePath string) {
 
 // Execute contiene la lógica para devolver un error tolerable.
 func (v *Validation) Execute() error {
-	fmt.Println("🔍 Ejecutando servicio de Validación Especial")
-
+	// Servicio de ejemplo: valida una condición de negocio y puede devolver un error tolerable.
 	rawAge, _ := v.ctx.GetInputValue("age")
 	age := 0
 	switch a := rawAge.(type) {

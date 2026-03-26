@@ -6,13 +6,11 @@ import (
 	"os"
 	"time"
 
-	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/services/dispatcher"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 )
 
 type OrganizeService struct {
@@ -24,8 +22,7 @@ type OrganizeService struct {
 }
 
 func NewOrganizeService() contracts.Service {
-	fmt.Println("si está llegando a la clase.... organize v.1.0.0")
-
+	// Crea el servicio con valores por defecto. Estos pueden ser sobreescritos desde CurrentStepConfig en Init.
 	return &OrganizeService{
 		batchSize: 50,
 		table:     "multi_queue_batch_one_table",
@@ -33,11 +30,11 @@ func NewOrganizeService() contracts.Service {
 }
 
 func (s *OrganizeService) Init(ctx *contracts.ServiceContext, servicePath string) {
-
-	fmt.Println("si está llegando a la clase.... organize")
+	// Inyecta el contexto de ejecución (incluye config del step) y el path del servicio.
 	s.ctx = ctx
 	s.servicePath = servicePath
 
+	// Lee configuración dinámica del step (si existe) para parametrizar la ejecución.
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
 		if v, ok := s.ctx.CurrentStepConfig["batch_size"]; ok {
 			switch n := v.(type) {
@@ -70,30 +67,17 @@ type bucketRangeRow struct {
 }
 
 func (s *OrganizeService) Execute() error {
-	const baseLoggerName = "MultiQueueBatchProcessorOneTable"
-
+	// Este step:
+	// 1) Cuenta registros en "pending"
+	// 2) Planifica buckets (rangos de IDs) por batch_size
+	// 3) Reserva registros cambiando status -> to_process y asignando run_id
+	// 4) Despacha un mensaje por bucket al step process_batch
 	execCtx := context.Background()
 	if s.ctx != nil && s.ctx.Ctx != nil {
 		execCtx = s.ctx.Ctx
 	}
 
-	wd, _ := os.Getwd()
-	logOutput := os.Getenv("LOG_OUTPUT")
-	appEnv := os.Getenv("APP_ENV")
-
-	base := logger.GetLoggerToFile(baseLoggerName, "pkg/logs/MultiQueueBatchProcessorOneTable.log")
-	defer func() { _ = base.Sync() }()
-
-	log := base.With(
-		zap.String("component", "mqb1t"),
-		zap.String("step", "organize"),
-		zap.String("service_path", s.servicePath),
-		zap.String("cwd", wd),
-		zap.String("app_env", appEnv),
-		zap.String("log_output", logOutput),
-		zap.String("log_file", "pkg/logs/MultiQueueBatchProcessorOneTable.log"),
-	)
-
+	// Validaciones básicas de configuración.
 	if s.batchSize <= 0 {
 		s.batchSize = 50
 	}
@@ -104,30 +88,21 @@ func (s *OrganizeService) Execute() error {
 		return fmt.Errorf("table not allowed: %s", s.table)
 	}
 
-	log.Info("starting",
-		zap.String("table", s.table),
-		zap.Int64("batch_size", s.batchSize),
-		zap.String("queue_target", s.queueTarget),
-	)
-
+	// Dependencias compartidas del flujo (DB write + Redis).
 	db, rdb, err := getDeps(execCtx)
 	if err != nil {
-		log.Error("deps error", zap.Error(err))
 		return err
 	}
-	log.Info("deps ready")
 
+	// run_id identifica una corrida completa del proceso y se propaga a todos los buckets.
 	runID := uuid.NewString()
 	now := time.Now()
-	log = log.With(zap.String("run_id", runID))
-	log.Info("run initialized", zap.String("now", now.Format(time.RFC3339)))
 
+	// Si no hay registros pending, se corta la cadena (no hay nada para procesar).
 	var totalPending int64
 	if err := db.WithContext(execCtx).Table(s.table).Where("status = ?", "pending").Count(&totalPending).Error; err != nil {
-		log.Error("count pending failed", zap.Error(err))
 		return err
 	}
-	log.Info("counted pending", zap.Int64("total_pending", totalPending))
 	if totalPending == 0 {
 		if s.ctx != nil {
 			s.ctx.SetInputValue("__stop_chain", true)
@@ -146,10 +121,10 @@ func (s *OrganizeService) Execute() error {
 				},
 			})
 		}
-		log.Info("no pending records, stopping")
 		return nil
 	}
 
+	// Plan de buckets: agrupa IDs en bloques de batch_size preservando orden.
 	query := fmt.Sprintf(`
 		WITH base AS (
 			SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn
@@ -168,22 +143,20 @@ func (s *OrganizeService) Execute() error {
 
 	var buckets []bucketRangeRow
 	if err := db.WithContext(execCtx).Raw(query, s.batchSize).Scan(&buckets).Error; err != nil {
-		log.Error("bucket planning failed", zap.Error(err))
 		return err
 	}
 	if len(buckets) == 0 {
-		log.Info("no buckets generated, stopping")
 		if s.ctx != nil {
 			s.ctx.SetInputValue("__stop_chain", true)
 		}
 		return nil
 	}
-	log.Info("buckets planned",
-		zap.Int("total_batches", len(buckets)),
-		zap.Int64("first_start_id", buckets[0].StartID),
-		zap.Int64("first_end_id", buckets[0].EndID),
-	)
 
+	// Keys en Redis para coordinar:
+	// - total: total de buckets
+	// - done: contador de buckets procesados
+	// - finalized: lock para que finalize se dispare una sola vez
+	// - started_at_ms: timestamp para calcular duración total al finalizar
 	projectPrefix := os.Getenv("APP_NAME")
 	if projectPrefix == "" {
 		projectPrefix = "go-fiber-core"
@@ -195,24 +168,15 @@ func (s *OrganizeService) Execute() error {
 
 	ttl := 24 * time.Hour
 	if err := rdb.Set(execCtx, totalKey, int64(len(buckets)), ttl).Err(); err != nil {
-		log.Error("redis set total failed", zap.String("key", totalKey), zap.Error(err))
-		return err
+		return fmt.Errorf("redis set total failed (key=%s): %w", totalKey, err)
 	}
 	if err := rdb.Set(execCtx, doneKey, 0, ttl).Err(); err != nil {
-		log.Error("redis set done failed", zap.String("key", doneKey), zap.Error(err))
-		return err
+		return fmt.Errorf("redis set done failed (key=%s): %w", doneKey, err)
 	}
 	if err := rdb.Set(execCtx, startedAtKey, now.UnixMilli(), ttl).Err(); err != nil {
-		log.Error("redis set started_at failed", zap.String("key", startedAtKey), zap.Error(err))
-		return err
+		return fmt.Errorf("redis set started_at failed (key=%s): %w", startedAtKey, err)
 	}
 	_ = rdb.Del(execCtx, finalizeKey).Err()
-	log.Info("redis initialized",
-		zap.String("total_key", totalKey),
-		zap.String("done_key", doneKey),
-		zap.String("finalized_key", finalizeKey),
-		zap.String("started_at_key", startedAtKey),
-	)
 
 	dispatched := 0
 	updatedRows := int64(0)
@@ -221,14 +185,11 @@ func (s *OrganizeService) Execute() error {
 	}
 
 	loopStart := time.Now()
-	log.Info("dispatch loop started",
-		zap.Int("total_batches", len(buckets)),
-		zap.Int64("batch_size", s.batchSize),
-		zap.String("table", s.table),
-		zap.String("queue_target", s.queueTarget),
-	)
+	var lastBucketStartID int64
+	var lastBucketEndID int64
 
 	for _, b := range buckets {
+		// Reserva el bucket: cambia status -> to_process y asigna run_id.
 		res := db.WithContext(execCtx).Table(s.table).
 			Where("status = ?", "pending").
 			Where("id BETWEEN ? AND ?", b.StartID, b.EndID).
@@ -238,16 +199,11 @@ func (s *OrganizeService) Execute() error {
 				"updated_at": now,
 			})
 		if res.Error != nil {
-			log.Error("update to_process failed",
-				zap.Int64("bucket_id", b.BucketID),
-				zap.Int64("start_id", b.StartID),
-				zap.Int64("end_id", b.EndID),
-				zap.Error(res.Error),
-			)
-			return res.Error
+			return fmt.Errorf("update to_process failed (bucket_id=%d start_id=%d end_id=%d): %w", b.BucketID, b.StartID, b.EndID, res.Error)
 		}
 		updatedRows += res.RowsAffected
 
+		// Payload por bucket: define el rango que deberá procesar el worker.
 		input := map[string]any{
 			"run_id":     runID,
 			"bucket_id":  b.BucketID,
@@ -259,31 +215,21 @@ func (s *OrganizeService) Execute() error {
 
 		stepCtx := contracts.NewServiceContextFromInput(context.Background(), input)
 		if err := dispatcher.DefaultDispatcher.DispatchStep(execCtx, "test/mqb1t/process_batch", 2, policy, stepCtx); err != nil {
-			log.Error("dispatch failed",
-				zap.Int64("bucket_id", b.BucketID),
-				zap.Error(err),
-			)
-			return err
+			return fmt.Errorf("dispatch failed (bucket_id=%d): %w", b.BucketID, err)
 		}
 		dispatched++
 
 		if b.BucketID == int64(len(buckets)) {
-			log.Info("last batch detected",
-				zap.Int64("bucket_id", b.BucketID),
-				zap.Int64("start_id", b.StartID),
-				zap.Int64("end_id", b.EndID),
-				zap.Int("dispatched_total", dispatched),
-				zap.Int64("dispatch_loop_ms", time.Since(loopStart).Milliseconds()),
-			)
+			lastBucketStartID = b.StartID
+			lastBucketEndID = b.EndID
 		}
 	}
-	log.Info("dispatch loop finished", zap.Int64("dispatch_loop_ms", time.Since(loopStart).Milliseconds()))
+	dispatchLoopMS := time.Since(loopStart).Milliseconds()
 
 	var reservedToProcess int64
 	if err := db.WithContext(execCtx).Table(s.table).
 		Where("run_id = ? AND status = ?", runID, "to_process").
 		Count(&reservedToProcess).Error; err != nil {
-		log.Error("count reserved_to_process failed", zap.Error(err))
 		return err
 	}
 
@@ -305,11 +251,13 @@ func (s *OrganizeService) Execute() error {
 				"redis_total":         totalKey,
 				"redis_done":          doneKey,
 				"dispatched_at":       now.Format(time.RFC3339),
+				"dispatch_loop_ms":    dispatchLoopMS,
+				"last_bucket_start_id": lastBucketStartID,
+				"last_bucket_end_id":   lastBucketEndID,
 			},
 		})
 	}
 
-	fmt.Printf("mqb1t dispatched run_id=%s table=%s batches=%d batch_size=%d\n", runID, s.table, len(buckets), s.batchSize)
 	return nil
 }
 

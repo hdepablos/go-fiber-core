@@ -9,28 +9,39 @@ import (
 	gormconn "go-fiber-core/internal/database/connections/gorm"
 	redisconn "go-fiber-core/internal/database/connections/redis"
 	"go-fiber-core/internal/dtos/config"
-	"go-fiber-core/internal/logger"
 
 	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 var (
+	// depsOnce garantiza que la inicialización ocurra una sola vez por proceso (por pod).
+	// Esto evita reconectar DB/Redis en cada step (organize/process_batch/finalize).
 	depsOnce sync.Once
-	depsErr  error
-	dbWrite  *gorm.DB
-	rdb      *redis.Client
+
+	// depsErr guarda el primer error de inicialización (si falla config/DB/Redis).
+	// Las siguientes llamadas a getDeps devuelven el mismo error.
+	depsErr error
+
+	// dbWrite es la conexión de escritura a la base de datos (GORM).
+	// En este flujo se usa para actualizar el estado de los registros del run.
+	dbWrite *gorm.DB
+
+	// rdb es el cliente Redis compartido.
+	// Se usa para coordinar batches (total/done/finalize/started_at) entre steps.
+	rdb *redis.Client
 )
 
+// getDeps devuelve las "dependencias" del flujo (deps = dependencies):
+// - DB (write) para actualizar estados de registros
+// - Redis para coordinación entre lotes
+//
+// Nota: se inicializa con sync.Once, por lo que si cambia el env/config en runtime,
+// este helper NO recarga automáticamente.
 func getDeps(ctx context.Context) (*gorm.DB, *redis.Client, error) {
 	_ = ctx
 	depsOnce.Do(func() {
-		log := logger.GetLoggerToFile("MultiQueueBatchProcessorOneTable", "pkg/logs/MultiQueueBatchProcessorOneTable.log").With(
-			zap.String("component", "mqb1t"),
-			zap.String("scope", "deps"),
-		)
-
+		// Resuelve el path de config. Prioriza CONFIG_PATH y tiene un fallback para local.
 		configPath := os.Getenv("CONFIG_PATH")
 		if configPath == "" {
 			configPath = "internal/appconfig/config.yml"
@@ -41,51 +52,40 @@ func getDeps(ctx context.Context) (*gorm.DB, *redis.Client, error) {
 			}
 		}
 
-		log.Info("loading config", zap.String("config_path", configPath))
+		// Carga configuración (DB/Redis) desde YAML.
 		appCfg, err := config.NewAppConfig(configPath)
 		if err != nil {
-			log.Error("load config failed", zap.Error(err))
 			depsErr = err
 			return
 		}
 
+		// Crea el servicio de conexión GORM y obtiene el DB de escritura.
 		gormSvc, _, err := gormconn.NewGormConnectService(appCfg.MultiDatabaseConfig)
 		if err != nil {
-			log.Error("gorm connect failed", zap.Error(err))
 			depsErr = err
 			return
 		}
 
+		// Crea el cliente Redis (usado para locks/contadores del proceso).
 		client, _, err := redisconn.NewRedisClient(appCfg.Redis)
 		if err != nil {
-			log.Error("redis connect failed",
-				zap.String("host", appCfg.Redis.RedisHost),
-				zap.String("port", appCfg.Redis.RedisPort),
-				zap.Int("db", appCfg.Redis.RedisDatabase),
-				zap.Error(err),
-			)
 			depsErr = err
 			return
 		}
 
+		// Cachea dependencias para próximos steps.
 		dbWrite = gormSvc.GetWriteDB()
 		rdb = client
 
+		// Validaciones básicas: si algo viene nil, fallar temprano con error explicativo.
 		if dbWrite == nil {
-			log.Error("gorm write db is nil")
 			depsErr = fmt.Errorf("gorm write db is nil")
 			return
 		}
 		if rdb == nil {
-			log.Error("redis client is nil")
 			depsErr = fmt.Errorf("redis client is nil")
 			return
 		}
-		log.Info("deps ready",
-			zap.String("redis_host", appCfg.Redis.RedisHost),
-			zap.String("redis_port", appCfg.Redis.RedisPort),
-			zap.Int("redis_db", appCfg.Redis.RedisDatabase),
-		)
 	})
 
 	return dbWrite, rdb, depsErr

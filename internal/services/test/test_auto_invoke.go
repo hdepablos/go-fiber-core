@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"math/rand"
@@ -76,8 +75,6 @@ func (s *TestAutoInvoke) Execute() error {
 	}
 	processedCount = newLastID - lastID
 
-	fmt.Println(batchConsoleMessage)
-
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	processTime := rng.Intn(4) + 2 // (0-3) + 2 = 2-5
 	time.Sleep(time.Duration(processTime) * time.Second)
@@ -85,8 +82,8 @@ func (s *TestAutoInvoke) Execute() error {
 	// 3. Check for autoInvoke config and propagate to Input
 	// This ensures the SQS Consumer can see the flag even if it wasn't in the original request input
 	if cfg, ok := s.ctx.CurrentStepConfig["autoInvoke"]; ok {
+		// Propaga el flag al input para que el siguiente ciclo lo pueda leer.
 		s.ctx.SetInputValue("autoInvoke", cfg)
-		fmt.Printf("✅ Propagated autoInvoke config to Input: %v\n", cfg)
 	}
 
 	// 4. Set Result
@@ -96,6 +93,7 @@ func (s *TestAutoInvoke) Execute() error {
 		Message: batchLabel,
 		Data: map[string]any{
 			"batch_label":       batchLabel,
+			"batch_message":     batchConsoleMessage,
 			"processed_count":   processedCount,
 			"last_id_processed": newLastID,
 			"is_last_batch":     isLastBatch,

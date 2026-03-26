@@ -163,10 +163,6 @@ func (s *ProcessBatchService) Execute() error {
 			"is_last_batch":               isLast,
 		},
 	})
-
-	if isLast {
-		fmt.Printf("mqb1t last batch run_id=%s range=%d-%d done=%d/%d\n", runID, startID, endID, done, total)
-	}
 	return nil
 }
 

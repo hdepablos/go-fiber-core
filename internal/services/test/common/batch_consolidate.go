@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -21,8 +20,7 @@ func (s *BatchConsolidateService) Init(ctx *contracts.ServiceContext, servicePat
 }
 
 func (s *BatchConsolidateService) Execute() error {
-	fmt.Printf("✅ Ejecutando BatchConsolidateService: %s\n", s.servicePath)
-
+	// Servicio de ejemplo: simula una consolidación al final de un batch.
 	data := map[string]any{
 		"status":          "success",
 		"consolidated_at": "now",

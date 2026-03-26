@@ -27,8 +27,7 @@ func (p *RiskLevel) Init(ctx *contracts.ServiceContext, servicePath string) {
 
 // Execute realiza un cálculo simple de riesgo.
 func (p *RiskLevel) Execute() error {
-	fmt.Println("📊 Ejecutando servicio RiskLevel")
-
+	// Servicio de ejemplo: calcula un nivel de riesgo en base a edad y salario.
 	if _, ok := p.ctx.GetInputValue("is_renovation"); !ok {
 		return fmt.Errorf("%w: missing required input key 'is_renovation' for RiskLevel", domain.ErrMissingRequiredKey)
 	}

@@ -1,7 +1,6 @@
 package loanrisk
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -25,8 +24,7 @@ func (r *IsRenovation) Init(ctx *contracts.ServiceContext, servicePath string) {
 
 // Execute contiene la lógica del servicio.
 func (r *IsRenovation) Execute() error {
-	fmt.Println("🔁 Ejecutando servicio IsRenovation")
-
+	// Servicio de ejemplo: setea is_renovation en el input para que pasos posteriores lo usen.
 	r.ctx.SetInputValue("is_renovation", true)
 
 	data := map[string]any{

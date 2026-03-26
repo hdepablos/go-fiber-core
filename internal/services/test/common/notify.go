@@ -1,7 +1,6 @@
 package common
 
 import (
-	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
@@ -21,14 +20,12 @@ func (s *NotifyService) Init(ctx *contracts.ServiceContext, servicePath string) 
 }
 
 func (s *NotifyService) Execute() error {
-	fmt.Printf("📧 Ejecutando NotifyService: %s\n", s.servicePath)
-	
 	// Aquí se integraría con el servicio de email real (AWS SES / SMTP)
 	// Por ahora simulamos el envío exitoso.
-	
+
 	data := map[string]any{
-		"sent": true,
-		"channel": "email",
+		"sent":      true,
+		"channel":   "email",
 		"timestamp": "now",
 	}
 
@@ -36,7 +33,7 @@ func (s *NotifyService) Execute() error {
 		Status: "completed",
 		Data:   data,
 	}
-	
+
 	s.ctx.SetResult(s.servicePath, result)
 	return nil
 }
