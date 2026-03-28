@@ -20,6 +20,14 @@ type AuthService interface {
 	RevokeUserSessions(ctx context.Context, userID uint64) error
 	RevokeAllSessions(ctx context.Context) error
 	GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error)
+
+	// Google OAuth2
+	GoogleAuthURL(state string) (string, error)
+	GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error)
+	SaveGoogleOAuthState(ctx context.Context, state string) error
+	ConsumeGoogleOAuthState(ctx context.Context, state string) (bool, error)
+	SaveGoogleOAuthLoginResult(ctx context.Context, code string, result *responses.GoogleOAuthLoginResponse) error
+	ConsumeGoogleOAuthLoginResult(ctx context.Context, code string) (*responses.GoogleOAuthLoginResponse, error)
 }
 
 // TokenService define la interfaz para la generación y validación de tokens.

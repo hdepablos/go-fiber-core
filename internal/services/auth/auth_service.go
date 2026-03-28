@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -18,6 +20,7 @@ import (
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
+	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/models"
 	refreshTokenRepo "go-fiber-core/internal/repositories/refreshtoken"
 	sessionRepo "go-fiber-core/internal/repositories/session"
@@ -25,12 +28,16 @@ import (
 	"go-fiber-core/internal/services"
 	"go-fiber-core/internal/services/cache"
 	menuService "go-fiber-core/internal/services/menu"
+
+	redis "github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 // authService es la implementación de la interfaz AuthService.
 type localAuthService struct {
 	services.TransactionManager
 	userReader       userRepo.UserReader
+	userWriter       userRepo.UserWriter
 	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository
 	sessionRepo      sessionRepo.SessionRepository
 	tokenService     TokenService
@@ -41,6 +48,7 @@ type localAuthService struct {
 // Decide qué implementación usar basándose en la configuración (Local vs Cognito).
 func NewAuthService(
 	userReader userRepo.UserReader,
+	userWriter userRepo.UserWriter,
 	refreshTokenRepo refreshTokenRepo.RefreshTokenRepository,
 	sessionRepo sessionRepo.SessionRepository,
 	tokenService TokenService,
@@ -55,11 +63,68 @@ func NewAuthService(
 	return &localAuthService{
 		TransactionManager: services.NewTransactionManager(connect),
 		userReader:         userReader,
+		userWriter:         userWriter,
 		refreshTokenRepo:   refreshTokenRepo,
 		sessionRepo:        sessionRepo,
 		tokenService:       tokenService,
 		menuReader:         menuReader,
 	}
+}
+
+func (s *localAuthService) createSessionAndTokens(ctx context.Context, userID uint64, userAgent, clientIP string) (accessToken string, refreshToken string, sessionID string, err error) {
+	sessionUUID := uuid.New()
+
+	accessToken, refreshToken, err = s.tokenService.GenerateTokens(strconv.FormatUint(userID, 10), sessionUUID.String())
+	if err != nil {
+		return "", "", "", errors.New("error al generar tokens")
+	}
+
+	err = s.TransactionManager.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		expiresAt := time.Now().Add(7 * 24 * time.Hour)
+		newSession := &models.Session{
+			ID:        sessionUUID,
+			UserID:    userID,
+			UserAgent: userAgent,
+			ClientIP:  clientIP,
+			ExpiresAt: expiresAt,
+			IsBlocked: false,
+		}
+		if err := s.sessionRepo.Create(ctx, tx, newSession); err != nil {
+			return fmt.Errorf("error al crear sesión: %w", err)
+		}
+
+		newRefreshToken := &models.RefreshToken{
+			UserID:    userID,
+			Token:     refreshToken,
+			ExpiresAt: expiresAt,
+		}
+		if err := s.refreshTokenRepo.Create(ctx, tx, newRefreshToken); err != nil {
+			return errors.New("error al guardar refresh token")
+		}
+		return nil
+	})
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return accessToken, refreshToken, sessionUUID.String(), nil
+}
+
+func (s *localAuthService) buildRolesAndMenu(ctx context.Context, user *models.User) (roleIDs []uint64, roleNames []string, menuItems []responses.MenuItemResponse, err error) {
+	for _, r := range user.Roles {
+		roleIDs = append(roleIDs, r.ID)
+		roleNames = append(roleNames, r.Name)
+	}
+
+	menuItems, err = s.menuReader.GetMenuByUser(ctx, user.ID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error al obtener el menú: %w", err)
+	}
+	if len(menuItems) == 0 {
+		return nil, nil, nil, domain.ErrNoMenuAccess
+	}
+
+	return roleIDs, roleNames, menuItems, nil
 }
 
 // ────────────────────────────────────────────────
@@ -86,58 +151,14 @@ func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest,
 		return nil, domain.ErrAuthentication
 	}
 
-	// 3️⃣ Generar Session ID
-	sessionID := uuid.New()
-
-	// 4️⃣ Generar tokens vinculados a la sesión
-	userIDStr := strconv.FormatUint(user.ID, 10)
-	accessToken, refreshToken, err := s.tokenService.GenerateTokens(userIDStr, sessionID.String())
-	if err != nil {
-		return nil, errors.New("error al generar tokens")
-	}
-
-	// 5️⃣ Guardar sesión y refresh token
-	err = s.TransactionManager.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		// Guardar Sesión
-		expiresAt := time.Now().Add(7 * 24 * time.Hour) // Misma duración que refresh token
-		newSession := &models.Session{
-			ID:        sessionID,
-			UserID:    user.ID,
-			UserAgent: userAgent,
-			ClientIP:  clientIP,
-			ExpiresAt: expiresAt,
-			IsBlocked: false,
-		}
-		if err := s.sessionRepo.Create(ctx, tx, newSession); err != nil {
-			return fmt.Errorf("error al crear sesión: %w", err)
-		}
-
-		newRefreshToken := &models.RefreshToken{
-			UserID:    user.ID,
-			Token:     refreshToken,
-			ExpiresAt: expiresAt,
-		}
-		if err := s.refreshTokenRepo.Create(ctx, tx, newRefreshToken); err != nil {
-			return errors.New("error al guardar refresh token")
-		}
-		return nil
-	})
+	roleIDs, roleNames, menuItems, err := s.buildRolesAndMenu(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 
-	// 6️⃣ Construir lista de roles
-	var roleIDs []uint64
-	var roleNames []string
-	for _, r := range user.Roles {
-		roleIDs = append(roleIDs, r.ID)
-		roleNames = append(roleNames, r.Name)
-	}
-
-	// 7️⃣ Obtener menús
-	menuItems, err := s.menuReader.GetMenuByUser(ctx, user.ID)
+	accessToken, refreshToken, _, err := s.createSessionAndTokens(ctx, user.ID, userAgent, clientIP)
 	if err != nil {
-		return nil, fmt.Errorf("error al obtener el menú: %w", err)
+		return nil, err
 	}
 
 	// 8️⃣ Construir respuesta
@@ -306,7 +327,7 @@ func (s *localAuthService) RevokeSession(ctx context.Context, sessionIDStr strin
 			projectPrefix = "go-fiber-core"
 		}
 		key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sessionID.String())
-		
+
 		lockService := cache.NewRedisLockService(redisClient)
 		if err := lockService.Set(ctx, key, "revoked", ttl); err != nil {
 			fmt.Printf("Error setting redis blacklist: %v\n", err)
@@ -380,10 +401,224 @@ func (s *localAuthService) RevokeAllSessions(ctx context.Context) error {
 	// 3️⃣ Revocar TODO en DB
 	return s.sessionRepo.RevokeAll(ctx, dbWrite)
 }
+
 // ────────────────────────────────────────────────
 // GET ACTIVE SESSIONS PAGINATED
 // ────────────────────────────────────────────────
 func (s *localAuthService) GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error) {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 	return s.sessionRepo.GetActiveSessionsPaginated(ctx, dbRead, req)
+}
+
+// ────────────────────────────────────────────────
+// GOOGLE OAUTH2
+// ────────────────────────────────────────────────
+func (s *localAuthService) GoogleAuthURL(state string) (string, error) {
+	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_google_service"))
+	client, err := newGoogleOAuthClientFromEnv()
+	if err != nil {
+		log.Error("google oauth: configuración inválida", zap.Error(err))
+		return "", err
+	}
+	return client.AuthCodeURL(state)
+}
+
+func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error) {
+	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_google_service"), zap.String("ip", clientIP))
+	if code == "" {
+		log.Warn("google callback login: missing code")
+		return nil, domain.ErrInvalidArgument
+	}
+
+	googleClient, err := newGoogleOAuthClientFromEnv()
+	if err != nil {
+		log.Error("google callback login: configuración inválida", zap.Error(err))
+		return nil, err
+	}
+
+	log.Info("google callback login: exchanging code", zap.String("ua", userAgent))
+	token, err := googleClient.Exchange(ctx, code)
+	if err != nil {
+		log.Warn("google callback login: exchange failed", zap.Error(err))
+		return nil, domain.ErrAuthentication
+	}
+	if token == nil || token.AccessToken == "" {
+		log.Warn("google callback login: missing access token after exchange")
+		return nil, domain.ErrAuthentication
+	}
+
+	log.Info("google callback login: fetching userinfo")
+	info, err := googleClient.FetchUserInfo(ctx, token.AccessToken)
+	if err != nil {
+		log.Warn("google callback login: userinfo failed", zap.Error(err))
+		return nil, domain.ErrAuthentication
+	}
+	log.Info(
+		"google callback login: userinfo ok",
+		zap.String("email", info.Email),
+		zap.Bool("verified_email", info.VerifiedEmail),
+		zap.String("google_id", info.ID),
+		zap.String("name", info.Name),
+		zap.String("locale", info.Locale),
+	)
+	if !info.VerifiedEmail {
+		log.Warn("google callback login: email not verified", zap.String("email", info.Email))
+		return nil, domain.ErrAuthentication
+	}
+
+	allowedDomain := strings.TrimSpace(os.Getenv("GOOGLE_ALLOWED_DOMAIN"))
+	if allowedDomain != "" {
+		emailLower := strings.ToLower(strings.TrimSpace(info.Email))
+		domainLower := strings.ToLower(allowedDomain)
+		if !strings.HasSuffix(emailLower, "@"+domainLower) {
+			log.Warn("google callback login: email domain not allowed", zap.String("allowed_domain", allowedDomain))
+			return nil, domain.ErrAuthentication
+		}
+	}
+
+	log = log.With(zap.String("email", info.Email), zap.String("google_id", info.ID))
+	dbRead := s.TransactionManager.Conn.ConnectGormRead
+
+	user, err := s.userReader.GetByEmailWithRoles(ctx, dbRead, info.Email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Warn("google callback login: user not found in database", zap.String("email", info.Email))
+			return nil, domain.ErrNoMenuAccess
+		} else {
+			log.Error("google callback login: error loading user", zap.Error(err))
+			return nil, errors.New("error obteniendo usuario")
+		}
+	}
+
+	if user == nil || !user.IsActive {
+		log.Warn("google callback login: user inactive or nil")
+		return nil, domain.ErrAuthentication
+	}
+
+	roleIDs, roleNames, menuItems, err := s.buildRolesAndMenu(ctx, user)
+	if err != nil {
+		log.Error("google callback login: error building roles/menu", zap.Error(err), zap.Uint64("user_id", user.ID))
+		return nil, err
+	}
+
+	log.Info("google callback login: creating session and jwt", zap.Uint64("user_id", user.ID))
+	accessToken, refreshToken, _, err := s.createSessionAndTokens(ctx, user.ID, userAgent, clientIP)
+	if err != nil {
+		log.Error("google callback login: error creating session/tokens", zap.Error(err), zap.Uint64("user_id", user.ID))
+		return nil, err
+	}
+
+	log.Info("google callback login: success", zap.Uint64("user_id", user.ID), zap.Int("roles", len(roleNames)), zap.Int("menu_items", len(menuItems)))
+	return &responses.GoogleOAuthLoginResponse{
+		Provider:     "google",
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		UserID:       user.ID,
+		UserName:     user.Name,
+		RoleIDs:      roleIDs,
+		Roles:        roleNames,
+		Menu:         menuItems,
+		User: responses.GoogleOAuthUser{
+			GoogleID:      info.ID,
+			Email:         info.Email,
+			VerifiedEmail: info.VerifiedEmail,
+			Name:          info.Name,
+			GivenName:     info.GivenName,
+			FamilyName:    info.FamilyName,
+			Picture:       info.Picture,
+			Locale:        info.Locale,
+		},
+	}, nil
+}
+
+func (s *localAuthService) googleOAuthStateKey(state string) string {
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+	return fmt.Sprintf("%s:oauth:google:state:%s", projectPrefix, state)
+}
+
+func (s *localAuthService) SaveGoogleOAuthState(ctx context.Context, state string) error {
+	if state == "" {
+		return domain.ErrInvalidArgument
+	}
+	redisClient := s.TransactionManager.Conn.ConnectRedis
+	if redisClient == nil {
+		return errors.New("redis no configurado para oauth state")
+	}
+
+	key := s.googleOAuthStateKey(state)
+	lockService := cache.NewRedisLockService(redisClient)
+	return lockService.Set(ctx, key, "1", 10*time.Minute)
+}
+
+func (s *localAuthService) ConsumeGoogleOAuthState(ctx context.Context, state string) (bool, error) {
+	if state == "" {
+		return false, domain.ErrInvalidArgument
+	}
+	redisClient := s.TransactionManager.Conn.ConnectRedis
+	if redisClient == nil {
+		return false, errors.New("redis no configurado para oauth state")
+	}
+
+	key := s.googleOAuthStateKey(state)
+	val, err := redisClient.GetDel(ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false, nil
+		}
+		return false, err
+	}
+	return val != "", nil
+}
+
+func (s *localAuthService) googleOAuthLoginKey(code string) string {
+	projectPrefix := os.Getenv("APP_NAME")
+	if projectPrefix == "" {
+		projectPrefix = "go-fiber-core"
+	}
+	return fmt.Sprintf("%s:oauth:google:login:%s", projectPrefix, code)
+}
+
+func (s *localAuthService) SaveGoogleOAuthLoginResult(ctx context.Context, code string, result *responses.GoogleOAuthLoginResponse) error {
+	if code == "" || result == nil {
+		return domain.ErrInvalidArgument
+	}
+	redisClient := s.TransactionManager.Conn.ConnectRedis
+	if redisClient == nil {
+		return errors.New("redis no configurado para oauth exchange")
+	}
+
+	b, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("error serializando login result: %w", err)
+	}
+
+	return redisClient.Set(ctx, s.googleOAuthLoginKey(code), string(b), 2*time.Minute).Err()
+}
+
+func (s *localAuthService) ConsumeGoogleOAuthLoginResult(ctx context.Context, code string) (*responses.GoogleOAuthLoginResponse, error) {
+	if code == "" {
+		return nil, domain.ErrInvalidArgument
+	}
+	redisClient := s.TransactionManager.Conn.ConnectRedis
+	if redisClient == nil {
+		return nil, errors.New("redis no configurado para oauth exchange")
+	}
+
+	val, err := redisClient.GetDel(ctx, s.googleOAuthLoginKey(code)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, domain.ErrAuthentication
+		}
+		return nil, err
+	}
+
+	var out responses.GoogleOAuthLoginResponse
+	if err := json.Unmarshal([]byte(val), &out); err != nil {
+		return nil, domain.ErrAuthentication
+	}
+
+	return &out, nil
 }

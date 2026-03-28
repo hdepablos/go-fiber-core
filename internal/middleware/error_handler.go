@@ -27,6 +27,9 @@ func GlobalErrorHandler(c *fiber.Ctx, err error) error {
 	case errors.Is(err, domain.ErrAuthentication):
 		return responses.Error(c, fiber.StatusUnauthorized, err.Error())
 
+	case errors.Is(err, domain.ErrNoMenuAccess):
+		return responses.Error(c, fiber.StatusForbidden, err.Error())
+
 	// Agrega más casos según tus necesidades
 	// case errors.Is(err, domain.ErrConflict):
 	// 	return responses.Error(c, fiber.StatusConflict, err.Error())

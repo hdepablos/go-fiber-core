@@ -56,6 +56,40 @@ func GetLoggerToFile(name string, filePath string) *zap.Logger {
 	return newLogger
 }
 
+func ResolveProjectPath(relPath string) string {
+	if filepath.IsAbs(relPath) {
+		return relPath
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		abs, err2 := filepath.Abs(relPath)
+		if err2 != nil {
+			return relPath
+		}
+		return abs
+	}
+
+	dir := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return filepath.Join(dir, relPath)
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	abs, err := filepath.Abs(relPath)
+	if err != nil {
+		return relPath
+	}
+	return abs
+}
+
 func createLogger(name string) *zap.Logger {
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {

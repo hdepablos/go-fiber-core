@@ -48,15 +48,15 @@ type PgxReadPool *pgxpool.Pool
 
 // AppContainer contiene la lógica de negocio completa sin el servidor HTTP
 type AppContainer struct {
-	Config            *config.AppConfig
-	Connect           *connect.ConnectDTO
-	UserWriterService user2.UserWriterService
-	UserReaderService user2.UserReaderService
-	BankWriterService bank2.BankWriterService
-	BankReaderService bank2.BankReaderService
-	AuthService       auth.AuthService
-	DatabaseService   *services.DatabaseService
-	QueueService      *queue.SQSService
+	Config                  *config.AppConfig
+	Connect                 *connect.ConnectDTO
+	UserWriterService       user2.UserWriterService
+	UserReaderService       user2.UserReaderService
+	BankWriterService       bank2.BankWriterService
+	BankReaderService       bank2.BankReaderService
+	AuthService             auth.AuthService
+	DatabaseService         *services.DatabaseService
+	QueueService            *queue.SQSService
 	ProcessLifecycleService processlifecycle2.Service
 }
 
@@ -225,7 +225,7 @@ var repositorySet = wire.NewSet(
 var serviceSet = wire.NewSet(
 	provideTokenService,
 	auth.NewAuthService,
-	
+
 	provideAWSService, // 👈 Proveedor de AWS
 	provideSQSService, // 👈 Proveedor de SQS
 

@@ -13,6 +13,10 @@ func RegisterAuthRoutes(router fiber.Router, authHandler handlers.AuthHandler) {
 
 	auth.Post("/login", authHandler.Login)
 	auth.Post("/refresh", authHandler.Refresh)
+	auth.Get("/google", authHandler.GoogleAuth)
+	auth.Post("/google/exchange", authHandler.GoogleExchange)
+
+	router.Get("/oauth/google/callback", authHandler.GoogleCallback)
 }
 
 // RegisterProtectedAuthRoutes registra las rutas de autenticación que requieren protección (middleware).

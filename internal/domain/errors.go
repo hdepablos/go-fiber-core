@@ -7,6 +7,7 @@ var (
 	ErrInvalidArgument = errors.New("argumento inválido")
 	ErrInternal        = errors.New("ha ocurrido un error interno")
 	ErrAuthentication  = errors.New("credenciales inválidas")
+	ErrNoMenuAccess    = errors.New("Usted no está asociado a ningún items")
 
 	// ErrCritical se usa para errores que deben detener inmediatamente la ejecución de la cadena.
 	// Por ejemplo, una falla al procesar una transacción financiera.

@@ -76,6 +76,7 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	}
 	connectDTO := provideConnectDTO(gormConnectService, pgxWritePool, pgxReadPool, client)
 	userReader := user.NewUserReaderRepo()
+	userWriter := user.NewUserWriterRepo()
 	refreshTokenReader := refreshtoken.NewRefreshTokenReaderRepo()
 	refreshTokenWriter := refreshtoken.NewRefreshTokenWriterRepo()
 	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
@@ -87,9 +88,8 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
+	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	authHandler := handlers.NewAuthHandler(authService)
-	userWriter := user.NewUserWriterRepo()
 	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
 	paginationPaginationService := provideUserPaginationService()
 	userPaginator := user.NewUserPaginatorRepo(paginationPaginationService)
@@ -202,7 +202,7 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
+	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	awsService, err := provideAWSService()
 	if err != nil {

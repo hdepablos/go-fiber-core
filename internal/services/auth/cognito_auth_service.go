@@ -57,3 +57,27 @@ func (s *cognitoAuthService) GetActiveSessions(ctx context.Context, req dtos.Pag
 	// Cognito no expone fácilmente las sesiones activas sin usar Cognito Sync o una DB externa.
 	return nil, errors.New("listar sesiones activas no soportado por defecto en Cognito")
 }
+
+func (s *cognitoAuthService) GoogleAuthURL(state string) (string, error) {
+	return "", errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
+
+func (s *cognitoAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error) {
+	return nil, errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
+
+func (s *cognitoAuthService) SaveGoogleOAuthState(ctx context.Context, state string) error {
+	return errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
+
+func (s *cognitoAuthService) ConsumeGoogleOAuthState(ctx context.Context, state string) (bool, error) {
+	return false, errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
+
+func (s *cognitoAuthService) SaveGoogleOAuthLoginResult(ctx context.Context, code string, result *responses.GoogleOAuthLoginResponse) error {
+	return errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
+
+func (s *cognitoAuthService) ConsumeGoogleOAuthLoginResult(ctx context.Context, code string) (*responses.GoogleOAuthLoginResponse, error) {
+	return nil, errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
+}
