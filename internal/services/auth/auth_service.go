@@ -26,6 +26,7 @@ import (
 	sessionRepo "go-fiber-core/internal/repositories/session"
 	userRepo "go-fiber-core/internal/repositories/user"
 	"go-fiber-core/internal/services"
+	"go-fiber-core/internal/services/authlog"
 	"go-fiber-core/internal/services/cache"
 	menuService "go-fiber-core/internal/services/menu"
 
@@ -42,6 +43,7 @@ type localAuthService struct {
 	sessionRepo      sessionRepo.SessionRepository
 	tokenService     TokenService
 	menuReader       menuService.MenuReaderService
+	authLog          authlog.AuthLogService
 }
 
 // NewAuthService crea una nueva instancia del servicio de autenticación.
@@ -53,6 +55,7 @@ func NewAuthService(
 	sessionRepo sessionRepo.SessionRepository,
 	tokenService TokenService,
 	menuReader menuService.MenuReaderService,
+	authLogService authlog.AuthLogService,
 	connect *connect.ConnectDTO,
 ) AuthService {
 	// Si AUTH_PROVIDER == "cognito", retornamos la implementación de Cognito.
@@ -68,6 +71,7 @@ func NewAuthService(
 		sessionRepo:        sessionRepo,
 		tokenService:       tokenService,
 		menuReader:         menuReader,
+		authLog:            authLogService,
 	}
 }
 
@@ -130,34 +134,44 @@ func (s *localAuthService) buildRolesAndMenu(ctx context.Context, user *models.U
 // ────────────────────────────────────────────────
 // LOGIN
 // ────────────────────────────────────────────────
-func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP string) (*responses.LoginResponse, error) {
+func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP, origin, requestID string) (*responses.LoginResponse, error) {
 	dbRead := s.TransactionManager.Conn.ConnectGormRead
 
 	// 1️⃣ Buscar usuario por email, incluyendo Roles
 	user, err := s.userReader.GetByEmailWithRoles(ctx, dbRead, req.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			s.tryLogLoginFailed(ctx, nil, req.Email, authlog.FailureUserNotFound, clientIP, userAgent, origin, requestID)
 			return nil, domain.ErrAuthentication
 		}
+		s.tryLogLoginFailed(ctx, nil, req.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, fmt.Errorf("error al buscar usuario: %w", err)
 	}
 
 	if !user.IsActive {
+		s.tryLogLoginFailed(ctx, &user.ID, user.Email, authlog.FailureUserInactive, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 
 	// 2️⃣ Verificar contraseña
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		s.tryLogLoginFailed(ctx, &user.ID, user.Email, authlog.FailureWrongPassword, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 
 	roleIDs, roleNames, menuItems, err := s.buildRolesAndMenu(ctx, user)
 	if err != nil {
+		if errors.Is(err, domain.ErrNoMenuAccess) {
+			s.tryLogLoginFailed(ctx, &user.ID, user.Email, authlog.FailureNoMenuAccess, clientIP, userAgent, origin, requestID)
+			return nil, err
+		}
+		s.tryLogLoginFailed(ctx, &user.ID, user.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, err
 	}
 
 	accessToken, refreshToken, _, err := s.createSessionAndTokens(ctx, user.ID, userAgent, clientIP)
 	if err != nil {
+		s.tryLogLoginFailed(ctx, &user.ID, user.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, err
 	}
 
@@ -171,6 +185,7 @@ func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest,
 		Menu:         menuItems,
 	}
 
+	s.tryLogLoginSuccess(ctx, &user.ID, user.Email, clientIP, userAgent, origin, requestID)
 	return resp, nil
 }
 
@@ -277,7 +292,7 @@ func (s *localAuthService) Refresh(ctx context.Context, refreshTokenString strin
 // ────────────────────────────────────────────────
 // LOGOUT
 // ────────────────────────────────────────────────
-func (s *localAuthService) Logout(ctx context.Context, userID uint64) error {
+func (s *localAuthService) Logout(ctx context.Context, userID uint64, userAgent, clientIP, origin, requestID string) error {
 	// 1. Revocar sesiones (DB + Redis Blacklist)
 	if err := s.RevokeUserSessions(ctx, userID); err != nil {
 		return err
@@ -288,11 +303,109 @@ func (s *localAuthService) Logout(ctx context.Context, userID uint64) error {
 	err := s.refreshTokenRepo.DeleteByUserID(ctx, dbWrite, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			s.tryLogLogout(ctx, &userID, nil, clientIP, userAgent, origin, requestID)
 			return nil
 		}
 		return fmt.Errorf("error al borrar tokens: %w", err)
 	}
+	s.tryLogLogout(ctx, &userID, nil, clientIP, userAgent, origin, requestID)
 	return nil
+}
+
+func (s *localAuthService) tryLogLoginSuccess(ctx context.Context, userID *uint64, email string, clientIP, userAgent, origin, requestID string) {
+	if s == nil || s.authLog == nil {
+		return
+	}
+	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_audit"))
+	email = strings.TrimSpace(email)
+	var emailSnapshot *string
+	if email != "" {
+		emailSnapshot = &email
+	}
+	var reqID *string
+	if strings.TrimSpace(requestID) != "" {
+		v := strings.TrimSpace(requestID)
+		reqID = &v
+	}
+	var o *string
+	if strings.TrimSpace(origin) != "" {
+		v := strings.TrimSpace(origin)
+		o = &v
+	}
+	if err := s.authLog.Log(ctx, authlog.Entry{
+		UserID:        userID,
+		EmailSnapshot: emailSnapshot,
+		EventType:     authlog.EventLoginSuccess,
+		IPAddress:     clientIP,
+		UserAgent:     userAgent,
+		RequestID:     reqID,
+		Origin:        o,
+	}); err != nil {
+		log.Warn("authentication log insert failed", zap.String("event_type", string(authlog.EventLoginSuccess)), zap.Error(err))
+	}
+}
+
+func (s *localAuthService) tryLogLoginFailed(ctx context.Context, userID *uint64, email string, reason authlog.FailureReason, clientIP, userAgent, origin, requestID string) {
+	if s == nil || s.authLog == nil {
+		return
+	}
+	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_audit"))
+	email = strings.TrimSpace(email)
+	var emailSnapshot *string
+	if email != "" {
+		emailSnapshot = &email
+	}
+	r := reason
+	var reqID *string
+	if strings.TrimSpace(requestID) != "" {
+		v := strings.TrimSpace(requestID)
+		reqID = &v
+	}
+	var o *string
+	if strings.TrimSpace(origin) != "" {
+		v := strings.TrimSpace(origin)
+		o = &v
+	}
+	if err := s.authLog.Log(ctx, authlog.Entry{
+		UserID:        userID,
+		EmailSnapshot: emailSnapshot,
+		EventType:     authlog.EventLoginFailed,
+		FailureReason: &r,
+		IPAddress:     clientIP,
+		UserAgent:     userAgent,
+		RequestID:     reqID,
+		Origin:        o,
+	}); err != nil {
+		log.Warn("authentication log insert failed", zap.String("event_type", string(authlog.EventLoginFailed)), zap.String("failure_reason", string(reason)), zap.Error(err))
+	}
+}
+
+func (s *localAuthService) tryLogLogout(ctx context.Context, userID *uint64, emailSnapshot *string, clientIP, userAgent, origin, requestID string) {
+	if s == nil || s.authLog == nil {
+		return
+	}
+	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_audit"))
+	var reqID *string
+	if strings.TrimSpace(requestID) != "" {
+		v := strings.TrimSpace(requestID)
+		reqID = &v
+	}
+	var o *string
+	if strings.TrimSpace(origin) != "" {
+		v := strings.TrimSpace(origin)
+		o = &v
+	}
+	if err := s.authLog.Log(ctx, authlog.Entry{
+		UserID:        userID,
+		EmailSnapshot: emailSnapshot,
+		EventType:     authlog.EventLogout,
+		IPAddress:     clientIP,
+		UserAgent:     userAgent,
+		RequestID:     reqID,
+		Origin:        o,
+	}); err != nil {
+		log.Warn("authentication log insert failed", zap.String("event_type", string(authlog.EventLogout)), zap.Error(err))
+	}
 }
 
 // ────────────────────────────────────────────────
@@ -423,16 +536,18 @@ func (s *localAuthService) GoogleAuthURL(state string) (string, error) {
 	return client.AuthCodeURL(state)
 }
 
-func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error) {
+func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP, origin, requestID string) (*responses.GoogleOAuthLoginResponse, error) {
 	log := logger.GetLoggerToFile("auth", logger.ResolveProjectPath("pkg/logs/auth.log")).With(zap.String("component", "auth_google_service"), zap.String("ip", clientIP))
 	if code == "" {
 		log.Warn("google callback login: missing code")
+		s.tryLogLoginFailed(ctx, nil, "", authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrInvalidArgument
 	}
 
 	googleClient, err := newGoogleOAuthClientFromEnv()
 	if err != nil {
 		log.Error("google callback login: configuración inválida", zap.Error(err))
+		s.tryLogLoginFailed(ctx, nil, "", authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, err
 	}
 
@@ -440,10 +555,12 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	token, err := googleClient.Exchange(ctx, code)
 	if err != nil {
 		log.Warn("google callback login: exchange failed", zap.Error(err))
+		s.tryLogLoginFailed(ctx, nil, "", authlog.FailureOAuthExchangeFailed, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 	if token == nil || token.AccessToken == "" {
 		log.Warn("google callback login: missing access token after exchange")
+		s.tryLogLoginFailed(ctx, nil, "", authlog.FailureOAuthExchangeFailed, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 
@@ -451,6 +568,7 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	info, err := googleClient.FetchUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		log.Warn("google callback login: userinfo failed", zap.Error(err))
+		s.tryLogLoginFailed(ctx, nil, "", authlog.FailureOAuthUserInfoFailed, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 	log.Info(
@@ -463,6 +581,7 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	)
 	if !info.VerifiedEmail {
 		log.Warn("google callback login: email not verified", zap.String("email", info.Email))
+		s.tryLogLoginFailed(ctx, nil, info.Email, authlog.FailureEmailNotVerified, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 
@@ -472,6 +591,7 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 		domainLower := strings.ToLower(allowedDomain)
 		if !strings.HasSuffix(emailLower, "@"+domainLower) {
 			log.Warn("google callback login: email domain not allowed", zap.String("allowed_domain", allowedDomain))
+			s.tryLogLoginFailed(ctx, nil, info.Email, authlog.FailureDomainNotAllowed, clientIP, userAgent, origin, requestID)
 			return nil, domain.ErrAuthentication
 		}
 	}
@@ -483,21 +603,33 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warn("google callback login: user not found in database", zap.String("email", info.Email))
+			s.tryLogLoginFailed(ctx, nil, info.Email, authlog.FailureUserNotFound, clientIP, userAgent, origin, requestID)
 			return nil, domain.ErrNoMenuAccess
 		} else {
 			log.Error("google callback login: error loading user", zap.Error(err))
+			s.tryLogLoginFailed(ctx, nil, info.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 			return nil, errors.New("error obteniendo usuario")
 		}
 	}
 
 	if user == nil || !user.IsActive {
 		log.Warn("google callback login: user inactive or nil")
+		var userID *uint64
+		if user != nil {
+			userID = &user.ID
+		}
+		s.tryLogLoginFailed(ctx, userID, info.Email, authlog.FailureUserInactive, clientIP, userAgent, origin, requestID)
 		return nil, domain.ErrAuthentication
 	}
 
 	roleIDs, roleNames, menuItems, err := s.buildRolesAndMenu(ctx, user)
 	if err != nil {
 		log.Error("google callback login: error building roles/menu", zap.Error(err), zap.Uint64("user_id", user.ID))
+		if errors.Is(err, domain.ErrNoMenuAccess) {
+			s.tryLogLoginFailed(ctx, &user.ID, info.Email, authlog.FailureNoMenuAccess, clientIP, userAgent, origin, requestID)
+		} else {
+			s.tryLogLoginFailed(ctx, &user.ID, info.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
+		}
 		return nil, err
 	}
 
@@ -505,10 +637,12 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	accessToken, refreshToken, _, err := s.createSessionAndTokens(ctx, user.ID, userAgent, clientIP)
 	if err != nil {
 		log.Error("google callback login: error creating session/tokens", zap.Error(err), zap.Uint64("user_id", user.ID))
+		s.tryLogLoginFailed(ctx, &user.ID, info.Email, authlog.FailureInternalError, clientIP, userAgent, origin, requestID)
 		return nil, err
 	}
 
 	log.Info("google callback login: success", zap.Uint64("user_id", user.ID), zap.Int("roles", len(roleNames)), zap.Int("menu_items", len(menuItems)))
+	s.tryLogLoginSuccess(ctx, &user.ID, info.Email, clientIP, userAgent, origin, requestID)
 	return &responses.GoogleOAuthLoginResponse{
 		Provider:     "google",
 		AccessToken:  accessToken,

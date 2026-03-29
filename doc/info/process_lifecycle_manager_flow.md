@@ -2,8 +2,6 @@
 
 Este documento describe, en lenguaje funcional, cómo se diseñan, prueban y ponen en producción los distintos escenarios de un proceso de negocio utilizando el gestor de ciclo de vida de procesos.
 
-No se detallan tablas, migraciones ni elementos técnicos; el enfoque es 100% funcional.
-
 ---
 
 ## Conceptos clave (en lenguaje de negocio)

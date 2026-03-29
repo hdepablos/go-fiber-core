@@ -45,6 +45,12 @@ func AuthMiddleware(tokenService auth.TokenService, redisClient *redis.Client) f
 		}
 		// --- VERIFICACIÓN DE SESIÓN (REVOCACIÓN INMEDIATA) ---
 		if sid, ok := claims["sid"].(string); ok {
+			if strings.HasSuffix(c.Path(), "/auth/logout") {
+				ctx := c.UserContext()
+				newCtx := contextkeys.SetUserID(ctx, userID)
+				c.SetUserContext(newCtx)
+				return c.Next()
+			}
 			projectPrefix := os.Getenv("APP_NAME")
 			if projectPrefix == "" {
 				projectPrefix = "go-fiber-core"
@@ -52,12 +58,13 @@ func AuthMiddleware(tokenService auth.TokenService, redisClient *redis.Client) f
 
 			key := fmt.Sprintf("%s:blacklist:session:%s", projectPrefix, sid)
 
-			lockService := cache.NewRedisLockService(redisClient)
-			val, err := lockService.Get(c.Context(), key)
+			if redisClient != nil {
+				lockService := cache.NewRedisLockService(redisClient)
+				val, err := lockService.Get(c.Context(), key)
 
-			// Si hay valor (blacklist) o está bloqueado (escritura en proceso), denegamos
-			if (err == nil && val != "") || err == cache.ErrCacheLocked {
-				return responses.Error(c, fiber.StatusUnauthorized, "sesión revocada")
+				if (err == nil && val != "") || err == cache.ErrCacheLocked {
+					return responses.Error(c, fiber.StatusUnauthorized, "sesión revocada")
+				}
 			}
 		}
 

@@ -20,7 +20,7 @@ func NewCognitoAuthService() AuthService {
 	return &cognitoAuthService{}
 }
 
-func (s *cognitoAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP string) (*responses.LoginResponse, error) {
+func (s *cognitoAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP, origin, requestID string) (*responses.LoginResponse, error) {
 	// ⚠️ TODO: Implementar lógica real con Cognito
 	// 1. Llamar a cognito.InitiateAuth con USER_SRP_AUTH o USER_PASSWORD_AUTH
 	// 2. Obtener AccessToken, IdToken, RefreshToken de la respuesta
@@ -34,7 +34,7 @@ func (s *cognitoAuthService) Refresh(ctx context.Context, refreshTokenString str
 	return "", "", errors.New("refresh con Cognito no implementado todavía")
 }
 
-func (s *cognitoAuthService) Logout(ctx context.Context, userID uint64) error {
+func (s *cognitoAuthService) Logout(ctx context.Context, userID uint64, userAgent, clientIP, origin, requestID string) error {
 	// Cognito maneja sesiones en el servidor, pero el logout suele ser local (borrar tokens)
 	// o GlobalSignOut para invalidar todos los tokens del usuario.
 	return errors.New("logout con Cognito no implementado todavía")
@@ -62,7 +62,7 @@ func (s *cognitoAuthService) GoogleAuthURL(state string) (string, error) {
 	return "", errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
 }
 
-func (s *cognitoAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error) {
+func (s *cognitoAuthService) GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP, origin, requestID string) (*responses.GoogleOAuthLoginResponse, error) {
 	return nil, errors.New("google oauth2 no disponible cuando AUTH_PROVIDER=cognito")
 }
 

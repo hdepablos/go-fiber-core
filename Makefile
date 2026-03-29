@@ -841,7 +841,7 @@ watch: check-env ## 🏎️ Inicia API con live-reload (Air). Uso: make watch
 	@$(MAKE) set-env ENV=local
 	@$(MAKE) update-bruno-url-base ENV=local
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
-	$(DC_BASE) -p $(PROJECT_SLUG)-local up --remove-orphans --force-recreate
+	$(DC_BASE) -p $(PROJECT_SLUG)-local up --build --remove-orphans --force-recreate
 
 
 

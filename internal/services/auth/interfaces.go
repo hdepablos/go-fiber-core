@@ -13,9 +13,9 @@ import (
 // AuthService define la interfaz para la lógica de autenticación.
 type AuthService interface {
 	// Login ahora acepta userAgent e IP para registrar la sesión
-	Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP string) (*responses.LoginResponse, error)
+	Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP, origin, requestID string) (*responses.LoginResponse, error)
 	Refresh(ctx context.Context, refreshTokenString string) (newAccessToken string, newRefreshToken string, err error)
-	Logout(ctx context.Context, userID uint64) error
+	Logout(ctx context.Context, userID uint64, userAgent, clientIP, origin, requestID string) error
 	RevokeSession(ctx context.Context, sessionID string) error
 	RevokeUserSessions(ctx context.Context, userID uint64) error
 	RevokeAllSessions(ctx context.Context) error
@@ -23,7 +23,7 @@ type AuthService interface {
 
 	// Google OAuth2
 	GoogleAuthURL(state string) (string, error)
-	GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP string) (*responses.GoogleOAuthLoginResponse, error)
+	GoogleCallbackLogin(ctx context.Context, code, userAgent, clientIP, origin, requestID string) (*responses.GoogleOAuthLoginResponse, error)
 	SaveGoogleOAuthState(ctx context.Context, state string) error
 	ConsumeGoogleOAuthState(ctx context.Context, state string) (bool, error)
 	SaveGoogleOAuthLoginResult(ctx context.Context, code string, result *responses.GoogleOAuthLoginResponse) error

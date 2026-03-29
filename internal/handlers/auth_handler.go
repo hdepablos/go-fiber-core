@@ -85,9 +85,21 @@ func (h *authHandler) Login(c *fiber.Ctx) error {
 
 	userAgent := c.Get("User-Agent")
 	clientIP := c.IP()
+	requestID := strings.TrimSpace(c.Get("X-Request-Id"))
+	if requestID == "" {
+		requestID = strings.TrimSpace(c.Get("X-Request-ID"))
+	}
+	origin := strings.TrimSpace(c.Get("X-Origin"))
+	if origin == "" {
+		if strings.TrimSpace(c.Get("Origin")) != "" {
+			origin = "web"
+		} else {
+			origin = "api"
+		}
+	}
 
 	log.Info("local login: attempt", zap.String("email", req.Email), zap.String("ip", clientIP), zap.String("ua", userAgent))
-	resp, err := h.authService.Login(c.UserContext(), req, userAgent, clientIP)
+	resp, err := h.authService.Login(c.UserContext(), req, userAgent, clientIP, origin, requestID)
 	if err != nil {
 		log.Warn("local login: failed", zap.String("email", req.Email), zap.String("ip", clientIP), zap.Error(err))
 		return err
@@ -210,9 +222,21 @@ func (h *authHandler) GoogleCallback(c *fiber.Ctx) error {
 
 	userAgent := c.Get("User-Agent")
 	clientIP := c.IP()
+	requestID := strings.TrimSpace(c.Get("X-Request-Id"))
+	if requestID == "" {
+		requestID = strings.TrimSpace(c.Get("X-Request-ID"))
+	}
+	origin := strings.TrimSpace(c.Get("X-Origin"))
+	if origin == "" {
+		if strings.TrimSpace(c.Get("Origin")) != "" {
+			origin = "web"
+		} else {
+			origin = "api"
+		}
+	}
 
 	log.Info("google callback: starting login", zap.String("ip", clientIP), zap.String("ua", userAgent))
-	resp, err := h.authService.GoogleCallbackLogin(c.UserContext(), code, userAgent, clientIP)
+	resp, err := h.authService.GoogleCallbackLogin(c.UserContext(), code, userAgent, clientIP, origin, requestID)
 	if err != nil {
 		log.Error("google callback: login failed", zap.Error(err), zap.String("ip", clientIP))
 		successRedirect := strings.TrimSpace(os.Getenv("GOOGLE_SUCCESS_REDIRECT_URL"))
@@ -324,22 +348,41 @@ func (h *authHandler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *authHandler) Logout(c *fiber.Ctx) error {
+	log := authFileLogger("auth_local")
 	userIDStr, ok := contextkeys.GetUserID(c.UserContext())
 	if !ok || userIDStr == "" {
-		// Este es un error de autorización que el middleware de errores
-		// puede traducir a un 401 si lo configuramos.
+		log.Warn("logout: missing user_id", zap.String("ip", c.IP()), zap.String("ua", c.Get("User-Agent")))
 		return domain.ErrInvalidArgument
 	}
 
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
+		log.Warn("logout: invalid user_id", zap.String("ip", c.IP()), zap.String("ua", c.Get("User-Agent")))
 		return domain.ErrInvalidArgument
 	}
 
-	if err := h.authService.Logout(c.Context(), userID); err != nil {
+	userAgent := c.Get("User-Agent")
+	clientIP := c.IP()
+	requestID := strings.TrimSpace(c.Get("X-Request-Id"))
+	if requestID == "" {
+		requestID = strings.TrimSpace(c.Get("X-Request-ID"))
+	}
+	origin := strings.TrimSpace(c.Get("X-Origin"))
+	if origin == "" {
+		if strings.TrimSpace(c.Get("Origin")) != "" {
+			origin = "web"
+		} else {
+			origin = "api"
+		}
+	}
+
+	log.Info("logout: attempt", zap.Uint64("user_id", userID), zap.String("ip", clientIP), zap.String("ua", userAgent))
+	if err := h.authService.Logout(c.Context(), userID, userAgent, clientIP, origin, requestID); err != nil {
+		log.Warn("logout: failed", zap.Uint64("user_id", userID), zap.String("ip", clientIP), zap.Error(err))
 		return err
 	}
 
+	log.Info("logout: success", zap.Uint64("user_id", userID), zap.String("ip", clientIP))
 	return responses.Success(c, "Cierre de sesión exitoso", nil)
 }
 

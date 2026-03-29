@@ -17,6 +17,7 @@ import (
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/catalog"
+	"go-fiber-core/internal/repositories/authenticationlog"
 	"go-fiber-core/internal/repositories/menu"
 	menu_user "go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
@@ -26,6 +27,7 @@ import (
 	"go-fiber-core/internal/server"
 	"go-fiber-core/internal/services"
 	"go-fiber-core/internal/services/auth"
+	authlog2 "go-fiber-core/internal/services/authlog"
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
@@ -220,10 +222,12 @@ var repositorySet = wire.NewSet(
 	menu_user.NewMenuUserPaginationRepository,
 	rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo,
 	catalog.NewCatalogRepository,
+	authenticationlog.NewAuthenticationLogWriterRepo, authenticationlog.NewAuthenticationLogRepository,
 )
 
 var serviceSet = wire.NewSet(
 	provideTokenService,
+	authlog2.NewAuthLogService,
 	auth.NewAuthService,
 
 	provideAWSService, // 👈 Proveedor de AWS

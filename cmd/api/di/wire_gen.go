@@ -20,6 +20,7 @@ import (
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/handlers"
 	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/repositories/authenticationlog"
 	"go-fiber-core/internal/repositories/bank"
 	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
@@ -31,6 +32,7 @@ import (
 	"go-fiber-core/internal/server"
 	"go-fiber-core/internal/services"
 	"go-fiber-core/internal/services/auth"
+	"go-fiber-core/internal/services/authlog"
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
 	menu2 "go-fiber-core/internal/services/menu"
@@ -88,7 +90,9 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
+	authenticationLogWriter := authenticationlog.NewAuthenticationLogWriterRepo()
+	authLogService := authlog.NewAuthLogService(connectDTO, authenticationLogWriter)
+	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, authLogService, connectDTO)
 	authHandler := handlers.NewAuthHandler(authService)
 	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
 	paginationPaginationService := provideUserPaginationService()
@@ -202,7 +206,9 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
 	menuReaderService := menu2.NewMenuReaderService(menuReader)
-	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, connectDTO)
+	authenticationLogWriter := authenticationlog.NewAuthenticationLogWriterRepo()
+	authLogService := authlog.NewAuthLogService(connectDTO, authenticationLogWriter)
+	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, authLogService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	awsService, err := provideAWSService()
 	if err != nil {
@@ -392,10 +398,10 @@ var connectionSet = wire.NewSet(
 	provideConnectDTO,
 )
 
-var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, catalog.NewCatalogRepository)
+var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, catalog.NewCatalogRepository, authenticationlog.NewAuthenticationLogWriterRepo, authenticationlog.NewAuthenticationLogRepository)
 
 var serviceSet = wire.NewSet(
-	provideTokenService, auth.NewAuthService, provideAWSService,
+	provideTokenService, authlog.NewAuthLogService, auth.NewAuthService, provideAWSService,
 	provideSQSService,
 
 	provideUserPaginationService,

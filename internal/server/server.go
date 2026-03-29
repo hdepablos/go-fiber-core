@@ -8,6 +8,8 @@ import (
 	authService "go-fiber-core/internal/services/auth"
 	"go-fiber-core/internal/services/queue"
 	userService "go-fiber-core/internal/services/user"
+	"os"
+	"strings"
 	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
@@ -51,12 +53,17 @@ func NewFiberServer(
 		QueueService:      queueService, // 👈 Asignación
 	}
 
+	allowOrigins := strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))
+	if allowOrigins == "" {
+		allowOrigins = "http://localhost:9050,http://127.0.0.1:9050,http://localhost:9000,http://127.0.0.1:9000"
+	}
+
 	// Middleware CORS
 	server.App.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:9050",
+		AllowOrigins:     allowOrigins,
 		AllowCredentials: true,
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Client-Code",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Client-Code, X-Origin, X-Request-Id, X-Request-ID",
 	}))
 
 	// Rate Limiting
