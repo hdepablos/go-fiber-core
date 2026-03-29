@@ -32,6 +32,7 @@ import (
 	// - internal/services/test/loanrisk: loanrisk/age, loanrisk/salary, loanrisk/validation, loanrisk/is_renovation, loanrisk/risk_level
 	// - internal/services/test: test/auto_invoke (y otros helpers de prueba)
 	"go-fiber-core/internal/services/dispatcher"
+	_ "go-fiber-core/internal/services/test/file"
 	_ "go-fiber-core/internal/services/test/loanrisk"
 	_ "go-fiber-core/internal/services/test/mqb1t"
 

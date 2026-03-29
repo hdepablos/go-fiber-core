@@ -1,5 +1,5 @@
 # 1. Empezamos con la imagen oficial de Go en la versión exacta que usa el proyecto.
-FROM golang:1.25-alpine
+FROM golang:1.26.1-alpine
 
 WORKDIR /app
 

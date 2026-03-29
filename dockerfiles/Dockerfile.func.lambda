@@ -1,11 +1,11 @@
 # Etapa 1: dependencias
-FROM golang:1.25-bookworm AS deps
+FROM golang:1.26.1-bookworm AS deps
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Etapa 2: compilación y vendor
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.26.1-bookworm AS builder
 ARG FUNC_NAME
 ARG FOLDER
 WORKDIR /app
@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
 	-o bootstrap ./cmd/${FOLDER}
 
 # Etapa final: empaquetado
-FROM golang:1.25-bookworm AS packager
+FROM golang:1.26.1-bookworm AS packager
 ARG FOLDER
 WORKDIR /app/${FOLDER}
 

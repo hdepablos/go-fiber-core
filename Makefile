@@ -2,6 +2,8 @@
 include .env
 export
 
+GOTOOLCHAIN ?= auto
+
 # .DEFAULT_GOAL define el comando que se ejecuta si solo escribís "make".
 .DEFAULT_GOAL := help
 
@@ -29,8 +31,11 @@ PROJECT_NAME_PASCAL := $(shell echo $(PROJECT_SLUG) | awk -F '[-_]' '{for(i=1;i<
 STACK_NAME := $(PROJECT_NAME_LOWERCASE)-stack-$(APP_ENV)
 FOLDERS := $(shell echo "$(FUNCTIONS)" | tr ',' ' ')
 LOCALSTACK_ENDPOINT_BASE ?= http://127.0.0.1:4566
-S3_BUCKET_NAME=${PROJECT_NAME_LOWERCASE}-app-data
-S3_BUCKET=${PROJECT_NAME_LOWERCASE}-bucket
+S3_BUCKET_NAME ?= ${PROJECT_NAME_LOWERCASE}-bucket
+S3_SHARED_BUCKET ?= $(S3_BUCKET)
+ifeq ($(S3_SHARED_BUCKET),)
+	S3_SHARED_BUCKET=shared-local-dev
+endif
 SQS_QUEUE_NAME=${PROJECT_NAME_LOWERCASE}queue
 SQS_DLQ_NAME=${PROJECT_NAME_LOWERCASE}dlq
 SQS_QUEUE_URL=${LOCALSTACK_ENDPOINT_BASE}/000000000000/${SQS_QUEUE_NAME}
@@ -64,7 +69,12 @@ ifeq ($(wildcard $(DOCKER_FILE)),)
     DOCKER_FILE := docker-compose-local.yml
 endif
 DC_BASE = docker compose -f docker-compose-base.yml -f $(DOCKER_FILE)
-DC_RUN  = $(DC_BASE) run --rm $(SERVICE_NAME)
+DC_RUN  = $(DC_BASE) run --rm -e GOTOOLCHAIN=$(GOTOOLCHAIN) $(SERVICE_NAME)
+
+LOCALSTACK_DOCKER_FILE := docker-composes/docker-compose.localstack.yml
+ifeq ($(wildcard $(LOCALSTACK_DOCKER_FILE)),)
+	LOCALSTACK_DOCKER_FILE := docker-composes/docker-compose.localstack-antes.yml
+endif
 
 ###############################################################################
 # Comandos disponibles
@@ -191,49 +201,106 @@ install-pkg: ## 📥 Instala un paquete Go específico. Uso: make install-pkg pk
 .PHONY: install-all-pkg
 install-all-pkg: ## 🗂️ Instala todas las dependencias Go necesarias del proyecto. Uso: make install-all-pkg
 	@echo "$(INFO)🗂️ Instalando todas las dependencias...$(RESET)"
-	@$(MAKE) install-pkg pkg=github.com/golang-jwt/jwt/v5
-	@$(MAKE) install-pkg pkg=golang.org/x/crypto/bcrypt
-	@$(MAKE) install-pkg pkg=github.com/redis/go-redis/v9
-	@$(MAKE) install-pkg pkg=gorm.io/gorm
-	@$(MAKE) install-pkg pkg=gorm.io/driver/postgres
-	@$(MAKE) install-pkg pkg=github.com/jackc/pgx/v5
-	@$(MAKE) install-pkg pkg=github.com/spf13/viper
-	@$(MAKE) install-pkg pkg=github.com/gofiber/fiber/v2
-	@$(MAKE) install-pkg pkg=github.com/gofiber/fiber/v2/middleware/limiter
-	@$(MAKE) install-pkg pkg=github.com/gofiber/fiber/v2/middleware/cors
-	@$(MAKE) install-pkg pkg=github.com/spf13/cobra
-	@$(MAKE) install-pkg pkg=github.com/robfig/cron/v3
-	@$(MAKE) install-pkg pkg=gopkg.in/gomail.v2
-	@$(MAKE) install-pkg pkg=github.com/natefinch/lumberjack
-	@$(MAKE) install-pkg pkg=github.com/russross/blackfriday/v2
-	@$(MAKE) install-pkg pkg=github.com/go-resty/resty/v2
-	@$(MAKE) install-pkg pkg=github.com/mitchellh/mapstructure
-	@$(MAKE) install-pkg pkg=github.com/go-playground/locales
-	@$(MAKE) install-pkg pkg=github.com/go-playground/universal-translator
-	@$(MAKE) install-pkg pkg=github.com/alicebob/miniredis/v2
-	@$(MAKE) install-pkg pkg=github.com/DATA-DOG/go-sqlmock
-	@$(MAKE) install-pkg pkg=github.com/stretchr/testify/mock
-	@$(MAKE) install-pkg pkg=github.com/go-playground/locales/es
-	@$(MAKE) install-pkg pkg=github.com/go-playground/validator/v10
-	@$(MAKE) install-pkg pkg=github.com/go-playground/validator/v10/translations/es
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-sdk-go-v2/aws
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-sdk-go-v2/service/sns
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-sdk-go-v2/service/sqs
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-lambda-go/events
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-lambda-go/lambda
-	@$(MAKE) install-pkg pkg=github.com/aws/aws-sdk-go-v2/config
-	@$(MAKE) vendor
+	@$(DC_BASE) build $(SERVICE_NAME)
+	@$(DC_RUN) sh -c 'go get -u github.com/golang-jwt/jwt/v5 golang.org/x/crypto/bcrypt github.com/redis/go-redis/v9 gorm.io/gorm gorm.io/driver/postgres github.com/jackc/pgx/v5 github.com/spf13/viper github.com/gofiber/fiber/v2 github.com/gofiber/fiber/v2/middleware/limiter github.com/gofiber/fiber/v2/middleware/cors github.com/spf13/cobra github.com/robfig/cron/v3 gopkg.in/gomail.v2 github.com/natefinch/lumberjack github.com/russross/blackfriday/v2 github.com/go-resty/resty/v2 github.com/mitchellh/mapstructure github.com/go-playground/locales github.com/go-playground/universal-translator github.com/alicebob/miniredis/v2 github.com/DATA-DOG/go-sqlmock github.com/stretchr/testify/mock github.com/go-playground/locales/es github.com/go-playground/validator/v10 github.com/go-playground/validator/v10/translations/es github.com/aws/aws-sdk-go-v2/aws github.com/aws/aws-sdk-go-v2/service/sns github.com/aws/aws-sdk-go-v2/service/sqs github.com/aws/aws-lambda-go/events github.com/aws/aws-lambda-go/lambda github.com/aws/aws-sdk-go-v2/config && go mod tidy && go mod download && go mod vendor'
 
 .PHONY: wire
 wire: ## 🧬 Genera el código de inyección de dependencias con Google Wire. Uso: make wire
 	@echo "$(SUCCESS)🧬 Generando inyección de dependencias con Wire...$(RESET)"
-	@$(DC_RUN) wire gen -tags wireinject ./cmd/api/di
+	@$(DC_BASE) build $(SERVICE_NAME)
+	@$(DC_RUN) sh -c 'go install github.com/google/wire/cmd/wire@latest && wire gen -tags wireinject ./cmd/api/di'
 
 .PHONY: wire-sync
 wire-sync: ## 🧬📦 Genera código de Wire y actualiza vendor. Uso: make wire-sync
 	@$(MAKE) wire
 	@$(MAKE) vendor
 	@echo "$(SUCCESS)✅ Proceso de Wire y vendor completado.$(RESET)"
+
+###############################################################################
+## S3 Utilities
+###############################################################################
+.PHONY: s3-ls
+s3-ls: ## 🪣 Lista todo el contenido del S3. Uso: make s3-ls [bucket=mi-bucket]
+	@BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	echo "$(INFO)🪣 Listando contenido recursivo de s3://$$BUCKET...$(RESET)"; \
+	aws s3 ls s3://$$BUCKET --recursive $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region $(AWS_DEFAULT_REGION)
+
+.PHONY: s3-download
+s3-download: ## ⬇️ Descarga un archivo de S3. Uso: make s3-download key=ruta/al/archivo.csv
+	@if [ -z "$(key)" ]; then \
+		echo "$(ERROR)❌ Debes pasar la ruta del archivo con key=\"ruta/al/archivo\".$(RESET)"; \
+		exit 1; \
+	fi; \
+	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	DEST="tmp/s3_downloads/$$(basename $(key))"; \
+	mkdir -p tmp/s3_downloads; \
+	echo "$(INFO)⬇️ Descargando s3://$$BUCKET/$(key) en $$DEST...$(RESET)"; \
+	aws s3 cp s3://$$BUCKET/$(key) $$DEST $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region $(AWS_DEFAULT_REGION); \
+	echo "$(SUCCESS)✅ Archivo descargado en: $$DEST$(RESET)"
+
+.PHONY: s3-upload
+s3-upload: ## ⬆️ Sube un archivo a S3. Uso: make s3-upload key=ruta/destino file=local/file
+	@if [ -z "$(key)" ]; then \
+		echo "$(ERROR)❌ Debes pasar el destino con key=\"ruta/destino\".$(RESET)"; \
+		exit 1; \
+	fi; \
+	SRC=$${file:-payload.json}; \
+	if [ ! -f "$$SRC" ]; then \
+		echo "$(ERROR)❌ No existe el archivo local: $$SRC$(RESET)"; \
+		exit 1; \
+	fi; \
+	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	echo "$(INFO)⬆️ Subiendo $$SRC a s3://$$BUCKET/$(key)...$(RESET)"; \
+	aws s3 cp "$$SRC" "s3://$$BUCKET/$(key)" $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region $(AWS_DEFAULT_REGION); \
+	echo "$(SUCCESS)✅ Archivo subido.$(RESET)"
+
+.PHONY: s3-rm
+s3-rm: ## 🗑️ Elimina un archivo de S3 (pide confirmación). Uso: make s3-rm key=ruta/archivo.csv
+	@if [ -z "$(key)" ]; then \
+		echo "$(ERROR)❌ Debes pasar la ruta del archivo con key=\"ruta/archivo\".$(RESET)"; \
+		exit 1; \
+	fi; \
+	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	echo "$(PROMPT)⚠️  ¿Estás seguro de eliminar el archivo s3://$$BUCKET/$(key)? [y/N]: $(RESET)" && read ans && \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		echo "$(INFO)🗑️ Eliminando s3://$$BUCKET/$(key)...$(RESET)"; \
+		aws s3 rm s3://$$BUCKET/$(key) $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region $(AWS_DEFAULT_REGION); \
+		echo "$(SUCCESS)✅ Archivo eliminado.$(RESET)"; \
+	else \
+		echo "$(WARNING)🛑 Operación cancelada.$(RESET)"; \
+	fi
+
+.PHONY: s3-rm-dir
+s3-rm-dir: ## 💥 Elimina una carpeta completa de S3 (pide confirmación). Uso: make s3-rm-dir prefix=ruta/carpeta/
+	@if [ -z "$(prefix)" ]; then \
+		echo "$(ERROR)❌ Debes pasar el prefijo/carpeta con prefix=\"ruta/carpeta/\".$(RESET)"; \
+		exit 1; \
+	fi; \
+	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	echo "$(WARNING)💥 ADVERTENCIA: Se eliminará todo bajo s3://$$BUCKET/$(prefix)$(RESET)"; \
+	echo "$(PROMPT)⚠️  ¿Estás completamente seguro? [y/N]: $(RESET)" && read ans && \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		echo "$(INFO)🗑️ Eliminando recursivamente s3://$$BUCKET/$(prefix)...$(RESET)"; \
+		aws s3 rm s3://$$BUCKET/$(prefix) --recursive $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region $(AWS_DEFAULT_REGION); \
+		echo "$(SUCCESS)✅ Carpeta eliminada.$(RESET)"; \
+	else \
+		echo "$(WARNING)🛑 Operación cancelada.$(RESET)"; \
+	fi
 
 ###############################################################################
 ## AWS
@@ -344,7 +411,7 @@ lint: ## 🎨 Analiza el código en busca de errores y malas prácticas con gola
 	@echo "Limpiando contenedores huérfanos..."
 	@docker compose -f docker-compose-local-lint.yml down --remove-orphans
 	@echo "Ejecutando linter..."
-	@docker compose -f docker-compose-local-lint.yml build --no-cache lint && docker compose -f docker-compose-local-lint.yml run --rm lint run --timeout=2m
+	@docker compose -f docker-compose-local-lint.yml build --no-cache lint && docker compose -f docker-compose-local-lint.yml run --rm lint run
 
 .PHONY: lint-check-config
 lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint. Uso: make lint-check-config
@@ -357,7 +424,7 @@ lint-check-config: ## 🔍 Verifica qué archivos está usando golangci-lint. Us
 .PHONY: lint-verbose
 lint-verbose: ## 🔍 Ejecuta el linter en modo verbose para ver qué archivos analiza. Uso: make lint-verbose
 	@echo "🔍 Ejecutando linter en modo verbose..."
-	@docker compose -f docker-compose-local-lint.yml run --rm lint run -v --timeout=2m
+	@docker compose -f docker-compose-local-lint.yml run --rm lint run -v
 
 .PHONY: lint-test
 lint-test: ## 🧪 Prueba si wire_gen.go está siendo ignorado. Uso: make lint-test
@@ -367,7 +434,7 @@ lint-test: ## 🧪 Prueba si wire_gen.go está siendo ignorado. Uso: make lint-t
 .PHONY: localstack-up
 localstack-up: ## 🛠️ Levanta LocalStack en segundo plano. Uso: make localstack-up
 	@echo "$(SUCCESS)🛠️ Iniciando LocalStack...$(RESET)"
-	@docker-compose -p localstack -f docker-composes/docker-compose.localstack.yml up -d --build --force-recreate
+	@docker compose -p localstack -f $(LOCALSTACK_DOCKER_FILE) up -d --build --force-recreate
 	@sleep 10
 	@echo "$(SUCCESS)✅ LocalStack listo.$(RESET)"
 
@@ -573,12 +640,12 @@ deploy: infra-init ## ⚡ Compila y actualiza una sola función (Uso: make deplo
 	@$(MAKE) infra-deploy
 
 .PHONY: infra-init
-infra-init: ## 🏁 Inicializa Terraform/LocalStack. Uso: make infra-init
+infra-init: infra-up ## 🏁 Inicializa Terraform/LocalStack. Uso: make infra-init
 	@echo "$(INFO)🚀 Inicializando Terraform con Backend S3 (LocalStack)...$(RESET)"
 	@cd $(TF_DIR) && tflocal init -backend-config=backend.local.conf -reconfigure
 
 .PHONY: infra-deploy
-infra-deploy: generate-tfvars ## 🚀 Despliega toda la infraestructura en LocalStack. Uso: make infra-deploy
+infra-deploy: infra-up generate-tfvars ## 🚀 Despliega toda la infraestructura en LocalStack. Uso: make infra-deploy
 	@if [ ! -d "$(TF_DIR)/.terraform" ]; then $(MAKE) infra-init; fi
 	@cd $(TF_DIR) && tflocal apply -var-file=$(TF_VARS) -auto-approve
 
@@ -921,9 +988,11 @@ terraform-deploy-lambda: ## 🚀⚡ Despliega la infraestructura en modo Lambda 
 infra-up: ## 🐳 Verifica si LocalStack está corriendo (Infraestructura Compartida).
 	@echo "$(INFO)🔍 Verificando LocalStack en $(LOCALSTACK_ENDPOINT_BASE)...$(RESET)"
 	@curl -s -f "$(LOCALSTACK_ENDPOINT_BASE)/_localstack/health" >/dev/null 2>&1 || ( \
+		echo "$(WARNING)⚠️ LocalStack NO respondió en $(LOCALSTACK_ENDPOINT_BASE). Intentando levantarlo...$(RESET)"; \
+		$(MAKE) localstack-up; \
+	)
+	@curl -s -f "$(LOCALSTACK_ENDPOINT_BASE)/_localstack/health" >/dev/null 2>&1 || ( \
 		echo "$(ERROR)❌ LocalStack NO respondió en $(LOCALSTACK_ENDPOINT_BASE).$(RESET)"; \
-		echo "$(INFO)ℹ️  Este proyecto asume LocalStack como infraestructura compartida (externa).$(RESET)"; \
-		echo "$(INFO)ℹ️  Levántalo aparte y reintenta (por ejemplo, en tu repo de localstack).$(RESET)"; \
 		exit 1; \
 	)
 	@echo "$(SUCCESS)✅ LocalStack OK (infraestructura compartida).$(RESET)"
@@ -932,7 +1001,7 @@ infra-up: ## 🐳 Verifica si LocalStack está corriendo (Infraestructura Compar
 
 .PHONY: infra-down
 infra-down: ## 🛑 Detiene dependencias
-	docker-compose -f docker-compose.localstack.yml down
+	docker compose -p localstack -f $(LOCALSTACK_DOCKER_FILE) down
 
 .PHONY: dev-local
 dev-local: ## ⚡ Nivel 1: Corre la API localmente con Air (Hot Reload)

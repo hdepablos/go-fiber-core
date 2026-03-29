@@ -3,7 +3,6 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"go-fiber-core/internal/contextkeys"
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
@@ -325,7 +324,6 @@ func (h *authHandler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *authHandler) Logout(c *fiber.Ctx) error {
-	fmt.Println("Entro a cerrar sessión")
 	userIDStr, ok := contextkeys.GetUserID(c.UserContext())
 	if !ok || userIDStr == "" {
 		// Este es un error de autorización que el middleware de errores

@@ -3,19 +3,27 @@
 -- crear en el frontend el catalago-all y almacenarlo en el localstore
 -- Que los filtros funcionen con el cuadro de texto que se almacenan con el localstore
 -- el rango de fecha para el componente y que se pueda limpiar
+-- listo
+-- Aplicar lógica de validación en age como el de salary
+-- Actualizar sqs-consumer para:
+--     - Normal
+--     - auto-invoke
+-- login con google
+-- generar los 12 casos de uso
+-- migrar a 1.26 golang y ver si funciona
 
 
 -- Pendiente
-Actualizar sqs-consumer para:
-    - Normal
-    - auto-invoke
+
+datatable con extras
+
+migrar bulk process
 
 
     Verificar primero que puedas crear un s3 local y que puedas utilizar en varios proyectos
-
     Recrear en el entorno aws el s3 con la configuración del MultipartUpload
 
-Aplicar lógica de validación en age como el de salary
+
 
 modificar el registre que sea igual al de la ruta del archivo
 

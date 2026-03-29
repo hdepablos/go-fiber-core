@@ -1,0 +1,25 @@
+meta {
+  name: RunProc -> process_type_id = 12
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 12,
+    "sede_id": 0,
+    "override_process_version_id": 17,
+    "roadmap": 0,
+    "input": {}
+  }
+}

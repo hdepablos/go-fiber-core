@@ -6,7 +6,7 @@ services:
       - "4566:4566"
       - "4567:4567"
     environment:
-      - SERVICES=lambda,sqs,logs,cloudformation,iam,cloudwatch,apigateway,events,sts,ec2,s3
+      - SERVICES=lambda,sqs,logs,cloudformation,iam,cloudwatch,apigateway,events,sts,ec2,s3,dynamodb
       - DATA_DIR=/tmp/localstack/data
       - DEBUG=${DEBUG:-0}
       - CLEAR_TMP_FOLDER=0

@@ -1,7 +1,7 @@
 meta {
   name: login-directo
   type: http
-  seq: 5
+  seq: 7
 }
 
 post {
@@ -16,7 +16,7 @@ headers {
 
 body:json {
   {
-    "email": "test@test.com",
+    "email": "admin@gmail.com",
     "password": "123456"
   }
 }
@@ -28,6 +28,12 @@ script:post-response {
     responseBody = JSON.parse(responseBody);
   }
   
-  const token = responseBody.data.access_token;
-  bru.setVar('access_token', token);
+  const token = responseBody?.data?.access_token || responseBody?.data?.token;
+  if (token) {
+    bru.setVar('access_token', token);
+    bru.setVar('auth_error', '');
+  } else {
+    bru.setVar('access_token', '');
+    bru.setVar('auth_error', responseBody?.message || 'login failed');
+  }
 }

@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine
+FROM golang:1.26.1-alpine
 
 # Instalar herramientas necesarias
 RUN apk add --no-cache bash git make

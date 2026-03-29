@@ -79,7 +79,8 @@ func main() {
 		os.Exit(2)
 	}
 	if host == "" {
-		host = "localhost"
+		fmt.Printf("ERROR: GOOGLE_REDIRECT_URL debe incluir host. Ejemplo: http://localhost:9009%s\n", u.Path)
+		os.Exit(2)
 	}
 
 	state, err := randomState()
@@ -227,7 +228,7 @@ func fetchUserInfo(ctx context.Context, accessToken string) (*googleUserInfo, er
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {

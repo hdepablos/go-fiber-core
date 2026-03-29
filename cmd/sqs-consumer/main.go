@@ -22,6 +22,7 @@ import (
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 	_ "go-fiber-core/internal/services/test/mqb1t"
+	_ "go-fiber-core/internal/services/test/file"
 
 	"github.com/google/uuid"
 

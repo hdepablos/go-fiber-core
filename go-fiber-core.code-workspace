@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "../../../private/var/www/go-fiber-core"
+		},
+		{
+			"path": "../../../private/var/www/client-quasar"
+		}
+	],
+	"settings": {
+		"php.suggest.basic": false,
+		"terminal.integrated.fontSize": 10,
+		"window.zoomLevel": 0
+	}
+}
