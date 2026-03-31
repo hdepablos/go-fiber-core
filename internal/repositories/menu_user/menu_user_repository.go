@@ -4,9 +4,9 @@ import (
 	"context"
 	"go-fiber-core/internal/dtos"
 
+	"fmt"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/pagination"
-	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -29,7 +29,7 @@ func (r *MenuUserPaginationRepository) GetAllPaginated(
 		db.WithContext(ctx).
 			Select("menu_user.id, menu_user.menu_id, menu_user.user_id, menu_user.operator_id, menu_user.is_active, menu_user.created_at, menu_user.updated_at, menu_user.deleted_at").
 			Joins("LEFT JOIN menus ON menus.id = menu_user.menu_id").
-			Joins("LEFT JOIN users ON users.id = menu_user.user_id").       // User normal
+			Joins("LEFT JOIN users ON users.id = menu_user.user_id").                      // User normal
 			Joins("LEFT JOIN users AS operators ON operators.id = menu_user.operator_id"), // Operador
 		req,
 		func(q *gorm.DB) *gorm.DB {
@@ -43,6 +43,7 @@ func (r *MenuUserPaginationRepository) GetAllPaginated(
 		nil,
 	)
 }
+
 // Menus asociados al usuario (Sin duplicados y compatible con Postgres)
 func (r *MenuUserPaginationRepository) GetMenusByUser(
 	ctx context.Context,
@@ -57,14 +58,14 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 
 	base := db.WithContext(ctx).
 		Table("menu_user mu").
-			Joins("LEFT JOIN menus m ON m.id = mu.menu_id").
-			Joins("LEFT JOIN users u ON u.id = mu.user_id").
-			Joins("LEFT JOIN users o ON o.id = mu.operator_id").
-			Where("mu.deleted_at IS NULL").
-			Where("mu.user_id = ? AND m.item_type = ?", userID, "link")
+		Joins("LEFT JOIN menus m ON m.id = mu.menu_id").
+		Joins("LEFT JOIN users u ON u.id = mu.user_id").
+		Joins("LEFT JOIN users o ON o.id = mu.operator_id").
+		Where("mu.deleted_at IS NULL").
+		Where("mu.user_id = ? AND m.item_type = ?", userID, "link")
 
 	/* =================================================
-	   🔥 FILTROS DINÁMICOS (desde tu JSON)
+	🔥 FILTROS DINÁMICOS (desde tu JSON)
 	================================================= */
 	for i, f := range req.FilterBy {
 
@@ -76,43 +77,43 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 
 		switch f {
 
-			case "operator_id":
-				base = base.Where("mu.operator_id = ?", val)
-			
-			case "user_id":
-				base = base.Where("mu.user_id = ?", val)
-			
-			case "menu_id":
-				base = base.Where("mu.menu_id = ?", val)
-			
-			case "item_name":
-				base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
-			
-			/* 🔥 NUEVO */
-			case "is_active": // estado del vínculo menu_user
-				base = base.Where("mu.is_active = ?", val)
-			
-			case "operator.is_active": // estado del operador (users)
-				base = base.Where("o.is_active = ?", val)
-			
-			case "users.is_active": // estado del usuario (users)
-				base = base.Where("u.is_active = ?", val)
+		case "operator_id":
+			base = base.Where("mu.operator_id = ?", val)
 
-			case "menus.is_active": // estado del menú (menus)
-				base = base.Where("m.is_active = ?", val)
+		case "user_id":
+			base = base.Where("mu.user_id = ?", val)
 
-				// ===== FUZZY (ILIKE) =====
-			case "email", "user.email":
-				base = base.Where("u.email ILIKE ?", "%"+fmt.Sprint(val)+"%")
-			
-			case "operator_name", "operator.name":
-				base = base.Where("o.name ILIKE ?", "%"+fmt.Sprint(val)+"%")
-			
-			case "menu.name":
-				base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+		case "menu_id":
+			base = base.Where("mu.menu_id = ?", val)
 
-			case "menu.name:fuzzy":
-    			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+		case "item_name":
+			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+		/* 🔥 NUEVO */
+		case "is_active": // estado del vínculo menu_user
+			base = base.Where("mu.is_active = ?", val)
+
+		case "operator.is_active": // estado del operador (users)
+			base = base.Where("o.is_active = ?", val)
+
+		case "users.is_active": // estado del usuario (users)
+			base = base.Where("u.is_active = ?", val)
+
+		case "menus.is_active": // estado del menú (menus)
+			base = base.Where("m.is_active = ?", val)
+
+			// ===== FUZZY (ILIKE) =====
+		case "email", "user.email":
+			base = base.Where("u.email ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+		case "operator_name", "operator.name":
+			base = base.Where("o.name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+		case "menu.name":
+			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+
+		case "menu.name:fuzzy":
+			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
 		}
 
 	}
@@ -237,7 +238,6 @@ func (r *MenuUserPaginationRepository) GetMenusByUser(
 	}, nil
 }
 
-
 // Menus NO asociados al usuario (SIN duplicados, 1 fila = 1 menú)
 // Menus NO asociados al usuario (SIN duplicados, 1 fila = 1 menú)
 func (r *MenuUserPaginationRepository) GetMenusNotByUser(
@@ -285,7 +285,7 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(
 			base = base.Where("m.is_active = ?", val)
 
 		case "menu.name:fuzzy":
-    		base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
+			base = base.Where("m.item_name ILIKE ?", "%"+fmt.Sprint(val)+"%")
 		}
 	}
 
@@ -363,9 +363,9 @@ func (r *MenuUserPaginationRepository) GetMenusNotByUser(
 	for _, r := range raw {
 
 		item := models.MenuUserResponse{
-			ID:       r.ID,          // 🔥 ← ESTA LÍNEA SOLUCIONA TODO
-			MenuID:   r.MenuIDRef,
-			IsActive: r.IsActive,
+			ID:        r.ID, // 🔥 ← ESTA LÍNEA SOLUCIONA TODO
+			MenuID:    r.MenuIDRef,
+			IsActive:  r.IsActive,
 			CreatedAt: r.CreatedAt,
 			UpdatedAt: r.UpdatedAt,
 			Menu: models.MenuResponse{
