@@ -25,6 +25,7 @@ func (s *FiberServer) RegisterRoutes(
 	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
 	processLifecycleHandler handlers.ProcessLifecycleHandler,
+	importHandler handlers.ImportHandler,
 	tokenService authService.TokenService,
 	redisClient *redis.Client,
 ) {
@@ -57,6 +58,7 @@ func (s *FiberServer) RegisterRoutes(
 	routes.RegisterMenuRoutes(protected, menuHandler)
 	routes.RegisterMenuUserRoutes(protected, menuUserHandler)
 	routes.RegisterProcessLifecycleRoutes(protected, processLifecycleHandler)
+	routes.RegisterImportRoutes(protected, importHandler)
 }
 
 // --- Handlers del Servidor ---

@@ -16,6 +16,12 @@ type RateLimitConfig struct {
 	Window time.Duration
 }
 
+type RateLimitByPathConfig struct {
+	Global       RateLimitConfig
+	Imports      RateLimitConfig
+	ImportsPath  string
+}
+
 // RateLimitMiddleware aplica un rate limit por IP o cabecera de forma atómica.
 func RateLimitMiddleware(redisClient *redis.Client, config RateLimitConfig) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -66,6 +72,61 @@ func RateLimitMiddleware(redisClient *redis.Client, config RateLimitConfig) fibe
 		}
 
 		// Si todo está bien, pasa a la siguiente ruta.
+		return c.Next()
+	}
+}
+
+func RateLimitByPathMiddleware(redisClient *redis.Client, config RateLimitByPathConfig) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		clientIdentifier := c.Get("X-Client-Code")
+		if clientIdentifier == "" {
+			clientIdentifier = c.IP()
+		}
+
+		projectPrefix := os.Getenv("APP_NAME")
+		if projectPrefix == "" {
+			projectPrefix = "go-fiber-core"
+		}
+
+		scope := "global"
+		limit := config.Global.Limit
+		window := config.Global.Window
+
+		if config.ImportsPath != "" && len(c.Path()) >= len(config.ImportsPath) && c.Path()[:len(config.ImportsPath)] == config.ImportsPath {
+			scope = "imports"
+			limit = config.Imports.Limit
+			window = config.Imports.Window
+		}
+
+		key := projectPrefix + ":rate-limit:" + scope + ":" + clientIdentifier
+
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		var countCmd *redis.IntCmd
+		_, err := redisClient.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+			countCmd = pipe.Incr(ctx, key)
+			pipe.Expire(ctx, key, window)
+			return nil
+		})
+
+		if err != nil {
+			log.Printf("Error al ejecutar la pipeline de Redis: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+		}
+
+		count, err := countCmd.Result()
+		if err != nil {
+			log.Printf("Error al obtener el resultado del contador: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Internal server error"})
+		}
+
+		if count > limit {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Rate limit exceeded",
+			})
+		}
+
 		return c.Next()
 	}
 }

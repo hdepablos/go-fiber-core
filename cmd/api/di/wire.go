@@ -15,9 +15,12 @@ import (
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/handlers"
 	"go-fiber-core/internal/models"
-	"go-fiber-core/internal/repositories/bank"
-	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/authenticationlog"
+	"go-fiber-core/internal/repositories/bank"
+	"go-fiber-core/internal/repositories/bulkjob"
+	"go-fiber-core/internal/repositories/bulkjobconfig"
+	"go-fiber-core/internal/repositories/bulkjobitem"
+	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
 	menu_user "go-fiber-core/internal/repositories/menu_user"
 	"go-fiber-core/internal/repositories/refreshtoken"
@@ -30,6 +33,7 @@ import (
 	authlog2 "go-fiber-core/internal/services/authlog"
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
+	"go-fiber-core/internal/services/imports"
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
@@ -223,12 +227,16 @@ var repositorySet = wire.NewSet(
 	rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo,
 	catalog.NewCatalogRepository,
 	authenticationlog.NewAuthenticationLogWriterRepo, authenticationlog.NewAuthenticationLogRepository,
+	bulkjob.NewBulkJobReaderRepo, bulkjob.NewBulkJobWriterRepo,
+	bulkjobitem.NewBulkJobItemReaderRepo, bulkjobitem.NewBulkJobItemWriterRepo,
+	bulkjobconfig.NewBulkJobConfigReaderRepo, bulkjobconfig.NewBulkJobConfigWriterRepo,
 )
 
 var serviceSet = wire.NewSet(
 	provideTokenService,
 	authlog2.NewAuthLogService,
 	auth.NewAuthService,
+	imports.NewService,
 
 	provideAWSService, // 👈 Proveedor de AWS
 	provideSQSService, // 👈 Proveedor de SQS
@@ -271,4 +279,5 @@ var handlerSet = wire.NewSet(
 	handlers.NewRolHandler,
 	handlers.NewCatalogHandler,
 	handlers.NewProcessLifecycleHandler,
+	handlers.NewImportHandler,
 )

@@ -3,7 +3,6 @@ package serviceconfig
 import (
 	"fmt"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
-	"log"
 )
 
 // ServiceFactory es un alias para un tipo de función: una que no recibe argumentos
@@ -18,7 +17,6 @@ var registry = make(map[string]ServiceFactory)
 // Register es la función que los servicios usarán en sus archivos 'init()'
 // para inscribirse en el mapa 'registry'.
 func Register(path string, factory ServiceFactory) {
-	log.Printf("✒️ Registrando servicio: %s", path)
 	registry[path] = factory
 }
 

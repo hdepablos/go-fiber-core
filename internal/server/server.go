@@ -9,6 +9,7 @@ import (
 	"go-fiber-core/internal/services/queue"
 	userService "go-fiber-core/internal/services/user"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ func NewFiberServer(
 	menuUserHandler handlers.MenuUserHandler,
 	dbHandler handlers.DatabaseHandler,
 	processLifecycleHandler handlers.ProcessLifecycleHandler,
+	importHandler handlers.ImportHandler,
 	tokenService authService.TokenService,
 	userWriterService userService.UserWriterService,
 	queueService *queue.SQSService, // 👈 Nuevo parámetro
@@ -67,14 +69,33 @@ func NewFiberServer(
 	}))
 
 	// Rate Limiting
-	rateLimitConfig := middleware.RateLimitConfig{
-		Limit:  100,
-		Window: 1 * time.Minute,
+	globalLimit := int64(100)
+	if v := strings.TrimSpace(os.Getenv("RATE_LIMIT_GLOBAL_PER_MINUTE")); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil && parsed > 0 {
+			globalLimit = parsed
+		}
 	}
-	server.App.Use(middleware.RateLimitMiddleware(connect.ConnectRedis, rateLimitConfig))
+	importsLimit := int64(5000)
+	if v := strings.TrimSpace(os.Getenv("RATE_LIMIT_IMPORTS_PER_MINUTE")); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil && parsed > 0 {
+			importsLimit = parsed
+		}
+	}
+
+	server.App.Use(middleware.RateLimitByPathMiddleware(connect.ConnectRedis, middleware.RateLimitByPathConfig{
+		Global: middleware.RateLimitConfig{
+			Limit:  globalLimit,
+			Window: 1 * time.Minute,
+		},
+		Imports: middleware.RateLimitConfig{
+			Limit:  importsLimit,
+			Window: 1 * time.Minute,
+		},
+		ImportsPath: "/api/v1/imports/",
+	}))
 
 	// Registrar rutas
-	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, dbHandler, processLifecycleHandler, tokenService, connect.ConnectRedis)
+	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, dbHandler, processLifecycleHandler, importHandler, tokenService, connect.ConnectRedis)
 
 	// Cleanup combinado (Wire lo mezcla con cleanup global)
 	cleanup := func() {}

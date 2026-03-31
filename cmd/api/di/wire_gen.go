@@ -22,6 +22,9 @@ import (
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/authenticationlog"
 	"go-fiber-core/internal/repositories/bank"
+	"go-fiber-core/internal/repositories/bulkjob"
+	"go-fiber-core/internal/repositories/bulkjobconfig"
+	"go-fiber-core/internal/repositories/bulkjobitem"
 	"go-fiber-core/internal/repositories/catalog"
 	"go-fiber-core/internal/repositories/menu"
 	"go-fiber-core/internal/repositories/menu_user"
@@ -35,6 +38,7 @@ import (
 	"go-fiber-core/internal/services/authlog"
 	bank2 "go-fiber-core/internal/services/bank"
 	catalog2 "go-fiber-core/internal/services/catalog"
+	"go-fiber-core/internal/services/imports"
 	menu2 "go-fiber-core/internal/services/menu"
 	menu_user2 "go-fiber-core/internal/services/menu_user"
 	"go-fiber-core/internal/services/pagination"
@@ -129,6 +133,13 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
 	service := processlifecycle.NewService(connectDTO)
 	processLifecycleHandler := handlers.NewProcessLifecycleHandler(service)
+	bulkJobReader := bulkjob.NewBulkJobReaderRepo()
+	bulkJobWriter := bulkjob.NewBulkJobWriterRepo()
+	bulkJobItemReader := bulkjobitem.NewBulkJobItemReaderRepo()
+	bulkJobItemWriter := bulkjobitem.NewBulkJobItemWriterRepo()
+	bulkJobConfigReader := bulkjobconfig.NewBulkJobConfigReaderRepo()
+	importsService := imports.NewService(connectDTO, bulkJobReader, bulkJobWriter, bulkJobItemReader, bulkJobItemWriter, bulkJobConfigReader)
+	importHandler := handlers.NewImportHandler(importsService)
 	awsService, err := provideAWSService()
 	if err != nil {
 		cleanup4()
@@ -138,7 +149,7 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 		return nil, nil, err
 	}
 	sqsService := provideSQSService(awsService)
-	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, tokenService, userWriterService, sqsService)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, importHandler, tokenService, userWriterService, sqsService)
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -398,10 +409,10 @@ var connectionSet = wire.NewSet(
 	provideConnectDTO,
 )
 
-var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, catalog.NewCatalogRepository, authenticationlog.NewAuthenticationLogWriterRepo, authenticationlog.NewAuthenticationLogRepository)
+var repositorySet = wire.NewSet(user.NewUserReaderRepo, user.NewUserWriterRepo, user.NewUserPaginatorRepo, user.NewUserRepository, bank.NewBankReaderRepo, bank.NewBankWriterRepo, bank.NewBankCrudRepository, bank.NewBankPaginationRepo, refreshtoken.NewRefreshTokenReaderRepo, refreshtoken.NewRefreshTokenWriterRepo, refreshtoken.NewRefreshTokenRepository, session.NewSessionReaderRepo, session.NewSessionWriterRepo, session.NewSessionPaginationRepo, session.NewSessionRepository, menu.NewMenuReaderRepository, menu.NewMenuWriterRepository, menu_user.NewMenuUserPaginationRepository, rol.NewRolReaderRepo, rol.NewRolWriterRepo, rol.NewRolCrudRepository, rol.NewRolPaginationRepo, catalog.NewCatalogRepository, authenticationlog.NewAuthenticationLogWriterRepo, authenticationlog.NewAuthenticationLogRepository, bulkjob.NewBulkJobReaderRepo, bulkjob.NewBulkJobWriterRepo, bulkjobitem.NewBulkJobItemReaderRepo, bulkjobitem.NewBulkJobItemWriterRepo, bulkjobconfig.NewBulkJobConfigReaderRepo, bulkjobconfig.NewBulkJobConfigWriterRepo)
 
 var serviceSet = wire.NewSet(
-	provideTokenService, authlog.NewAuthLogService, auth.NewAuthService, provideAWSService,
+	provideTokenService, authlog.NewAuthLogService, auth.NewAuthService, imports.NewService, provideAWSService,
 	provideSQSService,
 
 	provideUserPaginationService,
@@ -411,4 +422,4 @@ var serviceSet = wire.NewSet(
 	provideSessionPaginationService, services.NewTransactionManager, services.NewDatabaseService, user2.NewUserReaderService, user2.NewUserWriterService, bank2.NewBankReaderService, bank2.NewBankWriterService, bank2.NewBankPaginationService, bank2.NewDeactivationService, menu2.NewMenuReaderService, menu2.NewMenuWriterService, rol2.NewRolReaderService, rol2.NewRolWriterService, rol2.NewRolPaginationService, menu_user2.NewMenuUserPaginationService, catalog2.NewCatalogService, processlifecycle.NewService,
 )
 
-var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler, handlers.NewRolHandler, handlers.NewCatalogHandler, handlers.NewProcessLifecycleHandler)
+var handlerSet = wire.NewSet(handlers.NewAuthHandler, handlers.NewUserHandler, handlers.NewBankHandler, handlers.NewDatabaseHandler, handlers.NewMenuHandler, handlers.NewMenuUserHandler, handlers.NewRolHandler, handlers.NewCatalogHandler, handlers.NewProcessLifecycleHandler, handlers.NewImportHandler)
