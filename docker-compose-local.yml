@@ -5,6 +5,8 @@ services:
       dockerfile: ./dockerfiles/Dockerfile.api.${APP_ENV}
     env_file:
       - .env
+    environment:
+      - AWS_ENDPOINT_URL=http://host.docker.internal:4566
     restart: unless-stopped
     ports:
       - ${SERVER_PORT}:${SERVER_PORT}

@@ -31,11 +31,7 @@ PROJECT_NAME_PASCAL := $(shell echo $(PROJECT_SLUG) | awk -F '[-_]' '{for(i=1;i<
 STACK_NAME := $(PROJECT_NAME_LOWERCASE)-stack-$(APP_ENV)
 FOLDERS := $(shell echo "$(FUNCTIONS)" | tr ',' ' ')
 LOCALSTACK_ENDPOINT_BASE ?= http://127.0.0.1:4566
-S3_BUCKET_NAME ?= ${PROJECT_NAME_LOWERCASE}-bucket
-S3_SHARED_BUCKET ?= $(S3_BUCKET)
-ifeq ($(S3_SHARED_BUCKET),)
-	S3_SHARED_BUCKET=shared-local-dev
-endif
+S3_BUCKET ?= shared-local-dev
 SQS_QUEUE_NAME=${PROJECT_NAME_LOWERCASE}queue
 SQS_DLQ_NAME=${PROJECT_NAME_LOWERCASE}dlq
 SQS_QUEUE_URL=${LOCALSTACK_ENDPOINT_BASE}/000000000000/${SQS_QUEUE_NAME}
@@ -219,9 +215,58 @@ wire-sync: ## 🧬📦 Genera código de Wire y actualiza vendor. Uso: make wire
 ###############################################################################
 ## S3 Utilities
 ###############################################################################
+.PHONY: s3-check
+s3-check: ## ✅ Verifica conectividad y permisos de subida a S3 (AWS o LocalStack). Uso: make s3-check [bucket=mi-bucket] [endpoint=URL]
+	@if ! command -v aws >/dev/null 2>&1; then \
+		echo "$(ERROR)❌ aws cli no está instalado o no está en el PATH.$(RESET)"; \
+		exit 1; \
+	fi
+	@BUCKET=$${bucket:-$(S3_BUCKET)}; \
+	BUCKET=$$(echo "$$BUCKET" | tr -d '"'); \
+	if [ -z "$$BUCKET" ]; then \
+		echo "$(ERROR)❌ No se detectó bucket. Usa bucket=mi-bucket o define S3_BUCKET en .env$(RESET)"; \
+		exit 1; \
+	fi; \
+	ENDPOINT=$${endpoint-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$$(echo "$$ENDPOINT" | tr -d '"'); \
+	ENDPOINT_ARG=""; \
+	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
+	REGION=$${AWS_DEFAULT_REGION:-us-east-1}; \
+	KEY=$${key:-healthcheck/$(PROJECT_SLUG)/$$(date +%Y%m%dT%H%M%S)-$$RANDOM.txt}; \
+	TMPFILE=$${tmpfile:-tmp/s3_healthcheck_$$(date +%s)_$$RANDOM.txt}; \
+	mkdir -p tmp; \
+	printf "s3-healthcheck %s\n" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$$TMPFILE"; \
+	echo "$(INFO)🔎 Probando subida a s3://$$BUCKET/$$KEY ...$(RESET)"; \
+	IS_LOCALSTACK=0; \
+	if [ -n "$$ENDPOINT" ] && echo "$$ENDPOINT" | grep -Eq '(localhost|127\\.0\\.0\\.1).*:4566|localstack'; then IS_LOCALSTACK=1; fi; \
+	if [ "$$IS_LOCALSTACK" = "1" ]; then \
+		if ! aws s3api list-buckets $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region "$$REGION" >/dev/null 2>&1; then \
+			rm -f "$$TMPFILE"; \
+			echo "$(ERROR)❌ LocalStack no responde para S3 en $$ENDPOINT$(RESET)"; \
+			echo "$(INFO)Ejecuta esto en el proyecto LocalStack: cd /private/var/www/localstack && make aws-up$(RESET)"; \
+			exit 1; \
+		fi; \
+	fi; \
+	if ! aws s3api head-bucket --bucket "$$BUCKET" $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region "$$REGION" >/dev/null 2>&1; then \
+		rm -f "$$TMPFILE"; \
+		echo "$(ERROR)❌ No se pudo acceder al bucket '$$BUCKET' (head-bucket falló).$(RESET)"; \
+		if [ "$$IS_LOCALSTACK" = "1" ]; then \
+			echo "$(INFO)Crea el bucket en el proyecto LocalStack: cd /private/var/www/localstack && make bucket-create name=$$BUCKET$(RESET)"; \
+		fi; \
+		exit 1; \
+	fi; \
+	if ! aws s3 cp "$$TMPFILE" "s3://$$BUCKET/$$KEY" $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region "$$REGION" >/dev/null 2>&1; then \
+		rm -f "$$TMPFILE"; \
+		echo "$(ERROR)❌ Falló la subida a S3 (aws s3 cp). Revisa credenciales/permisos/endpoint.$(RESET)"; \
+		exit 1; \
+	fi; \
+	aws s3 rm "s3://$$BUCKET/$$KEY" $$ENDPOINT_ARG $(AWS_PROFILE_ARG) --region "$$REGION" >/dev/null 2>&1 || true; \
+	rm -f "$$TMPFILE"; \
+	echo "$(SUCCESS)✅ Conexión OK: se pudo subir (y limpiar) un objeto en S3.$(RESET)"
+
 .PHONY: s3-ls
 s3-ls: ## 🪣 Lista todo el contenido del S3. Uso: make s3-ls [bucket=mi-bucket]
-	@BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	@BUCKET=$${bucket:-$(S3_BUCKET)}; \
 	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -234,7 +279,7 @@ s3-download: ## ⬇️ Descarga un archivo de S3. Uso: make s3-download key=ruta
 		echo "$(ERROR)❌ Debes pasar la ruta del archivo con key=\"ruta/al/archivo\".$(RESET)"; \
 		exit 1; \
 	fi; \
-	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	BUCKET=$${bucket:-$(S3_BUCKET)}; \
 	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -255,7 +300,7 @@ s3-upload: ## ⬆️ Sube un archivo a S3. Uso: make s3-upload key=ruta/destino 
 		echo "$(ERROR)❌ No existe el archivo local: $$SRC$(RESET)"; \
 		exit 1; \
 	fi; \
-	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	BUCKET=$${bucket:-$(S3_BUCKET)}; \
 	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -269,7 +314,7 @@ s3-rm: ## 🗑️ Elimina un archivo de S3 (pide confirmación). Uso: make s3-rm
 		echo "$(ERROR)❌ Debes pasar la ruta del archivo con key=\"ruta/archivo\".$(RESET)"; \
 		exit 1; \
 	fi; \
-	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	BUCKET=$${bucket:-$(S3_BUCKET)}; \
 	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -288,7 +333,7 @@ s3-rm-dir: ## 💥 Elimina una carpeta completa de S3 (pide confirmación). Uso:
 		echo "$(ERROR)❌ Debes pasar el prefijo/carpeta con prefix=\"ruta/carpeta/\".$(RESET)"; \
 		exit 1; \
 	fi; \
-	BUCKET=$${bucket:-$(S3_SHARED_BUCKET)}; \
+	BUCKET=$${bucket:-$(S3_BUCKET)}; \
 	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -810,7 +855,7 @@ compile-all: ## 🏗️🏗️ Compila todas las funciones del proyecto. Uso: ma
 .PHONY: sam-deploy
 sam-deploy: ## 🚀 Despliega el stack SAM en LocalStack. Uso: make sam-deploy
 	@echo "$(INFO)🚀 Desplegando stack con SAM...$(RESET)"
-	@sam deploy --profile $(AWS_PROFILE_NAME) --template master-template.yml --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET_NAME) --region $(AWS_DEFAULT_REGION) --no-confirm-changeset --capabilities CAPABILITY_IAM --disable-rollback --force-upload
+	@sam deploy --profile $(AWS_PROFILE_NAME) --template master-template.yml --stack-name $(STACK_NAME) --s3-bucket $(S3_BUCKET) --region $(AWS_DEFAULT_REGION) --no-confirm-changeset --capabilities CAPABILITY_IAM --disable-rollback --force-upload
 
 
 .PHONY: deploy-staging
@@ -842,8 +887,6 @@ watch: check-env ## 🏎️ Inicia API con live-reload (Air). Uso: make watch
 	@$(MAKE) update-bruno-url-base ENV=local
 	@echo "$(SUCCESS)🏎️ Iniciando modo watch...$(RESET)"
 	$(DC_BASE) -p $(PROJECT_SLUG)-local up --build --remove-orphans --force-recreate
-
-
 
 
 .PHONY: aws-down
