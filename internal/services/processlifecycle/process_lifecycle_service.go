@@ -582,8 +582,12 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 	}
 
 	// Inject context variables from request
+	req.Input["process_type_id"] = req.ProcessTypeID
 	req.Input["sede_id"] = *req.SedeID
 	req.Input["roadmap"] = *req.Roadmap
+	if req.OverrideProcessVersionID != nil {
+		req.Input["override_process_version_id"] = *req.OverrideProcessVersionID
+	}
 	if req.OperatorID > 0 {
 		req.Input["operator_id"] = req.OperatorID
 	}
@@ -595,6 +599,7 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 	if err != nil {
 		return 0, nil, err
 	}
+	req.Input["resolved_process_version_id"] = processVersionID
 
 	registryRows, err := BuildServiceRegistryFromSteps(steps)
 	if err != nil {
@@ -633,5 +638,3 @@ func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int6
 
 	return processVersionID, serviceCtx, nil
 }
-
- 

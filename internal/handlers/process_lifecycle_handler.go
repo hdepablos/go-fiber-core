@@ -9,6 +9,7 @@ import (
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
 	"go-fiber-core/internal/logger"
+	"go-fiber-core/internal/services/exportmanager"
 	"go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
@@ -26,6 +27,7 @@ type ProcessLifecycleHandler interface {
 	MoveToTestScenario(c *fiber.Ctx) error
 	ListProcessVersions(c *fiber.Ctx) error
 	RunLoanRiskLifecycle(c *fiber.Ctx) error
+	PreviewExport(c *fiber.Ctx) error
 }
 
 type processLifecycleHandler struct {
@@ -310,4 +312,117 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Loan risk lifecycle ejecutado exitosamente", output)
+}
+
+func (h *processLifecycleHandler) PreviewExport(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.PreviewExportRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+	if req.Input == nil {
+		req.Input = make(map[string]any)
+	}
+
+	input := exportmanager.Input{
+		RedisKey: getStringFromMap(req.Input, "key_redis"),
+		ParentID: getInt64FromMap(req.Input, "id"),
+		Filters:  req.Input["filters"],
+	}
+
+	override := req.OverrideProcessVersionID
+	resolvedProcessVersionID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, &override, req.Roadmap, true)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrRoadmapNotFound), errors.Is(err, domain.ErrOverrideVersionNotFound):
+			return responses.Error(c, fiber.StatusNotFound, "No fue posible resolver la versión para preview", fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrInvalidArgument):
+			return responses.Error(c, fiber.StatusUnprocessableEntity, "Parámetros inválidos para preview", fiber.Map{"error": err.Error()})
+		default:
+			return responses.Error(c, fiber.StatusInternalServerError, "Error resolviendo versión para preview", fiber.Map{"error": err.Error()})
+		}
+	}
+
+	processVersion, err := h.service.GetProcessVersionByID(ctx, resolvedProcessVersionID)
+	if err != nil {
+		return responses.Error(c, fiber.StatusInternalServerError, "Error consultando process version para preview", fiber.Map{"error": err.Error()})
+	}
+
+	previewSvc, err := exportmanager.DefaultPreviewService()
+	if err != nil {
+		return err
+	}
+
+	res, err := previewSvc.Preview(ctx, exportmanager.PreviewRequest{
+		ProcessTypeID:            req.ProcessTypeID,
+		ProcessTypeName:          processVersion.ProcessTypeName,
+		ResolvedProcessVersionID: resolvedProcessVersionID,
+		ExecutionKeys:            extractExecutionKeys(steps),
+		Mode:                     req.Mode,
+		Input:                    input,
+		BatchSize:                req.BatchSize,
+		Limit:                    req.Limit,
+		Offset:                   req.Offset,
+		ItemIDs:                  req.ItemIDs,
+		RowNumbers:               req.RowNumbers,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			return responses.Error(c, fiber.StatusNotFound, "Preview no disponible", fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrInvalidArgument):
+			return responses.Error(c, fiber.StatusUnprocessableEntity, "Preview inválido", fiber.Map{"error": err.Error()})
+		default:
+			return responses.Error(c, fiber.StatusInternalServerError, "Error ejecutando preview", fiber.Map{"error": err.Error()})
+		}
+	}
+
+	return responses.Success(c, "Preview export ejecutado exitosamente", res)
+}
+
+func extractExecutionKeys(steps []processlifecycle.Step) []string {
+	keys := make([]string, 0, len(steps))
+	for _, step := range steps {
+		if step.ExecutionKey == "" {
+			continue
+		}
+		keys = append(keys, step.ExecutionKey)
+	}
+	return keys
+}
+
+func getStringFromMap(input map[string]any, key string) string {
+	raw, ok := input[key]
+	if !ok {
+		return ""
+	}
+	value, _ := raw.(string)
+	return value
+}
+
+func getInt64FromMap(input map[string]any, key string) int64 {
+	raw, ok := input[key]
+	if !ok {
+		return 0
+	}
+	switch typed := raw.(type) {
+	case int:
+		return int64(typed)
+	case int64:
+		return typed
+	case float64:
+		return int64(typed)
+	case string:
+		var value int64
+		for _, ch := range typed {
+			if ch < '0' || ch > '9' {
+				return 0
+			}
+			value = value*10 + int64(ch-'0')
+		}
+		return value
+	default:
+		return 0
+	}
 }

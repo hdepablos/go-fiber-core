@@ -20,6 +20,7 @@ type AppConfig struct {
 	JWTConfig           JWTConfig           `mapstructure:"jwt"`
 	MultiDatabaseConfig MultiDatabaseConfig `mapstructure:"database"`
 	Redis               Redis               `mapstructure:"redis"`
+	S3                  S3                  `mapstructure:"s3"`
 	EmailConfig         EmailConfig         `mapstructure:"email_config"`
 	ApiBackoffice       ApiConfig           `mapstructure:"apis.backoffice"`
 	ApiDiscord          ApiConfig           `mapstructure:"apis.discord"`
@@ -88,6 +89,10 @@ type Redis struct {
 	RedisPoolSize         int    `mapstructure:"redis_pool_size"`
 }
 
+type S3 struct {
+	Bucket string `mapstructure:"bucket"`
+}
+
 type EmailConfig struct {
 	SmtpHost     string `mapstructure:"smtp_host"`
 	SmtpPort     int    `mapstructure:"smtp_port"`
@@ -147,7 +152,7 @@ func NewAppConfig(configPath string) (*AppConfig, error) {
 	// Nota: Para simplificar esta implementación inicial, mantenemos la expansión de os.ExpandEnv
 	// para el caso local, y en el futuro se puede extender para llamar a provider.GetSecret()
 	// en claves específicas marcadas (ej: "aws:secret:prod/db/password").
-	
+
 	// Implementación simple de expansión de variables de entorno (compatible con EnvProvider)
 	for _, key := range v.AllKeys() {
 		value := v.GetString(key)

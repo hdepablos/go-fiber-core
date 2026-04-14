@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // AWSService es una estructura simple para manejar la configuración de AWS.
@@ -37,12 +39,10 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 	}
 
 	// Si hay una URL de endpoint personalizada en el entorno (ej: LocalStack), asegurar que se use.
-	// Aunque el SDK v2 moderno soporta AWS_ENDPOINT_URL, a veces es necesario ser explícito con el BaseEndpoint
-	// si la versión del SDK es antigua o hay comportamientos específicos.
-	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+	// Preferimos AWS_ENDPOINT_URL, pero si no existe usamos LOCALSTACK_ENDPOINT_BASE para mantener
+	// consistencia con los comandos del Makefile y el resto del entorno local.
+	if endpoint := resolveAWSEndpoint(); endpoint != "" {
 		fmt.Printf("⚠️ Usando Custom Endpoint: %s\n", endpoint)
-		// Forzamos el BaseEndpoint en la configuración si no se cargó automáticamente
-		// Nota: En versiones muy recientes de AWS SDK Go V2, esto es automático, pero esto asegura compatibilidad.
 		cfg.BaseEndpoint = aws.String(endpoint)
 	}
 
@@ -56,6 +56,33 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 // puede llamarlo para obtener la configuración y crear clientes de servicios específicos.
 func (s *AWSService) GetConfig() aws.Config {
 	return s.cfg
+}
+
+func (s *AWSService) NewS3Client() *s3.Client {
+	endpoint := resolveAWSEndpoint()
+	return s3.NewFromConfig(s.cfg, func(o *s3.Options) {
+		if endpoint != "" {
+			o.BaseEndpoint = aws.String(endpoint)
+			o.UsePathStyle = true
+		}
+	})
+}
+
+func resolveAWSEndpoint() string {
+	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+		return endpoint
+	}
+	if endpoint := os.Getenv("LOCALSTACK_ENDPOINT_BASE"); endpoint != "" {
+		return endpoint
+	}
+	return ""
+}
+
+func IsLocalAWSEndpoint() bool {
+	endpoint := strings.ToLower(resolveAWSEndpoint())
+	return strings.Contains(endpoint, "localhost") ||
+		strings.Contains(endpoint, "127.0.0.1") ||
+		strings.Contains(endpoint, "localstack")
 }
 
 // Ejemplo de uso:

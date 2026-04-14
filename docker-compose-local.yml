@@ -2,9 +2,9 @@ services:
   go-fiber-core:
     build:
       context: .
-      dockerfile: ./dockerfiles/Dockerfile.api.${APP_ENV}
+      dockerfile: ./dockerfiles/Dockerfile.api.local
     env_file:
-      - .env
+      - ${ENV_FILE:-.env}
     environment:
       - AWS_ENDPOINT_URL=http://host.docker.internal:4566
     restart: unless-stopped

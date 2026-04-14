@@ -214,7 +214,7 @@ func (s *OrganizeService) Execute() error {
 		}
 
 		stepCtx := contracts.NewServiceContextFromInput(context.Background(), input)
-		if err := dispatcher.DefaultDispatcher.DispatchStep(execCtx, "test/mqb1t/process_batch", 2, policy, stepCtx); err != nil {
+		if err := dispatcher.DefaultDispatcher.DispatchStep(execCtx, "test/mqb1t/process_batch", 2, policy, nil, stepCtx); err != nil {
 			return fmt.Errorf("dispatch failed (bucket_id=%d): %w", b.BucketID, err)
 		}
 		dispatched++
@@ -239,19 +239,19 @@ func (s *OrganizeService) Execute() error {
 			Status:  "completed",
 			Message: "batches dispatched",
 			Data: map[string]any{
-				"run_id":              runID,
-				"table":               s.table,
-				"batch_size":          s.batchSize,
-				"total_pending":       totalPending,
-				"total_batches":       len(buckets),
-				"dispatched":          dispatched,
-				"updated_rows":        updatedRows,
-				"reserved_to_process": reservedToProcess,
-				"queue_target":        s.queueTarget,
-				"redis_total":         totalKey,
-				"redis_done":          doneKey,
-				"dispatched_at":       now.Format(time.RFC3339),
-				"dispatch_loop_ms":    dispatchLoopMS,
+				"run_id":               runID,
+				"table":                s.table,
+				"batch_size":           s.batchSize,
+				"total_pending":        totalPending,
+				"total_batches":        len(buckets),
+				"dispatched":           dispatched,
+				"updated_rows":         updatedRows,
+				"reserved_to_process":  reservedToProcess,
+				"queue_target":         s.queueTarget,
+				"redis_total":          totalKey,
+				"redis_done":           doneKey,
+				"dispatched_at":        now.Format(time.RFC3339),
+				"dispatch_loop_ms":     dispatchLoopMS,
 				"last_bucket_start_id": lastBucketStartID,
 				"last_bucket_end_id":   lastBucketEndID,
 			},

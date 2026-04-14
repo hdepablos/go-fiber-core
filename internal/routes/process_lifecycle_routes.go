@@ -56,4 +56,10 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 		utils.Validate(new(requests.RunProcessRequest)),
 		handler.RunLoanRiskLifecycle,
 	)
+
+	group.Post(
+		"/export-preview",
+		utils.Validate(new(requests.PreviewExportRequest)),
+		handler.PreviewExport,
+	)
 }

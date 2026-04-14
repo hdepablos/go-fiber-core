@@ -48,6 +48,60 @@ CREATE INDEX idx_bulk_jobs_status_code
 ON bulk_jobs (status_code);
 
 
+-- =========================================
+-- Table: bulk_job_outputs
+-- =========================================
+
+CREATE TABLE bulk_job_outputs (
+    id BIGSERIAL PRIMARY KEY,
+
+    bulk_job_id BIGINT NOT NULL,
+
+    -- Tipo de output: csv, log, report, etc.
+    type VARCHAR(50) NOT NULL,
+
+    -- Ruta del archivo (S3, storage interno, etc.)
+    file_path TEXT NOT NULL,
+
+    -- Tamaño del archivo en bytes
+    file_size BIGINT NULL,
+
+    -- Estado del archivo: pending, generated, failed
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+
+    -- Metadata adicional (ej: headers csv, cantidad de registros, etc.)
+    metadata JSONB NULL,
+
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_bulk_job_outputs_job
+        FOREIGN KEY (bulk_job_id)
+        REFERENCES bulk_jobs (id)
+        ON DELETE CASCADE
+);
+
+-- =========================================
+-- Indexes
+-- =========================================
+
+-- Búsqueda por job
+CREATE INDEX idx_bulk_job_outputs_job_id
+ON bulk_job_outputs (bulk_job_id);
+
+-- Búsqueda por tipo (ej: solo csv)
+CREATE INDEX idx_bulk_job_outputs_type
+ON bulk_job_outputs (type);
+
+-- Búsqueda por estado
+CREATE INDEX idx_bulk_job_outputs_status
+ON bulk_job_outputs (status);
+
+-- Index combinado (muy útil en práctica real)
+CREATE INDEX idx_bulk_job_outputs_job_type
+ON bulk_job_outputs (bulk_job_id, type);
+
+
 CREATE TABLE bulk_job_items (
     id BIGSERIAL PRIMARY KEY,
     bulk_job_id BIGINT NOT NULL REFERENCES bulk_jobs(id) ON DELETE CASCADE,
@@ -116,6 +170,7 @@ ON bulk_job_configs (ref_code);
 DROP TABLE IF EXISTS bulk_job_configs;
 DROP TABLE IF EXISTS bulk_job_item_messages;
 DROP TABLE IF EXISTS bulk_job_items;
+DROP TABLE IF EXISTS bulk_job_outputs;
 DROP TABLE IF EXISTS bulk_jobs;
 DROP TYPE IF EXISTS log_severity;
 DROP TYPE IF EXISTS bulk_job_status;

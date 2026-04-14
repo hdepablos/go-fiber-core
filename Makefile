@@ -1,5 +1,11 @@
-# Carga las variables desde el archivo .env y las exporta.
-include .env
+# Carga las variables desde el archivo .env (o cae a .env-example) y las exporta.
+ENV_FILE ?= .env
+ifneq ("$(wildcard $(ENV_FILE))","")
+include $(ENV_FILE)
+else
+ENV_FILE := .env-example
+include $(ENV_FILE)
+endif
 export
 
 GOTOOLCHAIN ?= auto
@@ -32,6 +38,9 @@ STACK_NAME := $(PROJECT_NAME_LOWERCASE)-stack-$(APP_ENV)
 FOLDERS := $(shell echo "$(FUNCTIONS)" | tr ',' ' ')
 LOCALSTACK_ENDPOINT_BASE ?= http://127.0.0.1:4566
 S3_BUCKET ?= shared-local-dev
+AUTO_FIX_K8S_DISK_PRESSURE ?= 1
+AUTO_FIX_K8S_DISK_PRESSURE_WAIT_SECONDS ?= 45
+AUTO_FIX_K8S_PRUNE_VOLUMES ?= 0
 SQS_QUEUE_NAME=${PROJECT_NAME_LOWERCASE}queue
 SQS_DLQ_NAME=${PROJECT_NAME_LOWERCASE}dlq
 SQS_QUEUE_URL=${LOCALSTACK_ENDPOINT_BASE}/000000000000/${SQS_QUEUE_NAME}
@@ -179,6 +188,27 @@ create-step: ## 👣 Crea un nuevo servicio (Step) con boilerplate y auto-wiring
 	@echo "$(SUCCESS)✨ Servicio creado e inyectado correctamente.$(RESET)"
 	@echo "$(INFO)📝 Ahora edita el archivo generado para implementar tu lógica.$(RESET)"
 
+.PHONY: create-export-manager
+create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make create-export-manager process_name="generar archivo x" file="exports/x/y"
+	@if [ -z "$(process_name)" ]; then \
+		echo "$(ERROR)❌ Debes especificar process_name: make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\"$(RESET)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(file)" ]; then \
+		echo "$(ERROR)❌ Debes especificar file: make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\"$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🚀 Generando scaffold exportmanager para $(process_name)...$(RESET)"
+	@go run ./cmd/tools/export-manager-scaffold \
+		-process-name "$(process_name)" \
+		-service-slug "$(service_slug)" \
+		-file "$(file)" \
+		-batch-size "$(or $(batch_size),5000)" \
+		-part-prefix "$(or $(part_prefix),)" \
+		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
+		-bulk-job-id "$(or $(bulk_job_id),0)"
+	@echo "$(SUCCESS)✨ Scaffold exportmanager generado correctamente.$(RESET)"
+
 ###############################################################################
 ## Golang
 ###############################################################################
@@ -227,7 +257,7 @@ s3-check: ## ✅ Verifica conectividad y permisos de subida a S3 (AWS o LocalSta
 		echo "$(ERROR)❌ No se detectó bucket. Usa bucket=mi-bucket o define S3_BUCKET en .env$(RESET)"; \
 		exit 1; \
 	fi; \
-	ENDPOINT=$${endpoint-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT=$$(echo "$$ENDPOINT" | tr -d '"'); \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
@@ -267,7 +297,7 @@ s3-check: ## ✅ Verifica conectividad y permisos de subida a S3 (AWS o LocalSta
 .PHONY: s3-ls
 s3-ls: ## 🪣 Lista todo el contenido del S3. Uso: make s3-ls [bucket=mi-bucket]
 	@BUCKET=$${bucket:-$(S3_BUCKET)}; \
-	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
 	echo "$(INFO)🪣 Listando contenido recursivo de s3://$$BUCKET...$(RESET)"; \
@@ -280,7 +310,7 @@ s3-download: ## ⬇️ Descarga un archivo de S3. Uso: make s3-download key=ruta
 		exit 1; \
 	fi; \
 	BUCKET=$${bucket:-$(S3_BUCKET)}; \
-	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
 	DEST="tmp/s3_downloads/$$(basename $(key))"; \
@@ -301,7 +331,7 @@ s3-upload: ## ⬆️ Sube un archivo a S3. Uso: make s3-upload key=ruta/destino 
 		exit 1; \
 	fi; \
 	BUCKET=$${bucket:-$(S3_BUCKET)}; \
-	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
 	echo "$(INFO)⬆️ Subiendo $$SRC a s3://$$BUCKET/$(key)...$(RESET)"; \
@@ -315,7 +345,7 @@ s3-rm: ## 🗑️ Elimina un archivo de S3 (pide confirmación). Uso: make s3-rm
 		exit 1; \
 	fi; \
 	BUCKET=$${bucket:-$(S3_BUCKET)}; \
-	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
 	echo "$(PROMPT)⚠️  ¿Estás seguro de eliminar el archivo s3://$$BUCKET/$(key)? [y/N]: $(RESET)" && read ans && \
@@ -334,7 +364,7 @@ s3-rm-dir: ## 💥 Elimina una carpeta completa de S3 (pide confirmación). Uso:
 		exit 1; \
 	fi; \
 	BUCKET=$${bucket:-$(S3_BUCKET)}; \
-	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL}}; \
+	ENDPOINT=$${endpoint:-$${AWS_ENDPOINT_URL:-$${LOCALSTACK_ENDPOINT_BASE}}}; \
 	ENDPOINT_ARG=""; \
 	if [ -n "$$ENDPOINT" ]; then ENDPOINT_ARG="--endpoint-url $$ENDPOINT"; fi; \
 	echo "$(WARNING)💥 ADVERTENCIA: Se eliminará todo bajo s3://$$BUCKET/$(prefix)$(RESET)"; \
@@ -999,9 +1029,9 @@ seed-one: ## 🎯 Ejecuta un seeder específico. Uso: make seed-one name=catalog
 	@if [ -z "$(name)" ]; then \
 		echo "Debes pasar name=nombre_seeder, por ejemplo name=catalog_items"; \
 		exit 1; \
-	fi; \
-	echo "Ejecutando seeder: $(name)"; \
-	$(DC_RUN) go run ./cmd/cmd-cli/main.go seed --only $(name)
+	fi
+	@echo "Ejecutando seeder: $(name)"
+	@$(DC_RUN) go run ./cmd/cmd-cli/main.go seed --only "$(name)"
 
 .PHONY: seed-list
 seed-list: ## 📋 Muestra la lista de seeders disponibles y cómo ejecutarlos. Uso: make seed-list
@@ -1122,6 +1152,64 @@ k8s-up: ## ☸️🚀 Levanta el cluster de Kubernetes (Soporta OrbStack, Miniku
 	echo ""
 	@echo "$(SUCCESS)✅ Kubernetes está listo.$(RESET)"
 
+.PHONY: check-k8s-schedulable
+check-k8s-schedulable: ## 🩺 Verifica si el nodo actual puede agendar pods antes de desplegar.
+	@echo "$(INFO)🩺 Verificando salud del nodo Kubernetes...$(RESET)"
+	@NODE_NAME=$$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -z "$$NODE_NAME" ]; then \
+		echo "$(ERROR)❌ No se pudo detectar un nodo de Kubernetes.$(RESET)"; \
+		exit 1; \
+	fi; \
+	DISK_PRESSURE=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .status.conditions[?(@.type=="DiskPressure")]}{.status}{end}'); \
+	TAINTS=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .spec.taints[*]}{.key}:{.effect}{"\n"}{end}' 2>/dev/null); \
+	if [ "$$DISK_PRESSURE" = "True" ] || echo "$$TAINTS" | grep -q 'node.kubernetes.io/disk-pressure:NoSchedule'; then \
+		if [ "$(AUTO_FIX_K8S_DISK_PRESSURE)" = "1" ]; then \
+			echo "$(WARNING)⚠️ Detectado DiskPressure en '$$NODE_NAME'. Intentando limpieza automática segura...$(RESET)"; \
+			$(MAKE) recover-k8s-disk-pressure AUTO_FIX_K8S_PRUNE_VOLUMES=$(AUTO_FIX_K8S_PRUNE_VOLUMES); \
+			echo "$(INFO)⏳ Esperando a que Kubernetes actualice el estado del nodo (máx $(AUTO_FIX_K8S_DISK_PRESSURE_WAIT_SECONDS)s)...$(RESET)"; \
+			remaining=$(AUTO_FIX_K8S_DISK_PRESSURE_WAIT_SECONDS); \
+			while [ $$remaining -gt 0 ]; do \
+				DISK_PRESSURE=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .status.conditions[?(@.type=="DiskPressure")]}{.status}{end}'); \
+				TAINTS=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .spec.taints[*]}{.key}:{.effect}{"\n"}{end}' 2>/dev/null); \
+				if [ "$$DISK_PRESSURE" != "True" ] && ! echo "$$TAINTS" | grep -q 'node.kubernetes.io/disk-pressure:NoSchedule'; then \
+					break; \
+				fi; \
+				printf "."; \
+				sleep 5; \
+				remaining=$$((remaining-5)); \
+			done; \
+			echo ""; \
+		fi; \
+		DISK_PRESSURE=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .status.conditions[?(@.type=="DiskPressure")]}{.status}{end}'); \
+		TAINTS=$$(kubectl get node $$NODE_NAME -o jsonpath='{range .spec.taints[*]}{.key}:{.effect}{"\n"}{end}' 2>/dev/null); \
+		if [ "$$DISK_PRESSURE" = "True" ] || echo "$$TAINTS" | grep -q 'node.kubernetes.io/disk-pressure:NoSchedule'; then \
+			echo "$(ERROR)❌ El nodo '$$NODE_NAME' sigue con DiskPressure y no puede agendar pods.$(RESET)"; \
+			echo "$(WARNING)💡 Recomendado: revisa espacio en OrbStack/Docker y luego reintenta.$(RESET)"; \
+			echo "   docker builder prune -af"; \
+			echo "   docker image prune -af"; \
+			echo "   docker container prune -f"; \
+			echo "   docker volume prune -f"; \
+			echo "   kubectl describe node $$NODE_NAME | grep -A5 Conditions"; \
+			exit 1; \
+		fi; \
+	fi; \
+	echo "$(SUCCESS)✅ Nodo '$$NODE_NAME' sin DiskPressure. Se pueden agendar pods.$(RESET)"
+
+.PHONY: recover-k8s-disk-pressure
+recover-k8s-disk-pressure: ## 🧹 Ejecuta limpieza local para intentar liberar DiskPressure en Kubernetes.
+	@echo "$(INFO)🧹 Liberando build cache, imágenes y contenedores detenidos...$(RESET)"
+	@docker builder prune -af || true
+	@docker image prune -af || true
+	@docker container prune -f || true
+	@if [ "$(AUTO_FIX_K8S_PRUNE_VOLUMES)" = "1" ]; then \
+		echo "$(WARNING)🗑️ AUTO_FIX_K8S_PRUNE_VOLUMES=1 → limpiando volúmenes Docker...$(RESET)"; \
+		docker volume prune -f || true; \
+	else \
+		echo "$(INFO)ℹ️ Omitiendo docker volume prune (usa AUTO_FIX_K8S_PRUNE_VOLUMES=1 si lo necesitas).$(RESET)"; \
+	fi
+	@echo "$(INFO)📊 Estado de disco Docker después de la limpieza:$(RESET)"
+	@docker system df || true
+
 .PHONY: k8s-down
 k8s-down: ## 🛑 Detiene el cluster de Kubernetes.
 	@echo "$(INFO)🛑 Intentando detener Kubernetes...$(RESET)"
@@ -1146,10 +1234,11 @@ k8s-down: ## 🛑 Detiene el cluster de Kubernetes.
 	@echo "$(SUCCESS)✅ Kubernetes detenido.$(RESET)"
 
 .PHONY: watch-eks
-watch-eks: check-env infra-up k8s-up ## ☸️ Levanta todo el entorno en EKS (LocalStack) compilando imágenes.
+watch-eks: check-env infra-up k8s-up check-k8s-schedulable ## ☸️ Levanta todo el entorno en EKS (LocalStack) compilando imágenes.
 	@$(MAKE) generate-tfvars MODE=eks
 	@echo "$(INFO)🚀 Iniciando despliegue en EKS...$(RESET)"
 	@$(MAKE) build-all-images
+	@$(MAKE) check-k8s-schedulable
 	@$(MAKE) clean-k8s-apps
 	@$(MAKE) infra-init
 	@echo "$(INFO)terraform apply -var 'deploy_mode=eks'...$(RESET)"

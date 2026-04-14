@@ -119,7 +119,7 @@ func createLogger(name string) *zap.Logger {
 
 	if fileNeeded {
 		now := time.Now().Format("2006-01-02")
-		logDir := "pkg/logs"
+		logDir := resolveWritablePath("pkg/logs")
 		logPath := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", name, now))
 		dir := filepath.Dir(logPath)
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -212,6 +212,7 @@ func createLoggerToFile(name string, filePath string) *zap.Logger {
 	mode := strings.ToLower(os.Getenv("LOG_OUTPUT"))
 	stdoutNeeded := mode == "stdout" || mode == "both" || (mode == "" && strings.ToLower(appEnv) != "local")
 
+	filePath = resolveWritablePath(filePath)
 	dir := filepath.Dir(filePath)
 	var writers []zapcore.WriteSyncer
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -280,4 +281,30 @@ func ContextFields(reqID, batchID, handler string) zap.Field {
 		ctxMap["handler"] = handler
 	}
 	return zap.Any("context", ctxMap)
+}
+
+func resolveWritablePath(path string) string {
+	if path == "" {
+		return path
+	}
+
+	taskRoot := os.Getenv("LAMBDA_TASK_ROOT")
+	if taskRoot == "" {
+		taskRoot = "/var/task"
+	}
+
+	isLambda := os.Getenv("AWS_LAMBDA_FUNCTION_NAME") != "" || os.Getenv("AWS_EXECUTION_ENV") != "" || os.Getenv("LAMBDA_TASK_ROOT") != ""
+	if !isLambda {
+		return path
+	}
+
+	if filepath.IsAbs(path) {
+		if strings.HasPrefix(path, taskRoot+string(os.PathSeparator)) {
+			rel := strings.TrimPrefix(path, taskRoot+string(os.PathSeparator))
+			return filepath.Join(os.TempDir(), rel)
+		}
+		return path
+	}
+
+	return filepath.Join(os.TempDir(), path)
 }

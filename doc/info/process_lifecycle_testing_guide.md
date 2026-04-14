@@ -62,6 +62,43 @@ go run cmd/cmd-cli/main.go seed --only process_lifecycle_manager
 
 ---
 
+## Preview de Exports
+
+Para exportaciones basadas en `exportmanager` existe un endpoint de preview que reutiliza la misma implementación del proceso real:
+
+- endpoint: `POST /api/v1/process-lifecycle/export-preview`
+- colección Bruno: `bruno/process-lifecycle/test-export`
+
+Ejemplo:
+
+```json
+{
+  "process_type_id": 17,
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0,
+  "mode": "prepare",
+  "input": {
+    "id": 2,
+    "key_redis": "preview-001",
+    "filters": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": "ERROR_PROCESS"
+      }
+    ]
+  }
+}
+```
+
+Reglas:
+
+- `override_process_version_id = 0`: preview contra la versión resuelta en producción
+- `override_process_version_id > 0`: preview contra una versión específica sin importar su estado
+- `roadmap`: usa la misma lógica de resolución del lifecycle normal
+- `mode`: `prepare`, `header`, `body`, `footer`, `all`
+
 ## Caso 2: Ejecución Paralela y Recursiva (ASYNC Batching)
 
 **Descripción:** 4 Workers Async (Paralelos) + 1 Consolidación Final.

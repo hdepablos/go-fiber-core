@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"math/rand"
@@ -86,6 +87,7 @@ func (s *TestAutoInvoke) Execute() error {
 		s.ctx.SetInputValue("autoInvoke", cfg)
 	}
 
+	fmt.Println(batchLabel)
 	// 4. Set Result
 	// We put the data in Data, which the consumer will read to update the Input for the next run
 	result := contracts.StepResult{

@@ -55,8 +55,18 @@ func MultiQueueBatchOneTableRecreateRecordsSeeder(pool *pgxpool.Pool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), seedTimeout)
 	defer cancel()
 
+	logger := slog.Default().With("seeder", "multi_queue_batch_one_table_recreate_records")
+
 	return executeInTransaction(ctx, pool, func(ctx context.Context, tx pgx.Tx) error {
-		return seedMultiQueueBatchOneTableRecords(ctx, tx, 200000)
+		if err := seedMultiQueueBatchOneTableRecords(ctx, tx, 200000); err != nil {
+			return err
+		}
+
+		if err := seedMultiQueueBatchOneTableProcessLifecycle(ctx, tx, logger); err != nil {
+			return err
+		}
+
+		return nil
 	})
 }
 
@@ -81,15 +91,15 @@ func seedMultiQueueBatchOneTableRecords(ctx context.Context, tx pgx.Tx, count in
 }
 
 func seedMultiQueueBatchOneTableProcessLifecycle(ctx context.Context, tx pgx.Tx, logger *slog.Logger) error {
-	const processTypeName = "MultiQueueBatchProcessorOneTable"
+	const processTypeName = "MultiQueueBatchProcessorOneTableV1"
 	var processTypeID int64
 	err := tx.QueryRow(ctx, "SELECT id FROM process_types WHERE name = $1", processTypeName).Scan(&processTypeID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			if err := tx.QueryRow(ctx,
 				`INSERT INTO process_types (name, description, is_visible)
-				 VALUES ($1, $2, $3)
-				 RETURNING id`,
+				VALUES ($1, $2, $3)
+				RETURNING id`,
 				processTypeName,
 				"Fan-out masivo a colas procesando una sola tabla por lotes",
 				true,

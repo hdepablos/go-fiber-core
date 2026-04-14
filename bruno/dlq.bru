@@ -5,9 +5,7 @@ meta {
 }
 
 get {
-  url: http://127.0.0.1:9009/dlq?origen=sns&proyecto=sqsv4&ambiente=prod
-  body: none
-  auth: none
+  url: http://127.0.0.1:9009/dlq
 }
 
 params:query {
@@ -15,3 +13,5 @@ params:query {
   proyecto: sqsv4
   ambiente: prod
 }
+
+auth: none

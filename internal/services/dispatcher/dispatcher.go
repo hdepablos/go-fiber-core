@@ -7,7 +7,9 @@ import (
 	"go-fiber-core/internal/services/queue"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
@@ -20,7 +22,7 @@ type QueueService interface {
 
 // Dispatcher define la interfaz para despachar pasos de proceso
 type Dispatcher interface {
-	DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, svcCtx *contracts.ServiceContext) error
+	DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, stepConfig map[string]any, svcCtx *contracts.ServiceContext) error
 	SetQueueService(qs QueueService)
 }
 
@@ -43,7 +45,7 @@ func (d *ProcessDispatcherService) SetQueueService(qs QueueService) {
 }
 
 // DispatchStep envía un paso a la cola SQS configurada
-func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, svcCtx *contracts.ServiceContext) error {
+func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, stepConfig map[string]any, svcCtx *contracts.ServiceContext) error {
 	d.mu.RLock()
 	qs := d.queueService
 	d.mu.RUnlock()
@@ -61,8 +63,10 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 	}
 
 	targetQueue := policy.QueueTarget
+	defaultQueueName := os.Getenv("SQS_QUEUE_NAME")
+	defaultQueueURL := os.Getenv("SQS_QUEUE_URL")
 	if targetQueue == "" {
-		targetQueue = os.Getenv("SQS_QUEUE_NAME") // Fallback a la cola principal
+		targetQueue = defaultQueueName
 	}
 
 	fmt.Printf("☁️ Despachando servicio a cola SQS (%s): %s\n", targetQueue, servicePath)
@@ -70,10 +74,11 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 	// Construir payload para el worker
 	payload := map[string]any{
 		"service_path":         servicePath,
-		"process_execution_id": "TODO-UUID", // Deberíamos pasar esto desde arriba si estuviera disponible
+		"process_execution_id": "TODO-UUID",
 		"input":                svcCtx.SnapshotInput(),
 		"step_order":           order,
 		"execution_policy":     policy,
+		"service_config":       stepConfig,
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -81,21 +86,37 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 		return fmt.Errorf("error marshaling payload: %w", err)
 	}
 
-	// Construir URL completa si es LocalStack o AWS
-	endpoint := os.Getenv("LOCALSTACK_ENDPOINT_BASE")
-	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+	queueURL := ""
+	switch {
+	case strings.HasPrefix(targetQueue, "http://") || strings.HasPrefix(targetQueue, "https://"):
+		queueURL = targetQueue
+	case defaultQueueURL != "" && targetQueue != "" && (targetQueue == defaultQueueName || policy.QueueTarget == ""):
+		queueURL = defaultQueueURL
+	default:
+		endpoint := os.Getenv("LOCALSTACK_ENDPOINT_BASE")
+		if endpoint == "" {
+			endpoint = os.Getenv("AWS_ENDPOINT_URL")
+		}
+		if endpoint == "" {
+			endpoint = "http://localhost:4566"
+		}
+		if targetQueue == "" {
+			return fmt.Errorf("queue target is empty and SQS_QUEUE_URL is not configured")
+		}
+		queueURL = fmt.Sprintf("%s/000000000000/%s", strings.TrimRight(endpoint, "/"), targetQueue)
 	}
-	queueUrl := fmt.Sprintf("%s/000000000000/%s", endpoint, targetQueue)
 
 	msg := &queue.Message{
 		Source:  "process-lifecycle-dispatcher",
 		Body:    string(payloadBytes),
-		Created: "now", 
+		Created: "now",
 	}
 
 	// Usar la instancia inyectada o fallback
-	if err := qs.SendMessageToUrl(ctx, queueUrl, msg); err != nil {
+	dispatchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := qs.SendMessageToUrl(dispatchCtx, queueURL, msg); err != nil {
 		return fmt.Errorf("failed to send message to SQS: %w", err)
 	}
 

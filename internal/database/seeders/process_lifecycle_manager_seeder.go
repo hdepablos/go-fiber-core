@@ -203,7 +203,7 @@ func ProcessLifecycleManagerSeeder(pool *pgxpool.Pool) error {
 			Config       string
 		}{
 			{1, "Validación Rápida", "common/validate", `{"execution_policy": {"mode": "SYNC"}}`},
-			{2, "Proceso Pesado (Cola)", "heavy/process", `{"execution_policy": {"mode": "ASYNC", "queue_target": "vip-queue"}}`},
+			{2, "Proceso Pesado (Cola)", "heavy/process", `{"execution_policy": {"mode": "ASYNC", "queue_target": "gofibercorequeue"}}`},
 			{3, "Notificación (Si termina)", "common/notify", `{"execution_policy": {"mode": "SYNC"}}`},
 		}
 

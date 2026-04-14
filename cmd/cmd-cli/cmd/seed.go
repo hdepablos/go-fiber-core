@@ -52,8 +52,6 @@ var seedCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println("\nEjecutando los seeders...")
-
 		var selected []string
 		if onlySeeders != "" {
 			parts := strings.Split(onlySeeders, ",")
@@ -63,6 +61,12 @@ var seedCmd = &cobra.Command{
 					selected = append(selected, name)
 				}
 			}
+		}
+
+		if len(selected) > 0 {
+			fmt.Printf("\nEjecutando %d seeder(s) seleccionado(s)...\n", len(selected))
+		} else {
+			fmt.Println("\nEjecutando los seeders...")
 		}
 
 		if err := seeders.SeedDatabase(selected...); err != nil {

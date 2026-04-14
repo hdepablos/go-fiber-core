@@ -16,9 +16,12 @@ import (
 	"go-fiber-core/internal/services/queue"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	bulkexportv2 "go-fiber-core/internal/services/test/bulkexportV2"
+	bulkexportv1 "go-fiber-core/internal/services/test/bulkexportv1"
 
 	// Import services to register them
 	_ "go-fiber-core/internal/services/test"
+	_ "go-fiber-core/internal/services/test/bulkexportV2"
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 	_ "go-fiber-core/internal/services/test/mqb1t"
@@ -28,7 +31,8 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/joho/godotenv/autoload"
-)
+
+	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia")
 
 var (
 	appContainer *di.AppContainer
@@ -50,6 +54,30 @@ func init() {
 	appContainer = res
 	if appContainer.QueueService != nil {
 		dispatcher.DefaultDispatcher.SetQueueService(appContainer.QueueService)
+	}
+
+	if appContainer.Connect != nil && appContainer.Connect.ConnectRedis != nil && appContainer.Config != nil {
+		awsSvc, err := queue.NewAWSService(context.Background())
+		if err == nil {
+			prov, err := bulkexportv1.NewProviderWithConfig(
+				appContainer.Config,
+				appContainer.Connect,
+				appContainer.Connect.ConnectRedis,
+				awsSvc.NewS3Client(),
+			)
+			if err == nil {
+				bulkexportv1.SetDefaultProvider(prov)
+			}
+			provV2, err := bulkexportv2.NewProviderWithConfig(
+				appContainer.Config,
+				appContainer.Connect,
+				appContainer.Connect.ConnectRedis,
+				awsSvc.NewS3Client(),
+			)
+			if err == nil {
+				bulkexportv2.SetDefaultProvider(provV2)
+			}
+		}
 	}
 }
 
@@ -213,6 +241,7 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 		Input              map[string]any            `json:"input"`
 		StepOrder          int                       `json:"step_order"`
 		ExecutionPolicy    contracts.ExecutionPolicy `json:"execution_policy,omitempty"`
+		ServiceConfig      map[string]any            `json:"service_config,omitempty"`
 	}
 
 	var stepReq DispatchStepRequest
@@ -255,7 +284,7 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 		svcCtx := contracts.NewServiceContextFromInput(ctx, stepReq.Input)
 
 		// Ejecutar el servicio individual
-		if err := serviceconfig.ExecuteService(ctx, stepReq.ServicePath, svcCtx); err != nil {
+		if err := serviceconfig.ExecuteDispatchedServiceWithConfig(ctx, stepReq.ServicePath, stepReq.ServiceConfig, svcCtx); err != nil {
 			slog.Error("❌ Error executing async step", "service", stepReq.ServicePath, "error", err)
 			return err
 		}
@@ -399,6 +428,7 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 							ProcessExecutionID: stepReq.ProcessExecutionID,
 							Input:              stepReq.Input,
 							StepOrder:          stepReq.StepOrder + 1,
+							ServiceConfig:      resolveStepConfig(ctx, policy.NextStep, stepReq.Input),
 						}
 
 						finalBytes, err := json.Marshal(finalReq)
@@ -443,6 +473,82 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func resolveStepConfig(ctx context.Context, servicePath string, input map[string]any) map[string]any {
+	if appContainer == nil || appContainer.ProcessLifecycleService == nil || input == nil {
+		return nil
+	}
+
+	processTypeID := getInt64FromAny(input["process_type_id"])
+	sedeID := getInt64FromAny(input["sede_id"])
+	roadmap := getIntFromAny(input["roadmap"])
+	overrideVal, hasOverride := input["override_process_version_id"]
+	if processTypeID <= 0 || sedeID < 0 || roadmap < 0 || !hasOverride {
+		return nil
+	}
+
+	overrideIDValue := getInt64FromAny(overrideVal)
+	overrideID := &overrideIDValue
+
+	_, steps, err := appContainer.ProcessLifecycleService.ResolveProcessVersion(ctx, processTypeID, sedeID, overrideID, roadmap, true)
+	if err != nil {
+		slog.Warn("⚠️ No se pudo resolver config del next_step", "service", servicePath, "error", err)
+		return nil
+	}
+
+	for _, step := range steps {
+		if step.ExecutionKey != servicePath {
+			continue
+		}
+		if len(step.Config) == 0 {
+			return nil
+		}
+		var cfg map[string]any
+		if err := json.Unmarshal(step.Config, &cfg); err != nil {
+			slog.Warn("⚠️ Config inválida para next_step", "service", servicePath, "error", err)
+			return nil
+		}
+		return cfg
+	}
+
+	return nil
+}
+
+func getInt64FromAny(v any) int64 {
+	switch n := v.(type) {
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	case int32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case json.Number:
+		i, _ := n.Int64()
+		return i
+	default:
+		return 0
+	}
+}
+
+func getIntFromAny(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case int32:
+		return int(n)
+	case float64:
+		return int(n)
+	case json.Number:
+		i, _ := n.Int64()
+		return int(i)
+	default:
+		return 0
+	}
 }
 
 func executeRunProcessRequest(ctx context.Context, req requests.RunProcessRequest) error {

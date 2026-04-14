@@ -31,3 +31,29 @@ modificar el registre que sea igual al de la ruta del archivo
 
 Que este por el .env
 secret := "tu_super_secreto_para_access_tokens" // Valor real de .env
+
+
+1 Traer data de otra api interna
+crear el proceso de traer data de otra api interna
+contemplando el después de tantas peticiones espera un tiempo determinado,
+para evitar rate limits de la api interna
+con comando con todo
+
+2 Procesar data de otra api externa cuando la data es una solo respuesta
+un json inmenso donde se tendría que almacenar en redis y procesar por parte
+con comando con todo
+
+3 Procesar data tal cual como el export pero en vez de exportar sería procesar y
+cambiar estatus del registro hijo por lotes
+
+4 Al momento de importar data debes agregar la forma de invocar el proceso de bulk process,
+sería el mismo body de bruno en la tabla bulk_job_configs, con el ref_code y a la vez
+crear un endpoint para mandar a procesar desde el frontend reutilizable para todos los casos de usos
+
+
+
+
+
+
+
+

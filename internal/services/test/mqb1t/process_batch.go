@@ -142,7 +142,7 @@ func (s *ProcessBatchService) Execute() error {
 			}
 			stepCtx := contracts.NewServiceContextFromInput(context.Background(), input)
 			policy := contracts.ExecutionPolicy{}
-			if err := dispatcher.DefaultDispatcher.DispatchStep(s.ctx.Ctx, "test/mqb1t/finalize", 3, policy, stepCtx); err != nil {
+			if err := dispatcher.DefaultDispatcher.DispatchStep(s.ctx.Ctx, "test/mqb1t/finalize", 3, policy, nil, stepCtx); err != nil {
 				return err
 			}
 		}

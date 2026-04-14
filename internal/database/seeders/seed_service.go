@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -42,8 +43,11 @@ func ListSeedersNames() []string {
 		"process_lifecycle_manager",
 		"test_process_scenarios",
 		"process_lifecycle_auto_invoke",
+		"bulk_export_generate_file_v1",
+		"bulk_export_generate_file_v2",
 		"multi_queue_batch_one_table_process_lifecycle",
 		"multi_queue_batch_one_table_recreate_records",
+		"export_manager_generar_archivo_banco_galicia",
 		"all_menus",
 	}
 }
@@ -113,8 +117,11 @@ func (s *SeederService) RunSelected(ctx context.Context, names []string) error {
 	}
 
 	if len(filtered) == 0 {
-		s.logger.Warn("no se encontraron seeders para los nombres solicitados", "requested", names)
-		return nil
+		available := make([]string, 0, len(s.seeders))
+		for _, sc := range s.seeders {
+			available = append(available, sc.Name)
+		}
+		return fmt.Errorf("no se encontraron seeders para los nombres solicitados (%s). Disponibles: %s", strings.Join(names, ", "), strings.Join(available, ", "))
 	}
 
 	s.logger.Info("iniciando ejecución de seeders filtrados",
@@ -154,7 +161,7 @@ func SeedDatabase(selected ...string) error {
 	// Asumimos que la config path es la default o la que se pase explícitamente si se refactoriza.
 	// Para simplificar y evitar el error "flag provided but not defined: -config" al usar Cobra:
 	configPath := defaultConfigPath
-	
+
 	// Si se quiere soportar custom config path desde Cobra, se debería pasar como argumento a SeedDatabase.
 	// Por ahora hardcodeamos el default o leemos de variable de entorno si es necesario.
 	if os.Getenv("CONFIG_PATH") != "" {
@@ -287,6 +294,14 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return ProcessLifecycleAutoInvokeSeeder(pool)
 	})
 
+	service.AddSeeder("bulk_export_generate_file_v1", func() error {
+		return BulkExportGenerateFileV1Seeder(pool)
+	})
+
+	service.AddSeeder("bulk_export_generate_file_v2", func() error {
+		return BulkExportGenerateFileV2Seeder(pool)
+	})
+
 	service.AddSeeder("multi_queue_batch_one_table_process_lifecycle", func() error {
 		return MultiQueueBatchOneTableProcessLifecycleSeeder(pool)
 	})
@@ -295,9 +310,13 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return MultiQueueBatchOneTableRecreateRecordsSeeder(pool)
 	})
 
+	service.AddSeeder("export_manager_generar_archivo_banco_galicia", func() error {
+		return ExportManagerGenerarArchivoBancoGaliciaSeeder(pool)
+	})
+
 	service.AddSeeder("all_menus", func() error {
-	return AllMenusSeeder(pool, configPath)
-})
+		return AllMenusSeeder(pool, configPath)
+	})
 	// Example: Seed menus for multiple users at once
 	// Uncomment this if you created multiple users above
 	// service.AddSeeder("menu_user_multiple", func() error {

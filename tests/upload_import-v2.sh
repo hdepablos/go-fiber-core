@@ -63,6 +63,7 @@ X_CLIENT_CODE="${X_CLIENT_CODE:-cron}"
 
 # Configuración de la API
 URL_BASE="${URL_BASE:-http://127.0.0.1:9009/}"
+LOGIN_URL="${LOGIN_URL:-}"
 EMAIL="${EMAIL:-hdepablos@libgot.com}"
 PASSWORD="${PASSWORD:-123456}"
 
@@ -83,6 +84,7 @@ readonly PER_REQUEST_SLEEP_SECONDS="$(awk "BEGIN {printf \"%.6f\", 60/${IMPORTS_
 
 # Variables globales (inicializadas)
 tmp_dir=""
+AUTH_TOKEN=""
 
 # ============================================================================
 # FUNCIONES UTILITARIAS
@@ -180,6 +182,79 @@ normalize_url() {
     echo "${url}" | sed 's:/*$:/:'
 }
 
+sanitize_env_value() {
+    local value="${1-}"
+    value="${value//$'\r'/}"
+    value="${value//$'\n'/}"
+    value="$(printf '%s' "${value}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+    if [[ ${#value} -ge 2 ]]; then
+        local first_char="${value:0:1}"
+        local last_char="${value: -1}"
+        if [[ "${first_char}" == "${last_char}" ]]; then
+            case "${first_char}" in
+                '"'|"'"|'`')
+                    value="${value:1:${#value}-2}"
+                    ;;
+            esac
+        fi
+    fi
+
+    printf '%s' "${value}"
+}
+
+build_api_base_url() {
+    local url
+    url="$(sanitize_env_value "${1}")"
+    url="${url%/}"
+
+    if [[ -z "${url}" ]]; then
+        printf '%s' "http://127.0.0.1:9009/api"
+        return 0
+    fi
+
+    if [[ "${url}" == */api ]]; then
+        printf '%s' "${url}"
+        return 0
+    fi
+
+    printf '%s/api' "${url}"
+}
+
+describe_curl_exit_code() {
+    local exit_code="${1:-0}"
+    case "${exit_code}" in
+        3) echo "URL mal formada" ;;
+        5) echo "No pudo resolver el proxy" ;;
+        6) echo "No pudo resolver el host" ;;
+        7) echo "No pudo conectar al host" ;;
+        28) echo "Timeout de conexión o respuesta" ;;
+        35) echo "Fallo de handshake SSL/TLS" ;;
+        52) echo "Respuesta vacía del servidor" ;;
+        56) echo "Fallo al recibir datos de red" ;;
+        *) echo "Error de red/curl" ;;
+    esac
+}
+
+sanitize_loaded_configuration() {
+    FILE="$(sanitize_env_value "${FILE}")"
+    BRANCH_ID="$(sanitize_env_value "${BRANCH_ID}")"
+    REF_CODE="$(sanitize_env_value "${REF_CODE}")"
+    BATCH="$(sanitize_env_value "${BATCH}")"
+    X_CLIENT_CODE="$(sanitize_env_value "${X_CLIENT_CODE}")"
+    URL_BASE="$(sanitize_env_value "${URL_BASE}")"
+    LOGIN_URL="$(sanitize_env_value "${LOGIN_URL}")"
+    EMAIL="$(sanitize_env_value "${EMAIL}")"
+    PASSWORD="$(sanitize_env_value "${PASSWORD}")"
+    TMP_DIR_BASE="$(sanitize_env_value "${TMP_DIR_BASE}")"
+
+    URL_BASE="${URL_BASE:-http://127.0.0.1:9009/}"
+    X_CLIENT_CODE="${X_CLIENT_CODE:-cron}"
+    EMAIL="${EMAIL:-hdepablos@libgot.com}"
+    PASSWORD="${PASSWORD:-123456}"
+    TMP_DIR_BASE="${TMP_DIR_BASE:-/tmp}"
+}
+
 # Validar archivo de entrada
 validate_input_file() {
     local file_path="${1}"
@@ -251,24 +326,47 @@ authenticate() {
     local attempt=1
 
     log "AUTH" "Authenticating to ${login_url}..."
+    log "DEBUG" "Login headers -> X-Client-Code: ${x_client_code}"
+    log "DEBUG" "Login payload -> email: ${email}"
 
     while [[ ${attempt} -le ${RETRY_MAX} ]]; do
         local response_file
+        local stderr_file
         response_file="$(mktemp)"
+        stderr_file="$(mktemp)"
 
         log "DEBUG" "Login attempt ${attempt}/${RETRY_MAX}"
 
         local http_code
+        local curl_exit_code
+        set +e
         http_code="$(
             curl -sS -o "${response_file}" -w "%{http_code}" \
                 -X POST "${login_url}" \
+                -L \
+                -H "Accept: application/json" \
                 -H "Content-Type: application/json" \
                 -H "X-Client-Code: ${x_client_code}" \
                 -d "{\"email\":\"${email}\",\"password\":\"${password}\"}" \
                 --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
                 --max-time "${CURL_MAX_TIME}" \
-                2>/dev/null
+                2>"${stderr_file}"
         )"
+        curl_exit_code=$?
+        set -e
+
+        if [[ ${curl_exit_code} -ne 0 ]]; then
+            log "ERROR" "Login curl failed (exit=${curl_exit_code}: $(describe_curl_exit_code "${curl_exit_code}"))"
+            log "ERROR" "Login URL usado: [${login_url}]"
+            if [[ -s "${stderr_file}" ]]; then
+                log "ERROR" "curl stderr: $(tr '\n' ' ' < "${stderr_file}")"
+            fi
+            if [[ "${login_url}" == *"/api/api/"* ]]; then
+                log "ERROR" "La URL parece tener '/api' duplicado"
+            fi
+            rm -f "${response_file}" "${stderr_file}"
+            error_exit "Authentication failed por error de red o redirect" 3
+        fi
 
         if [[ "${http_code}" == "200" ]]; then
             # Extraer token usando jq si está disponible, sino python
@@ -291,14 +389,14 @@ except:
                 )"
             fi
 
-            rm -f "${response_file}"
+            rm -f "${response_file}" "${stderr_file}"
 
             if [[ -z "${token}" ]]; then
                 error_exit "Token not found in response" 3
             fi
 
+            AUTH_TOKEN="${token}"
             log "SUCCESS" "Authentication successful"
-            echo "${token}"
             return 0
         fi
 
@@ -306,7 +404,7 @@ except:
         if [[ "${http_code}" == "429" ]]; then
             local wait_time=$((RATE_LIMIT_WINDOW_SLEEP_SECONDS * attempt))
             log "RATE" "Rate limit hit, waiting ${wait_time}s before retry (${attempt}/${RETRY_MAX})"
-            rm -f "${response_file}"
+            rm -f "${response_file}" "${stderr_file}"
             sleep "${wait_time}"
             attempt=$((attempt + 1))
             continue
@@ -317,7 +415,10 @@ except:
         if [[ -s "${response_file}" ]]; then
             log "ERROR" "Response: $(head -c 500 "${response_file}" | tr '\n' ' ')"
         fi
-        rm -f "${response_file}"
+        if [[ -s "${stderr_file}" ]]; then
+            log "ERROR" "curl stderr: $(tr '\n' ' ' < "${stderr_file}")"
+        fi
+        rm -f "${response_file}" "${stderr_file}"
         error_exit "Authentication failed" 3
     done
 
@@ -462,6 +563,16 @@ main() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo ""
 
+    local url_base_normalized
+    url_base_normalized="$(normalize_url "${URL_BASE}")"
+    local api_base_url
+    api_base_url="$(build_api_base_url "${URL_BASE}")"
+
+    # Construir URLs
+    local login_url="${LOGIN_URL:-${api_base_url}/v1/auth/login}"
+    local imports_base_url="${api_base_url}/v1/imports/all"
+    local logout_url="${api_base_url}/v1/auth/logout"
+
     # Mostrar configuración
     log "CONFIG" "Configuration Summary:"
     log "CONFIG" "  📁 Input File     : ${FILE}"
@@ -471,20 +582,14 @@ main() {
     log "CONFIG" "  🚦 Rate Limit     : ${IMPORTS_RATE_LIMIT_PER_MINUTE} requests/minute"
     log "CONFIG" "  ⏱️  Sleep/Request  : ${PER_REQUEST_SLEEP_SECONDS} seconds"
     log "CONFIG" "  🔄 Max Retries    : ${RETRY_MAX}"
-    log "CONFIG" "  🌐 API Base URL   : ${URL_BASE}"
+    log "CONFIG" "  🌐 API Base URL   : ${url_base_normalized}"
+    log "CONFIG" "  🧭 API Root       : ${api_base_url}"
+    log "CONFIG" "  🔐 Login URL      : ${login_url}"
+    log "CONFIG" "  🪪 X-Client-Code  : ${X_CLIENT_CODE}"
     echo ""
 
     # Validar dependencias
     check_dependencies
-
-    # Normalizar URL base
-    local url_base_normalized
-    url_base_normalized="$(normalize_url "${URL_BASE}")"
-
-    # Construir URLs
-    local login_url="${url_base_normalized}api/v1/auth/login"
-    local imports_base_url="${url_base_normalized}api/v1/imports/all"
-    local logout_url="${url_base_normalized}api/v1/auth/logout"
 
     # Validar archivo de entrada
     local total_lines
@@ -499,8 +604,8 @@ main() {
     echo ""
 
     # Autenticación
-    local token
-    token="$(authenticate "${login_url}" "${X_CLIENT_CODE}" "${EMAIL}" "${PASSWORD}")"
+    authenticate "${login_url}" "${X_CLIENT_CODE}" "${EMAIL}" "${PASSWORD}"
+    local token="${AUTH_TOKEN}"
     echo ""
 
     # Preparar directorio temporal
@@ -637,6 +742,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Ejecutar función principal
+sanitize_loaded_configuration
 if ! main "$@"; then
     exit 1
 fi

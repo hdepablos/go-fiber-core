@@ -1,0 +1,5 @@
+Quiero que lo hagas todo con:
+
+Service Layer con Dependency Injection + Interface-driven design (Clean Architecture), es decir, refactorizar tu servicio a nivel “empresa top”.
+
+Guiate con /private/var/www/go-fiber-core/internal/services/catalog/catalog_service.go

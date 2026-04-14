@@ -21,6 +21,7 @@ import (
 type FiberServer struct {
 	*fiber.App
 	AppConfig         *config.AppConfig
+	Connect           *connect.ConnectDTO
 	UserWriterService userService.UserWriterService
 	QueueService      *queue.SQSService // 👈 Nuevo campo para acceso global
 }
@@ -51,6 +52,7 @@ func NewFiberServer(
 			ErrorHandler: middleware.GlobalErrorHandler,
 		}),
 		AppConfig:         appConfig,
+		Connect:           connect,
 		UserWriterService: userWriterService,
 		QueueService:      queueService, // 👈 Asignación
 	}

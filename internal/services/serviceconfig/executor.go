@@ -63,7 +63,7 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 		for _, serviceConfig := range groupRows {
 			sc := serviceConfig // Capturar variable para la goroutine
 			g.Go(func() error {
-				return executeOneService(groupCtx, sc, svcCtx)
+				return executeOneService(groupCtx, sc, svcCtx, false)
 			})
 		}
 
@@ -86,7 +86,7 @@ func ExecuteServicesInOrder(ctx context.Context, services []ServiceRegistryRow, 
 	return nil
 }
 
-func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, svcCtx *contracts.ServiceContext) error {
+func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, svcCtx *contracts.ServiceContext, skipAsyncDispatch bool) error {
 	// Manejo de Timeout específico para este paso
 	var cancel context.CancelFunc
 	if serviceConfig.Timeout > 0 {
@@ -138,9 +138,9 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 	}
 
 	// Si el modo es ASYNC, despachamos a cola y terminamos este paso
-	if policy.Mode == "ASYNC" {
+	if policy.Mode == "ASYNC" && !skipAsyncDispatch {
 		// Usar el dispatcher centralizado
-		if err := dispatcher.DefaultDispatcher.DispatchStep(ctx, serviceConfig.Path, serviceConfig.Order, policy, svcCtx); err != nil {
+		if err := dispatcher.DefaultDispatcher.DispatchStep(ctx, serviceConfig.Path, serviceConfig.Order, policy, cfg, svcCtx); err != nil {
 			return fmt.Errorf("dispatch failed: %w", err)
 		}
 
@@ -150,6 +150,7 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 		}
 		if svcCtx != nil {
 			svcCtx.SetResult(serviceConfig.Path, res)
+			svcCtx.SetInputValue("__stop_chain", true)
 		}
 		return nil // Terminamos exitosamente el despacho
 	}
@@ -273,4 +274,29 @@ func ExecuteService(ctx context.Context, path string, svcCtx *contracts.ServiceC
 		Order: 1,
 	}
 	return ExecuteServicesInOrder(ctx, []ServiceRegistryRow{row}, svcCtx)
+}
+
+func ExecuteServiceWithConfig(ctx context.Context, path string, config map[string]any, svcCtx *contracts.ServiceContext) error {
+	return executeSingleServiceWithConfig(ctx, path, config, svcCtx, false)
+}
+
+func ExecuteDispatchedServiceWithConfig(ctx context.Context, path string, config map[string]any, svcCtx *contracts.ServiceContext) error {
+	return executeSingleServiceWithConfig(ctx, path, config, svcCtx, true)
+}
+
+func executeSingleServiceWithConfig(ctx context.Context, path string, config map[string]any, svcCtx *contracts.ServiceContext, skipAsyncDispatch bool) error {
+	var cfgBytes []byte
+	if len(config) > 0 {
+		b, err := json.Marshal(config)
+		if err != nil {
+			return err
+		}
+		cfgBytes = b
+	}
+	row := ServiceRegistryRow{
+		Path:   path,
+		Order:  1,
+		Config: cfgBytes,
+	}
+	return executeOneService(ctx, row, svcCtx, skipAsyncDispatch)
 }

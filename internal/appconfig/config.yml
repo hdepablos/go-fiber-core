@@ -72,6 +72,9 @@ redis:
   redis_expires_in_seconds: ${REDIS_EXPIRES_IN_SECONDS}
   redis_pool_size: ${POOL_SIZE}
 
+s3:
+  bucket: ${S3_BUCKET}
+
 email_config:
   smtp_host: ${SMTP_HOST}
   smtp_port: ${SMTP_PORT}
