@@ -1,0 +1,18 @@
+meta {
+  name: delete-soft-user
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{urlBase}}api/v1/users/{{user_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

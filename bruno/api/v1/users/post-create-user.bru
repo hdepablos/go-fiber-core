@@ -1,0 +1,28 @@
+meta {
+  name: post-create-user
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/users/
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "name": "Admin Demo",
+  "email": "admin.demo@example.com",
+  "password": "12345678",
+  "role_ids": [1]
+}
+}

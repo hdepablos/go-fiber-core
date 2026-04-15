@@ -26,6 +26,10 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 - [core-architecture-spec.md](architecture/core-architecture-spec.md)
 - [service-design-spec.md](architecture/service-design-spec.md)
 
+### API
+
+- [http-endpoints-spec.md](api/http-endpoints-spec.md)
+
 ### Platform
 
 - [platform-runtime-spec.md](platform/platform-runtime-spec.md)

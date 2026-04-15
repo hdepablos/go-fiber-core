@@ -1,0 +1,18 @@
+meta {
+  name: get-menu-assignment-status
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{urlBase}}api/v1/menu-users/status/{{user_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

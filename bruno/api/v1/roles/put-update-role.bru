@@ -1,0 +1,26 @@
+meta {
+  name: put-update-role
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{urlBase}}api/v1/roles/{{role_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "name": "Supervisor Senior",
+  "is_active": true
+}
+}

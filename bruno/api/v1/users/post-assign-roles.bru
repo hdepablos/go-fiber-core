@@ -1,0 +1,26 @@
+meta {
+  name: post-assign-roles
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{urlBase}}api/v1/users/assign-roles
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "user_ids": [1, 2],
+  "role_ids": [1]
+}
+}

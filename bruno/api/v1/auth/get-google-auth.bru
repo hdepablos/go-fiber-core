@@ -1,0 +1,14 @@
+meta {
+  name: get-google-auth
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{urlBase}}api/v1/auth/google?mode=json
+  auth: none
+}
+
+headers {
+  X-Client-Code: bruno
+}

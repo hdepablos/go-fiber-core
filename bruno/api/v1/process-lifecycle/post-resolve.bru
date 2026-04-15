@@ -1,0 +1,28 @@
+meta {
+  name: post-resolve
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/resolve
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "process_type_id": {{process_type_id}},
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0
+}
+}

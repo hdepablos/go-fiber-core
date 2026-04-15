@@ -1,0 +1,36 @@
+meta {
+  name: post-google-exchange
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}api/v1/auth/google/exchange
+  body: json
+  auth: none
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "code": "{{google_oauth_code}}"
+}
+}
+
+script:post-response {
+let responseBody = res.getBody();
+if (typeof responseBody === "string") {
+  responseBody = JSON.parse(responseBody);
+}
+const accessToken = responseBody?.data?.access_token || responseBody?.data?.token;
+const refreshToken = responseBody?.data?.refresh_token;
+if (accessToken) {
+  bru.setVar("access_token", accessToken);
+}
+if (refreshToken) {
+  bru.setVar("refresh_token", refreshToken);
+}
+}

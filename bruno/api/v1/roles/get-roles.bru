@@ -1,0 +1,18 @@
+meta {
+  name: get-roles
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}api/v1/roles/
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

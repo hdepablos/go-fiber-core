@@ -1,0 +1,25 @@
+meta {
+  name: post-create-role
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/roles/
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "name": "Supervisor"
+}
+}

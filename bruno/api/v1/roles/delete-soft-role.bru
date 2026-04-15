@@ -1,0 +1,18 @@
+meta {
+  name: delete-soft-role
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{urlBase}}api/v1/roles/soft/{{role_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

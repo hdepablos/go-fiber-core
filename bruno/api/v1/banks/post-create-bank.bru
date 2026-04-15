@@ -1,0 +1,26 @@
+meta {
+  name: post-create-bank
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/banks/
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "name": "Banco Demo",
+  "entity_code": "123"
+}
+}

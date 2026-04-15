@@ -1,0 +1,14 @@
+meta {
+  name: get-google-callback
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}oauth/google/callback?code={{google_oauth_code}}&state={{google_oauth_state}}
+  auth: none
+}
+
+headers {
+  X-Client-Code: bruno
+}

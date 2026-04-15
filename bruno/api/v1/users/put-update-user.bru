@@ -1,0 +1,27 @@
+meta {
+  name: put-update-user
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{urlBase}}api/v1/users/{{user_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "name": "Admin Editado",
+  "email": "admin.editado@example.com",
+  "role_ids": [1, 2]
+}
+}

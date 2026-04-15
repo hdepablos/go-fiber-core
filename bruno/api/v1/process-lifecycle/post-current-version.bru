@@ -1,0 +1,28 @@
+meta {
+  name: post-current-version
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/current-version
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "process_type_id": {{process_type_id}},
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0
+}
+}

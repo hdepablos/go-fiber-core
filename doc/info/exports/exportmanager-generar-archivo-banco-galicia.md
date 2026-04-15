@@ -245,7 +245,8 @@ Semántica de resolución:
 
 Los requests Bruno quedaron en:
 
-- `bruno/process-lifecycle/test-export`
+- request canónico: `bruno/api/v1/process-lifecycle/post-export-preview.bru`
+- variantes históricas: `bruno/legacy/process-lifecycle/test-export`
 
 ## Nota sobre atomicidad en Redis
 

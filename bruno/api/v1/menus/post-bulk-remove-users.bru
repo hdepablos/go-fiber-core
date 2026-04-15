@@ -1,0 +1,26 @@
+meta {
+  name: post-bulk-remove-users
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}api/v1/menus/users-delete/bulk
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "menu_ids": [1, 2],
+  "user_ids": [10, 11]
+}
+}

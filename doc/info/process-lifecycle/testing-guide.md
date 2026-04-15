@@ -67,7 +67,8 @@ go run cmd/cmd-cli/main.go seed --only process_lifecycle_manager
 Para exportaciones basadas en `exportmanager` existe un endpoint de preview que reutiliza la misma implementación del proceso real:
 
 - endpoint: `POST /api/v1/process-lifecycle/export-preview`
-- colección Bruno: `bruno/process-lifecycle/test-export`
+- colección Bruno canónica: `bruno/api/v1/process-lifecycle/post-export-preview.bru`
+- variantes históricas preservadas: `bruno/legacy/process-lifecycle/test-export`
 
 Ejemplo:
 

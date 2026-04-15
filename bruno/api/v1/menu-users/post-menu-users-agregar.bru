@@ -1,0 +1,31 @@
+meta {
+  name: post-menu-users-agregar
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}api/v1/menu-users/agregar/{{user_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "sortBy": ["id"],
+  "sortDesc": [true],
+  "filterBy": [],
+  "filterValues": [],
+  "rowsPerPage": 10,
+  "page": 1,
+  "optimize_with_key": ""
+}
+}

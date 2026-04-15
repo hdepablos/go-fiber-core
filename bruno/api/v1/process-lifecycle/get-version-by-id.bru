@@ -1,0 +1,18 @@
+meta {
+  name: get-version-by-id
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{urlBase}}api/v1/process-lifecycle/versions/{{process_version_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

@@ -1,0 +1,39 @@
+meta {
+  name: post-run
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "process_type_id": {{process_type_id}},
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0,
+  "input": {
+    "id": 2,
+    "key_redis": "run-demo",
+    "filters": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": "ERROR_PROCESS"
+      }
+    ]
+  }
+}
+}

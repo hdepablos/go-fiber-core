@@ -1,0 +1,18 @@
+meta {
+  name: get-redis-health
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}api/v1/database/health/redis
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

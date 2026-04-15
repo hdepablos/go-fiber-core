@@ -17,6 +17,10 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [redis-locking-strategy.md](architecture/redis-locking-strategy.md): consistencia de cache y bloqueo en Redis.
 - [process-architecture-evolution.md](architecture/process-architecture-evolution.md): analisis y lineas de evolucion del motor.
 
+## API
+
+- [http-endpoints-guide.md](api/http-endpoints-guide.md): mapa de endpoints HTTP con ejemplos de request y organizacion Bruno por URL.
+
 ## Development
 
 - [development-workflow.md](development/development-workflow.md): niveles de desarrollo y flujo de trabajo local.

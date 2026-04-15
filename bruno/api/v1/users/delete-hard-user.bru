@@ -1,0 +1,18 @@
+meta {
+  name: delete-hard-user
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{urlBase}}api/v1/users/hard/{{user_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

@@ -1,0 +1,25 @@
+meta {
+  name: post-revoke-user-sessions
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{urlBase}}api/v1/auth/revoke-user-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "user_id": {{user_id}}
+}
+}

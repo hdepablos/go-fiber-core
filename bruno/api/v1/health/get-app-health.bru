@@ -1,0 +1,14 @@
+meta {
+  name: get-app-health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}api/v1/health
+  auth: none
+}
+
+headers {
+  X-Client-Code: bruno
+}

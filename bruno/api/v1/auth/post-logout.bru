@@ -1,0 +1,18 @@
+meta {
+  name: post-logout
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}api/v1/auth/logout
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

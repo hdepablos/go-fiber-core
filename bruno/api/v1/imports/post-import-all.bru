@@ -1,0 +1,23 @@
+meta {
+  name: post-import-all
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/imports/all/{{branch_id}}/{{import_ref_code}}/{{import_total}}/{{import_key}}
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:multipart-form {
+  file: @file({{import_file_path}})
+}

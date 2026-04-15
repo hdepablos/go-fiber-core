@@ -1,0 +1,31 @@
+meta {
+  name: post-menu-users-eliminar
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}api/v1/menu-users/eliminar/{{user_id}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "sortBy": ["id"],
+  "sortDesc": [true],
+  "filterBy": [],
+  "filterValues": [],
+  "rowsPerPage": 10,
+  "page": 1,
+  "optimize_with_key": ""
+}
+}

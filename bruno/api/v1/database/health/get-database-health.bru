@@ -1,0 +1,18 @@
+meta {
+  name: get-database-health
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}api/v1/database/health
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

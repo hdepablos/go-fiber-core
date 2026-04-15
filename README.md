@@ -29,6 +29,10 @@ La documentacion se divide en dos capas complementarias:
 - [Evolucion del motor de procesos](doc/info/architecture/process-architecture-evolution.md)
 - [Convenciones de diseño de servicios](doc/info/development/service-design-conventions.md)
 
+### API
+
+- [Guia de endpoints HTTP](doc/info/api/http-endpoints-guide.md)
+
 ### Process Lifecycle
 
 - [Overview del motor](doc/info/process-lifecycle/motor-overview.md)

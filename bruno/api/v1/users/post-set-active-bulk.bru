@@ -1,0 +1,26 @@
+meta {
+  name: post-set-active-bulk
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{urlBase}}api/v1/users/set-active-bulk
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "ids": [1, 2, 3],
+  "active": true
+}
+}

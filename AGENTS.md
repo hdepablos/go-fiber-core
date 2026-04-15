@@ -101,6 +101,35 @@ La documentacion del `Makefile` debe dejar claro:
 - comandos destructivos o sensibles,
 - flujos principales de desarrollo, despliegue, datos y soporte.
 
+## Convenciones de endpoints y Bruno
+
+Todo endpoint nuevo o modificado debe evaluarse junto con su documentacion HTTP y su request correspondiente en Bruno.
+
+### Regla general
+
+- Todo endpoint nuevo debe tener documentacion humana en `doc/info/` con ejemplo de request si usa body.
+- Si el endpoint define un contrato reutilizable o relevante para automatizacion, debe reflejarse tambien en `doc/specs/`.
+- Todo endpoint nuevo o modificado debe tener request Bruno canónico cuando forme parte del API operable.
+
+### Regla de organizacion en Bruno
+
+- La coleccion canónica debe vivir en `bruno/api/`.
+- Los endpoints bajo `/api/v1/...` deben organizarse en `bruno/api/v1/...` siguiendo la URL real.
+- Endpoints fuera de `/api/v1`, como `/` o `/oauth/...`, deben agruparse por path real.
+- Requests historicos, variantes de prueba o casos exploratorios deben preservarse en `bruno/legacy/` y no mezclarse con la colección principal.
+
+### Regla de auth y headers
+
+- Todo endpoint protegido debe tener `auth: bearer` y reutilizar `{{access_token}}`.
+- El login o endpoints equivalentes deben actualizar `access_token` y, cuando aplique, `refresh_token`.
+- Los requests operativos de Bruno deben usar por defecto `X-Client-Code: bruno`, salvo que exista un motivo explícito para otro valor.
+
+### Regla de request bodies
+
+- Todo endpoint `POST .../paginated` debe partir de una estructura base consistente compatible con `PaginationRequest`.
+- Los endpoints multipart deben dejar claro el `content-type`, el nombre del campo archivo y las variables necesarias.
+- Los ejemplos de body en documentación y Bruno deben mantenerse alineados con los DTOs reales del código.
+
 ## Referencias
 
 - `doc/info/README.md`
@@ -109,3 +138,5 @@ La documentacion del `Makefile` debe dejar claro:
 - `doc/specs/documentation-defaults-spec.md`
 - `doc/info/development/service-design-conventions.md`
 - `doc/specs/architecture/service-design-spec.md`
+- `doc/info/api/http-endpoints-guide.md`
+- `doc/specs/api/http-endpoints-spec.md`

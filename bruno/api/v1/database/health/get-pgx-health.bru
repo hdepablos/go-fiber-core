@@ -1,0 +1,18 @@
+meta {
+  name: get-pgx-health
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{urlBase}}api/v1/database/health/pgx
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}

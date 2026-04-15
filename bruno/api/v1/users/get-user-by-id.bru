@@ -1,0 +1,18 @@
+meta {
+  name: get-user-by-id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{urlBase}}api/v1/users/{{user_id}}
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
