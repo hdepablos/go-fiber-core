@@ -8,13 +8,10 @@ import (
 	"time"
 
 	"go-fiber-core/cmd/api/di"
-	"go-fiber-core/internal/runtimebootstrap"
-	serverpkg "go-fiber-core/internal/server"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
-	fiber "github.com/gofiber/fiber/v2"
 
 	// Registro de servicios (Process Lifecycle)
 	//
@@ -67,7 +64,6 @@ func initializeLambdaApp() {
 
 	fiberLambda = fiberadapter.New(server.App)
 	log.Println("✅ Fiber Lambda Adapter initialized")
-	attachRuntimeMiddleware(server)
 }
 
 // Handler is the Lambda entry point
@@ -119,25 +115,9 @@ func main() {
 			port = "3000" // Fallback
 		}
 
-		attachRuntimeMiddleware(server)
-
 		log.Printf("✅ Server listening on port %s", port)
 		if err := server.Listen(":" + port); err != nil {
 			log.Printf("❌ Error starting server: %v", err)
 		}
 	}
-}
-
-func attachRuntimeMiddleware(server *serverpkg.FiberServer) {
-	if server == nil {
-		return
-	}
-	deps, err := runtimebootstrap.Build(context.Background(), server.AppConfig, server.Connect, server.QueueService)
-	if err != nil {
-		log.Printf("⚠️ Runtime bootstrap parcial: %v", err)
-	}
-	server.App.Use(func(c *fiber.Ctx) error {
-		c.SetUserContext(deps.Inject(c.UserContext()))
-		return c.Next()
-	})
 }

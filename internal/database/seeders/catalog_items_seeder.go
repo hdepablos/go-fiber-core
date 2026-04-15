@@ -171,7 +171,7 @@ func ensureItem(ctx context.Context, tx pgx.Tx, jsonID int, source map[int]RawCa
 	err = tx.QueryRow(ctx,
 		`SELECT id FROM catalog_items
         WHERE code=$1
-		AND ((parent_id IS NULL AND $2::bigint IS NULL) OR parent_id=$2) 
+		AND ((parent_id IS NULL AND $2::bigint IS NULL) OR parent_id=$2)
 		AND deleted_at IS NULL`,
 		code, parentDBID,
 	).Scan(&existingID)

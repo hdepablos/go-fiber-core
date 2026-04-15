@@ -90,25 +90,3 @@ func IsLocalAWSEndpoint() bool {
 		strings.Contains(endpoint, "127.0.0.1") ||
 		strings.Contains(endpoint, "localstack")
 }
-
-// Ejemplo de uso:
-// Funciona como un conector para otros servicios de AWS.
-//
-// Importa la configuración en tu `dlq-consumer`:
-//
-// import (
-// 	"mi_proyecto/internal/config"
-// )
-//
-// En tu función principal o `main`:
-//
-// awsService, err := config.NewAWSService(context.Background())
-// if err != nil {
-// 	log.Fatalf("No se pudo inicializar el servicio de AWS: %v", err)
-// }
-//
-// awsConfig := awsService.GetConfig()
-//
-// Y luego, usa `awsConfig` para crear un cliente de SQS, por ejemplo:
-//
-// sqsClient := sqs.NewFromConfig(awsConfig)

@@ -1,17 +1,21 @@
 package server
 
 import (
-	"go-fiber-core/internal/dtos/config"
-	"go-fiber-core/internal/dtos/connect"
-	"go-fiber-core/internal/handlers"
-	"go-fiber-core/internal/middleware"
-	authService "go-fiber-core/internal/services/auth"
-	"go-fiber-core/internal/services/queue"
-	userService "go-fiber-core/internal/services/user"
+	"context"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"go-fiber-core/internal/dtos/config"
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/handlers"
+	"go-fiber-core/internal/middleware"
+	"go-fiber-core/internal/runtimebootstrap"
+	authService "go-fiber-core/internal/services/auth"
+	"go-fiber-core/internal/services/queue"
+	userService "go-fiber-core/internal/services/user"
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -95,6 +99,17 @@ func NewFiberServer(
 		},
 		ImportsPath: "/api/v1/imports/",
 	}))
+
+	runtimeDeps, err := runtimebootstrap.Build(context.Background(), appConfig, connect, queueService)
+	if err != nil {
+		log.Printf("⚠️ Runtime bootstrap parcial: %v", err)
+	}
+	server.App.Use(func(c *fiber.Ctx) error {
+		if runtimeDeps != nil {
+			c.SetUserContext(runtimeDeps.Inject(c.UserContext()))
+		}
+		return c.Next()
+	})
 
 	// Registrar rutas
 	server.RegisterRoutes(authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, dbHandler, processLifecycleHandler, importHandler, tokenService, connect.ConnectRedis)
