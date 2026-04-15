@@ -9,18 +9,24 @@ import (
 	"gorm.io/gorm"
 )
 
-// TransactionManager contiene las dependencias y la lógica para gestionar transacciones.
-type TransactionManager struct {
+// TransactionManager define el contrato mínimo del gestor de transacciones.
+type TransactionManager interface {
+	Connection() *connect.ConnectDTO
+	ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error
+}
+
+// transactionManager contiene las dependencias y la lógica para gestionar transacciones.
+type transactionManager struct {
 	Conn *connect.ConnectDTO
 }
 
 // NewTransactionManager es el constructor para nuestro gestor de transacciones.
 func NewTransactionManager(conn *connect.ConnectDTO) TransactionManager {
-	return TransactionManager{Conn: conn}
+	return &transactionManager{Conn: conn}
 }
 
 // ExecuteTx encapsula todo el ciclo de vida de una transacción.
-func (tm *TransactionManager) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
+func (tm *transactionManager) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	tx := tm.Conn.ConnectGormWrite.WithContext(ctx).Begin()
 	if tx.Error != nil {
 		return tx.Error
@@ -41,4 +47,8 @@ func (tm *TransactionManager) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB
 	}
 
 	return tx.Commit().Error
+}
+
+func (tm *transactionManager) Connection() *connect.ConnectDTO {
+	return tm.Conn
 }

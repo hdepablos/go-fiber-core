@@ -53,10 +53,10 @@ func NewUserWriterRepo() UserWriter { return &UserWriterRepo{} }
 
 // UserPaginatorRepo se encarga solo de la paginación. SÍ tiene una dependencia.
 type UserPaginatorRepo struct {
-	ps *pagination.PaginationService[models.User]
+	ps pagination.Service[models.User]
 }
 
-func NewUserPaginatorRepo(ps *pagination.PaginationService[models.User]) UserPaginator {
+func NewUserPaginatorRepo(ps pagination.Service[models.User]) UserPaginator {
 	return &UserPaginatorRepo{ps: ps}
 }
 
@@ -140,7 +140,6 @@ func (r *UserReaderRepo) GetByEmailWithRolesAndMenus(ctx context.Context, db *go
 	return &user, nil
 }
 
-
 // GetAll obtiene todos los usuarios con sus relaciones básicas
 func (r *UserReaderRepo) GetAll(ctx context.Context, db *gorm.DB) ([]models.User, error) {
 	var users []models.User
@@ -158,7 +157,6 @@ func (r *UserPaginatorRepo) GetAllPaginated(ctx context.Context, db *gorm.DB, re
 
 	return r.ps.Execute(db.WithContext(ctx), req, preload, nil)
 }
-
 
 func (r *UserReaderRepo) GetByEmailWithRoles(ctx context.Context, db *gorm.DB, email string) (*models.User, error) {
 	var user models.User

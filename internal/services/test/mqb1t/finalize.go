@@ -9,16 +9,16 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type FinalizeService struct {
+type finalizeService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewFinalizeService() contracts.Service {
-	return &FinalizeService{}
+	return &finalizeService{}
 }
 
-func (s *FinalizeService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *finalizeService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
@@ -28,7 +28,7 @@ type statusCountRow struct {
 	Count  int64  `gorm:"column:count"`
 }
 
-func (s *FinalizeService) Execute() error {
+func (s *finalizeService) Execute() error {
 	// Este step se ejecuta una sola vez al final del procesamiento:
 	// - Calcula conteos por status dentro del run_id
 	// - Calcula duración total usando started_at_ms (seteado por organize.go)
@@ -98,14 +98,14 @@ func (s *FinalizeService) Execute() error {
 	s.ctx.SetResult(s.servicePath, contracts.StepResult{
 		Status: "completed",
 		Data: map[string]any{
-			"run_id":                 runID,
-			"table":                  table,
-			"total_to_process":       total,
-			"total_processed":        stats["processed"],
+			"run_id":                      runID,
+			"table":                       table,
+			"total_to_process":            total,
+			"total_processed":             stats["processed"],
 			"total_processed_with_detail": stats["processed_with_details"],
-			"duration_seconds":       durationSeconds,
-			"duration_ms":            durationMS,
-			"duration":               fmt.Sprintf("%.3fs", durationSeconds),
+			"duration_seconds":            durationSeconds,
+			"duration_ms":                 durationMS,
+			"duration":                    fmt.Sprintf("%.3fs", durationSeconds),
 		},
 	})
 	return nil

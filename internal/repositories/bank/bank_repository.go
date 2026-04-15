@@ -25,10 +25,10 @@ func NewBankWriterRepo(catalogRepo catalog.CatalogRepository) BankWriter {
 }
 
 type BankPaginationRepo struct {
-	ps *pagination.PaginationService[models.Bank]
+	ps pagination.Service[models.Bank]
 }
 
-func NewBankPaginationRepo(ps *pagination.PaginationService[models.Bank]) BankPagination {
+func NewBankPaginationRepo(ps pagination.Service[models.Bank]) BankPagination {
 	return &BankPaginationRepo{ps: ps}
 }
 

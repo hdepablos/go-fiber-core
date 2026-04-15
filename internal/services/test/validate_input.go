@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type ValidateInput struct {
+type validateInput struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewValidateInputService() contracts.Service {
-	return &ValidateInput{}
+	return &validateInput{}
 }
 
-func (s *ValidateInput) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *validateInput) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ValidateInput) Execute() error {
+func (s *validateInput) Execute() error {
 	res := contracts.StepResult{
 		Status: "ok",
 		Data: map[string]any{

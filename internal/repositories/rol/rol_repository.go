@@ -2,10 +2,10 @@ package rol
 
 import (
 	"context"
+	"fmt"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/pagination"
-	"fmt"
 	"gorm.io/gorm"
 )
 
@@ -15,13 +15,14 @@ type RolReaderRepo struct{}
 func NewRolReaderRepo() RolReader { return &RolReaderRepo{} }
 
 type RolWriterRepo struct{}
+
 func NewRolWriterRepo() RolWriter { return &RolWriterRepo{} }
 
 type RolPaginationRepo struct {
-	ps *pagination.PaginationService[models.Role]
+	ps pagination.Service[models.Role]
 }
 
-func NewRolPaginationRepo(ps *pagination.PaginationService[models.Role]) RolPagination {
+func NewRolPaginationRepo(ps pagination.Service[models.Role]) RolPagination {
 	return &RolPaginationRepo{ps: ps}
 }
 

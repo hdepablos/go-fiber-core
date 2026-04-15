@@ -9,25 +9,25 @@ import (
 	"go-fiber-core/internal/utils"
 )
 
-type OrganizeStep struct {
+type organizeStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewOrganizeStep() contracts.Service {
-	return &OrganizeStep{}
+	return &organizeStep{}
 }
 
-func (s *OrganizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *organizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *OrganizeStep) Execute() error {
+func (s *organizeStep) Execute() error {
 	if s.ctx == nil {
 		return fmt.Errorf("service context is nil")
 	}
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -80,25 +80,25 @@ func (s *OrganizeStep) Execute() error {
 	return nil
 }
 
-type WriteCSVBatchStep struct {
+type writeCSVBatchStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewWriteCSVBatchStep() contracts.Service {
-	return &WriteCSVBatchStep{}
+	return &writeCSVBatchStep{}
 }
 
-func (s *WriteCSVBatchStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *writeCSVBatchStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *WriteCSVBatchStep) Execute() error {
+func (s *writeCSVBatchStep) Execute() error {
 	if s.ctx == nil {
 		return fmt.Errorf("service context is nil")
 	}
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -144,17 +144,17 @@ func (s *WriteCSVBatchStep) Execute() error {
 	return nil
 }
 
-type MergeMultipartStep struct {
+type mergeMultipartStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 	fileBase    string
 }
 
 func NewMergeMultipartStep() contracts.Service {
-	return &MergeMultipartStep{}
+	return &mergeMultipartStep{}
 }
 
-func (s *MergeMultipartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *mergeMultipartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
@@ -166,11 +166,11 @@ func (s *MergeMultipartStep) Init(ctx *contracts.ServiceContext, servicePath str
 	}
 }
 
-func (s *MergeMultipartStep) Execute() error {
+func (s *mergeMultipartStep) Execute() error {
 	if s.ctx == nil {
 		return fmt.Errorf("service context is nil")
 	}
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}

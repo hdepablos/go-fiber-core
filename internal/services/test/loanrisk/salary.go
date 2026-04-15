@@ -9,24 +9,24 @@ import (
 )
 
 // Salary es la implementación para el servicio de validación de salario.
-type Salary struct {
+type salary struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewSalaryService es el constructor que se registrará.
 func NewSalaryService() contracts.Service {
-	return &Salary{}
+	return &salary{}
 }
 
 // Init inyecta el contexto y la ruta.
-func (s *Salary) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *salary) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
 // Execute contiene la lógica para devolver un error crítico.
-func (s *Salary) Execute() error {
+func (s *salary) Execute() error {
 	// Servicio de ejemplo: valida salario mínimo y propaga datos al input.
 	salary := utils.GetIntInput(s.ctx, "salary")
 	minSalary := utils.GetIntConfig(s.ctx.CurrentStepConfig, "min_salary", 1)

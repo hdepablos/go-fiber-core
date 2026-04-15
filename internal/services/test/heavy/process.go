@@ -6,21 +6,21 @@ import (
 	"time"
 )
 
-type ProcessService struct {
+type processService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewProcessService() contracts.Service {
-	return &ProcessService{}
+	return &processService{}
 }
 
-func (s *ProcessService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *processService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ProcessService) Execute() error {
+func (s *processService) Execute() error {
 	// Simular carga de trabajo real
 	time.Sleep(500 * time.Millisecond)
 

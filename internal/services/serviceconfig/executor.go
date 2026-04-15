@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go-fiber-core/internal/domain"
-	"go-fiber-core/internal/services/dispatcher"
+	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"log"
 	"sort"
@@ -139,8 +139,11 @@ func executeOneService(ctx context.Context, serviceConfig ServiceRegistryRow, sv
 
 	// Si el modo es ASYNC, despachamos a cola y terminamos este paso
 	if policy.Mode == "ASYNC" && !skipAsyncDispatch {
-		// Usar el dispatcher centralizado
-		if err := dispatcher.DefaultDispatcher.DispatchStep(ctx, serviceConfig.Path, serviceConfig.Order, policy, cfg, svcCtx); err != nil {
+		dispatcherSvc, ok := runtimectx.Dispatcher(ctx)
+		if !ok {
+			return fmt.Errorf("dispatcher no disponible en contexto para '%s'", serviceConfig.Path)
+		}
+		if err := dispatcherSvc.DispatchStep(ctx, serviceConfig.Path, serviceConfig.Order, policy, cfg, svcCtx); err != nil {
 			return fmt.Errorf("dispatch failed: %w", err)
 		}
 

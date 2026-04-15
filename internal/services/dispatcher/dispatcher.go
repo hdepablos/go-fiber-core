@@ -26,26 +26,26 @@ type Dispatcher interface {
 	SetQueueService(qs QueueService)
 }
 
-// ProcessDispatcherService implementa la lógica centralizada de despacho a colas
-type ProcessDispatcherService struct {
+// processDispatcherService implementa la lógica centralizada de despacho a colas.
+type processDispatcherService struct {
 	queueService QueueService
 	mu           sync.RWMutex
 }
 
 // NewProcessDispatcherService crea una nueva instancia del dispatcher
-func NewProcessDispatcherService() *ProcessDispatcherService {
-	return &ProcessDispatcherService{}
+func NewProcessDispatcherService() Dispatcher {
+	return &processDispatcherService{}
 }
 
 // SetQueueService permite inyectar el servicio de colas después de la inicialización (Lazy Injection)
-func (d *ProcessDispatcherService) SetQueueService(qs QueueService) {
+func (d *processDispatcherService) SetQueueService(qs QueueService) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.queueService = qs
 }
 
 // DispatchStep envía un paso a la cola SQS configurada
-func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, stepConfig map[string]any, svcCtx *contracts.ServiceContext) error {
+func (d *processDispatcherService) DispatchStep(ctx context.Context, servicePath string, order int, policy contracts.ExecutionPolicy, stepConfig map[string]any, svcCtx *contracts.ServiceContext) error {
 	d.mu.RLock()
 	qs := d.queueService
 	d.mu.RUnlock()
@@ -58,7 +58,7 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 		if err != nil {
 			return fmt.Errorf("error initializing AWS service (fallback): %w", err)
 		}
-		// Usamos un cliente SQS genérico, la URL se pasará en cada llamada
+		// Usamos un cliente SQS genérico, la URL se pasará en cada llamada.
 		qs = queue.NewSQSService(sqs.NewFromConfig(awsSvc.GetConfig()), "")
 	}
 
@@ -122,6 +122,3 @@ func (d *ProcessDispatcherService) DispatchStep(ctx context.Context, servicePath
 
 	return nil
 }
-
-// Global instance
-var DefaultDispatcher Dispatcher = NewProcessDispatcherService()

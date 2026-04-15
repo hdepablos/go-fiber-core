@@ -12,12 +12,10 @@ import (
 
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/dtos/requests"
-	"go-fiber-core/internal/services/dispatcher"
+	"go-fiber-core/internal/runtimebootstrap"
 	"go-fiber-core/internal/services/queue"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
-	bulkexportv2 "go-fiber-core/internal/services/test/bulkexportV2"
-	bulkexportv1 "go-fiber-core/internal/services/test/bulkexportv1"
 
 	// Import services to register them
 	_ "go-fiber-core/internal/services/test"
@@ -32,10 +30,12 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/joho/godotenv/autoload"
 
-	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia")
+	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
+)
 
 var (
 	appContainer *di.AppContainer
+	runtimeDeps  *runtimebootstrap.Dependencies
 )
 
 func init() {
@@ -52,32 +52,9 @@ func init() {
 		os.Exit(1)
 	}
 	appContainer = res
-	if appContainer.QueueService != nil {
-		dispatcher.DefaultDispatcher.SetQueueService(appContainer.QueueService)
-	}
-
-	if appContainer.Connect != nil && appContainer.Connect.ConnectRedis != nil && appContainer.Config != nil {
-		awsSvc, err := queue.NewAWSService(context.Background())
-		if err == nil {
-			prov, err := bulkexportv1.NewProviderWithConfig(
-				appContainer.Config,
-				appContainer.Connect,
-				appContainer.Connect.ConnectRedis,
-				awsSvc.NewS3Client(),
-			)
-			if err == nil {
-				bulkexportv1.SetDefaultProvider(prov)
-			}
-			provV2, err := bulkexportv2.NewProviderWithConfig(
-				appContainer.Config,
-				appContainer.Connect,
-				appContainer.Connect.ConnectRedis,
-				awsSvc.NewS3Client(),
-			)
-			if err == nil {
-				bulkexportv2.SetDefaultProvider(provV2)
-			}
-		}
+	runtimeDeps, err = runtimebootstrap.Build(context.Background(), appContainer.Config, appContainer.Connect, appContainer.QueueService)
+	if err != nil {
+		slog.Warn("Runtime bootstrap parcial", "error", err)
 	}
 }
 
@@ -184,6 +161,9 @@ func Handler(ctx context.Context, event events.SQSEvent) (events.SQSEventRespons
 }
 
 func processMessage(ctx context.Context, record events.SQSMessage) error {
+	if runtimeDeps != nil {
+		ctx = runtimeDeps.Inject(ctx)
+	}
 	// 1. Unmarshal inicial para detectar origen
 	var wrapper struct {
 		Type    string `json:"Type"`

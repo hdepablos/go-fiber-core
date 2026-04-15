@@ -25,6 +25,7 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 
 - [core-architecture-spec.md](architecture/core-architecture-spec.md)
 - [service-design-spec.md](architecture/service-design-spec.md)
+- [service-runtime-bootstrap-spec.md](architecture/service-runtime-bootstrap-spec.md)
 
 ### API
 

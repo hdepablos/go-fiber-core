@@ -11,8 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-// SQSService encapsula las operaciones de SQS
-type SQSService struct {
+// MessageQueue define el contrato operativo mínimo para interactuar con SQS.
+type MessageQueue interface {
+	SendMessage(ctx context.Context, message *Message) error
+	SendMessageToUrl(ctx context.Context, queueURL string, message *Message) error
+	ReceiveMessages(ctx context.Context, maxMessages int32) ([]types.Message, error)
+	DeleteMessage(ctx context.Context, receiptHandle string) error
+	ProcessMessage(ctx context.Context, sqsMessage types.Message) error
+	GetQueueAttributes(ctx context.Context) (map[string]string, error)
+}
+
+// sqsService encapsula las operaciones de SQS.
+type sqsService struct {
 	client   *sqs.Client
 	queueURL string
 }
@@ -29,20 +39,20 @@ type Message struct {
 // NewSQSService crea una nueva instancia del servicio SQS.
 // Ahora recibe el cliente de SQS y la URL de la cola como dependencias.
 // Esto elimina la lógica de configuración duplicada.
-func NewSQSService(client *sqs.Client, queueURL string) *SQSService {
-	return &SQSService{
+func NewSQSService(client *sqs.Client, queueURL string) MessageQueue {
+	return &sqsService{
 		client:   client,
 		queueURL: queueURL,
 	}
 }
 
 // SendMessage envía un mensaje a la cola SQS configurada por defecto
-func (s *SQSService) SendMessage(ctx context.Context, message *Message) error {
+func (s *sqsService) SendMessage(ctx context.Context, message *Message) error {
 	return s.SendMessageToUrl(ctx, s.queueURL, message)
 }
 
 // SendMessageToUrl envía un mensaje a una URL de cola específica
-func (s *SQSService) SendMessageToUrl(ctx context.Context, queueURL string, message *Message) error {
+func (s *sqsService) SendMessageToUrl(ctx context.Context, queueURL string, message *Message) error {
 	messageBody, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("error marshaling message: %w", err)
@@ -69,7 +79,7 @@ func (s *SQSService) SendMessageToUrl(ctx context.Context, queueURL string, mess
 }
 
 // ReceiveMessages recibe mensajes de la cola SQS
-func (s *SQSService) ReceiveMessages(ctx context.Context, maxMessages int32) ([]types.Message, error) {
+func (s *sqsService) ReceiveMessages(ctx context.Context, maxMessages int32) ([]types.Message, error) {
 	if maxMessages <= 0 {
 		maxMessages = 10
 	}
@@ -91,7 +101,7 @@ func (s *SQSService) ReceiveMessages(ctx context.Context, maxMessages int32) ([]
 }
 
 // DeleteMessage elimina un mensaje de la cola SQS
-func (s *SQSService) DeleteMessage(ctx context.Context, receiptHandle string) error {
+func (s *sqsService) DeleteMessage(ctx context.Context, receiptHandle string) error {
 	input := &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(s.queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
@@ -107,7 +117,7 @@ func (s *SQSService) DeleteMessage(ctx context.Context, receiptHandle string) er
 }
 
 // ProcessMessage procesa un mensaje específico
-func (s *SQSService) ProcessMessage(ctx context.Context, sqsMessage types.Message) error {
+func (s *sqsService) ProcessMessage(ctx context.Context, sqsMessage types.Message) error {
 	var message Message
 	if err := json.Unmarshal([]byte(*sqsMessage.Body), &message); err != nil {
 		log.Printf("❌ Error unmarshaling message: %v", err)
@@ -125,7 +135,7 @@ func (s *SQSService) ProcessMessage(ctx context.Context, sqsMessage types.Messag
 }
 
 // GetQueueAttributes obtiene los atributos de la cola
-func (s *SQSService) GetQueueAttributes(ctx context.Context) (map[string]string, error) {
+func (s *sqsService) GetQueueAttributes(ctx context.Context) (map[string]string, error) {
 	input := &sqs.GetQueueAttributesInput{
 		QueueUrl: aws.String(s.queueURL),
 		AttributeNames: []types.QueueAttributeName{

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"go-fiber-core/internal/services/dispatcher"
+	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"go-fiber-core/internal/utils"
@@ -14,21 +14,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type ProcessBatchService struct {
+type processBatchService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewProcessBatchService() contracts.Service {
-	return &ProcessBatchService{}
+	return &processBatchService{}
 }
 
-func (s *ProcessBatchService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *processBatchService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ProcessBatchService) Execute() error {
+func (s *processBatchService) Execute() error {
 	// 1) Dependencias: base de datos (para actualizar estados) y Redis (para coordinar batches).
 	db, rdb, err := getDeps(s.ctx.Ctx)
 	if err != nil {
@@ -128,7 +128,11 @@ func (s *ProcessBatchService) Execute() error {
 			}
 			stepCtx := contracts.NewServiceContextFromInput(context.Background(), input)
 			policy := contracts.ExecutionPolicy{}
-			if err := dispatcher.DefaultDispatcher.DispatchStep(s.ctx.Ctx, "test/mqb1t/finalize", 3, policy, nil, stepCtx); err != nil {
+			dispatcherSvc, ok := runtimectx.Dispatcher(s.ctx.Ctx)
+			if !ok {
+				return fmt.Errorf("dispatcher no disponible en contexto")
+			}
+			if err := dispatcherSvc.DispatchStep(s.ctx.Ctx, "test/mqb1t/finalize", 3, policy, nil, stepCtx); err != nil {
 				return err
 			}
 		}

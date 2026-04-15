@@ -12,15 +12,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type BulkJobDataProvider struct {
+type bulkJobDataProvider struct {
 	readDB *gorm.DB
 }
 
-func NewBulkJobDataProvider(readDB *gorm.DB) *BulkJobDataProvider {
-	return &BulkJobDataProvider{readDB: readDB}
+func NewBulkJobDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
+	return &bulkJobDataProvider{readDB: readDB}
 }
 
-func (p *BulkJobDataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
+func (p *bulkJobDataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	input := execCtx.Input
 	if input.ParentID <= 0 {
 		return exportmanager.LoadBatchesResult{}, fmt.Errorf("id inválido")

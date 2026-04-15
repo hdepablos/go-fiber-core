@@ -11,16 +11,24 @@ import (
 	"gorm.io/gorm"
 )
 
-// DatabaseService no necesita cambios en su estructura.
-type DatabaseService struct {
+type DatabaseService interface {
+	HealthGormWrite() map[string]any
+	HealthGormRead() map[string]any
+	HealthPgxWrite() map[string]any
+	HealthPgxRead() map[string]any
+	HealthRedis() map[string]any
+}
+
+// databaseService concentra chequeos de salud de infraestructura.
+type databaseService struct {
 	// CAMBIO: AppConfig y Db ahora son punteros.
 	AppConfig *config.AppConfig
 	Db        *connect.ConnectDTO
 }
 
 // CAMBIO: Los parámetros appConfig y connect ahora son punteros.
-func NewDatabaseService(appConfig *config.AppConfig, connect *connect.ConnectDTO) *DatabaseService {
-	return &DatabaseService{
+func NewDatabaseService(appConfig *config.AppConfig, connect *connect.ConnectDTO) DatabaseService {
+	return &databaseService{
 		AppConfig: appConfig,
 		Db:        connect,
 	}
@@ -29,7 +37,7 @@ func NewDatabaseService(appConfig *config.AppConfig, connect *connect.ConnectDTO
 // --- CHEQUEOS DE SALUD PARA GORM ---
 
 // checkGormHealth es un helper interno para no repetir código.
-func (s *DatabaseService) checkGormHealth(db *gorm.DB, cfg config.GormConnectionConfig, connectionName string) map[string]any {
+func (s *databaseService) checkGormHealth(db *gorm.DB, cfg config.GormConnectionConfig, connectionName string) map[string]any {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -72,19 +80,19 @@ func (s *DatabaseService) checkGormHealth(db *gorm.DB, cfg config.GormConnection
 }
 
 // HealthGormWrite verifica la conexión de escritura de GORM.
-func (s *DatabaseService) HealthGormWrite() map[string]any {
+func (s *databaseService) HealthGormWrite() map[string]any {
 	return s.checkGormHealth(s.Db.ConnectGormWrite, s.AppConfig.MultiDatabaseConfig.Gorm.Write, "gorm-write")
 }
 
 // HealthGormRead verifica la conexión de lectura de GORM.
-func (s *DatabaseService) HealthGormRead() map[string]any {
+func (s *databaseService) HealthGormRead() map[string]any {
 	return s.checkGormHealth(s.Db.ConnectGormRead, s.AppConfig.MultiDatabaseConfig.Gorm.Read, "gorm-read")
 }
 
 // --- CHEQUEOS DE SALUD PARA PGX ---
 
 // checkPgxHealth es un helper interno para PGX.
-func (s *DatabaseService) checkPgxHealth(pool *pgxpool.Pool, cfg config.PgxConnectionConfig, connectionName string) map[string]any {
+func (s *databaseService) checkPgxHealth(pool *pgxpool.Pool, cfg config.PgxConnectionConfig, connectionName string) map[string]any {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -114,18 +122,18 @@ func (s *DatabaseService) checkPgxHealth(pool *pgxpool.Pool, cfg config.PgxConne
 }
 
 // HealthPgxWrite verifica la conexión de escritura de PGX.
-func (s *DatabaseService) HealthPgxWrite() map[string]any {
+func (s *databaseService) HealthPgxWrite() map[string]any {
 	return s.checkPgxHealth(s.Db.ConnectPgxWrite, s.AppConfig.MultiDatabaseConfig.Pgx.Write, "pgx-write")
 }
 
 // HealthPgxRead verifica la conexión de lectura de PGX.
-func (s *DatabaseService) HealthPgxRead() map[string]any {
+func (s *databaseService) HealthPgxRead() map[string]any {
 	return s.checkPgxHealth(s.Db.ConnectPgxRead, s.AppConfig.MultiDatabaseConfig.Pgx.Read, "pgx-read")
 }
 
 // --- CHEQUEO DE SALUD PARA REDIS (sin cambios) ---
 
-func (s *DatabaseService) HealthRedis() map[string]any {
+func (s *databaseService) HealthRedis() map[string]any {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 

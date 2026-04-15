@@ -8,24 +8,24 @@ import (
 )
 
 // Validation es la implementación para un servicio de validación especial.
-type Validation struct {
+type validation struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewValidationService es el constructor que se registrará.
 func NewValidationService() contracts.Service {
-	return &Validation{}
+	return &validation{}
 }
 
 // Init inyecta el contexto y la ruta.
-func (v *Validation) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (v *validation) Init(ctx *contracts.ServiceContext, servicePath string) {
 	v.ctx = ctx
 	v.servicePath = servicePath
 }
 
 // Execute contiene la lógica para devolver un error tolerable.
-func (v *Validation) Execute() error {
+func (v *validation) Execute() error {
 	// Servicio de ejemplo: valida una condición de negocio y puede devolver un error tolerable.
 	rawAge, _ := v.ctx.GetInputValue("age")
 	age := 0

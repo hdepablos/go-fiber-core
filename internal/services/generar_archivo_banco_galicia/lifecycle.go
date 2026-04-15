@@ -12,16 +12,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type ParentLifecycle struct {
+type parentLifecycle struct {
 	readDB  *gorm.DB
 	writeDB *gorm.DB
 }
 
-func NewParentLifecycle(readDB, writeDB *gorm.DB) *ParentLifecycle {
-	return &ParentLifecycle{readDB: readDB, writeDB: writeDB}
+func NewParentLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &parentLifecycle{readDB: readDB, writeDB: writeDB}
 }
 
-func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+func (l *parentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
 	input := execCtx.Input
 	var job models.BulkJob
 	if err := l.readDB.WithContext(ctx).
@@ -39,29 +39,29 @@ func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.Execu
 		Update("status_code", models.BulkJobStatusProcessing).Error
 }
 
-func (l *ParentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
+func (l *parentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusProcessed).Error
 }
 
-func (l *ParentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
+func (l *parentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusErrorProcess).Error
 }
 
-type OutputRegistrar struct {
+type outputRegistrar struct {
 	writeDB *gorm.DB
 }
 
-func NewOutputRegistrar(writeDB *gorm.DB) *OutputRegistrar {
-	return &OutputRegistrar{writeDB: writeDB}
+func NewOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &outputRegistrar{writeDB: writeDB}
 }
 
-func (r *OutputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+func (r *outputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
 	metadata, err := json.Marshal(map[string]any{
 		"bucket":        output.Bucket,
 		"key":           output.Key,

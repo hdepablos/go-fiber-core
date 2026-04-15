@@ -9,24 +9,24 @@ import (
 )
 
 // RiskLevel es la implementación para el servicio de cálculo de riesgo.
-type RiskLevel struct {
+type riskLevel struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewRiskLevelService es el constructor que se registrará.
 func NewRiskLevelService() contracts.Service {
-	return &RiskLevel{}
+	return &riskLevel{}
 }
 
 // Init inyecta el contexto y la ruta.
-func (p *RiskLevel) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (p *riskLevel) Init(ctx *contracts.ServiceContext, servicePath string) {
 	p.ctx = ctx
 	p.servicePath = servicePath
 }
 
 // Execute realiza un cálculo simple de riesgo.
-func (p *RiskLevel) Execute() error {
+func (p *riskLevel) Execute() error {
 	// Servicio de ejemplo: calcula un nivel de riesgo en base a edad y salario.
 	if _, ok := p.ctx.GetInputValue("is_renovation"); !ok {
 		return fmt.Errorf("%w: missing required input key 'is_renovation' for RiskLevel", domain.ErrMissingRequiredKey)

@@ -28,6 +28,7 @@ La documentacion se divide en dos capas complementarias:
 - [Redis locking strategy](doc/info/architecture/redis-locking-strategy.md)
 - [Evolucion del motor de procesos](doc/info/architecture/process-architecture-evolution.md)
 - [Convenciones de diseño de servicios](doc/info/development/service-design-conventions.md)
+- [Runtime y scaffold de servicios](doc/info/development/service-runtime-and-scaffold.md)
 
 ### API
 

@@ -2,12 +2,12 @@ package bulkexportv1
 
 import "github.com/google/uuid"
 
-type UUIDRunIDProvider struct{}
+type uuidRunIDProvider struct{}
 
-func NewUUIDRunIDProvider() *UUIDRunIDProvider {
-	return &UUIDRunIDProvider{}
+func NewUUIDRunIDProvider() RunIDProvider {
+	return &uuidRunIDProvider{}
 }
 
-func (p *UUIDRunIDProvider) NewRunID() string {
+func (p *uuidRunIDProvider) NewRunID() string {
 	return uuid.New().String()
 }

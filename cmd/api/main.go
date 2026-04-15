@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"go-fiber-core/cmd/api/di"
-	"go-fiber-core/internal/services/queue"
-	bulkexportv2 "go-fiber-core/internal/services/test/bulkexportV2"
-	bulkexportv1 "go-fiber-core/internal/services/test/bulkexportv1"
+	"go-fiber-core/internal/runtimebootstrap"
+	serverpkg "go-fiber-core/internal/server"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
+	fiber "github.com/gofiber/fiber/v2"
 
 	// Registro de servicios (Process Lifecycle)
 	//
@@ -34,7 +34,6 @@ import (
 	// - internal/services/test/heavy: heavy/process
 	// - internal/services/test/loanrisk: loanrisk/age, loanrisk/salary, loanrisk/validation, loanrisk/is_renovation, loanrisk/risk_level
 	// - internal/services/test: test/auto_invoke (y otros helpers de prueba)
-	"go-fiber-core/internal/services/dispatcher"
 	_ "go-fiber-core/internal/services/test/loanrisk"
 	_ "go-fiber-core/internal/services/test/mqb1t"
 
@@ -51,7 +50,8 @@ import (
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 
-	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia")
+	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
+)
 
 var fiberLambda *fiberadapter.FiberLambda
 
@@ -67,40 +67,7 @@ func initializeLambdaApp() {
 
 	fiberLambda = fiberadapter.New(server.App)
 	log.Println("✅ Fiber Lambda Adapter initialized")
-
-	// Inject SQS Service into Dispatcher
-	if server.QueueService != nil {
-		dispatcher.DefaultDispatcher.SetQueueService(server.QueueService)
-		log.Println("✅ ProcessDispatcher configurado con QueueService")
-	} else {
-		log.Println("⚠️ QueueService no disponible en FiberServer")
-	}
-
-	if server.Connect != nil && server.Connect.ConnectRedis != nil && server.AppConfig != nil {
-		awsSvc, err := diProvideAWSService()
-		if err == nil {
-			prov, err := bulkexportv1.NewProviderWithConfig(
-				server.AppConfig,
-				server.Connect,
-				server.Connect.ConnectRedis,
-				awsSvc.NewS3Client(),
-			)
-			if err == nil {
-				bulkexportv1.SetDefaultProvider(prov)
-				log.Println("✅ BulkExport provider configurado con dependencias reutilizadas")
-			}
-			provV2, err := bulkexportv2.NewProviderWithConfig(
-				server.AppConfig,
-				server.Connect,
-				server.Connect.ConnectRedis,
-				awsSvc.NewS3Client(),
-			)
-			if err == nil {
-				bulkexportv2.SetDefaultProvider(provV2)
-				log.Println("✅ BulkExportV2 provider configurado con dependencias reutilizadas")
-			}
-		}
-	}
+	attachRuntimeMiddleware(server)
 }
 
 // Handler is the Lambda entry point
@@ -152,31 +119,7 @@ func main() {
 			port = "3000" // Fallback
 		}
 
-		if server.Connect != nil && server.Connect.ConnectRedis != nil && server.AppConfig != nil {
-			awsSvc, err := diProvideAWSService()
-			if err == nil {
-				prov, err := bulkexportv1.NewProviderWithConfig(
-					server.AppConfig,
-					server.Connect,
-					server.Connect.ConnectRedis,
-					awsSvc.NewS3Client(),
-				)
-				if err == nil {
-					bulkexportv1.SetDefaultProvider(prov)
-					log.Println("✅ BulkExport provider configurado con dependencias reutilizadas")
-				}
-				provV2, err := bulkexportv2.NewProviderWithConfig(
-					server.AppConfig,
-					server.Connect,
-					server.Connect.ConnectRedis,
-					awsSvc.NewS3Client(),
-				)
-				if err == nil {
-					bulkexportv2.SetDefaultProvider(provV2)
-					log.Println("✅ BulkExportV2 provider configurado con dependencias reutilizadas")
-				}
-			}
-		}
+		attachRuntimeMiddleware(server)
 
 		log.Printf("✅ Server listening on port %s", port)
 		if err := server.Listen(":" + port); err != nil {
@@ -185,6 +128,16 @@ func main() {
 	}
 }
 
-func diProvideAWSService() (*queue.AWSService, error) {
-	return queue.NewAWSService(context.Background())
+func attachRuntimeMiddleware(server *serverpkg.FiberServer) {
+	if server == nil {
+		return
+	}
+	deps, err := runtimebootstrap.Build(context.Background(), server.AppConfig, server.Connect, server.QueueService)
+	if err != nil {
+		log.Printf("⚠️ Runtime bootstrap parcial: %v", err)
+	}
+	server.App.Use(func(c *fiber.Ctx) error {
+		c.SetUserContext(deps.Inject(c.UserContext()))
+		return c.Next()
+	})
 }

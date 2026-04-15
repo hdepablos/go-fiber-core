@@ -8,16 +8,19 @@ import (
 	"gorm.io/gorm"
 )
 
-type GormBulkJobRepository struct {
+type gormBulkJobRepository struct {
 	readDB  *gorm.DB
 	writeDB *gorm.DB
 }
 
-func NewGormBulkJobRepository(readDB, writeDB *gorm.DB) *GormBulkJobRepository {
-	return &GormBulkJobRepository{readDB: readDB, writeDB: writeDB}
+func NewGormBulkJobRepository(readDB, writeDB *gorm.DB) interface {
+	BulkJobReader
+	BulkJobWriter
+} {
+	return &gormBulkJobRepository{readDB: readDB, writeDB: writeDB}
 }
 
-func (r *GormBulkJobRepository) GetStatus(ctx context.Context, bulkJobID int64) (models.BulkJobStatus, error) {
+func (r *gormBulkJobRepository) GetStatus(ctx context.Context, bulkJobID int64) (models.BulkJobStatus, error) {
 	var job models.BulkJob
 	if err := r.readDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
@@ -29,22 +32,22 @@ func (r *GormBulkJobRepository) GetStatus(ctx context.Context, bulkJobID int64) 
 	return job.StatusCode, nil
 }
 
-func (r *GormBulkJobRepository) UpdateStatus(ctx context.Context, bulkJobID int64, status models.BulkJobStatus) error {
+func (r *gormBulkJobRepository) UpdateStatus(ctx context.Context, bulkJobID int64, status models.BulkJobStatus) error {
 	return r.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", bulkJobID).
 		Update("status_code", status).Error
 }
 
-type GormBulkJobItemRepository struct {
+type gormBulkJobItemRepository struct {
 	db *gorm.DB
 }
 
-func NewGormBulkJobItemRepository(db *gorm.DB) *GormBulkJobItemRepository {
-	return &GormBulkJobItemRepository{db: db}
+func NewGormBulkJobItemRepository(db *gorm.DB) BulkJobItemReader {
+	return &gormBulkJobItemRepository{db: db}
 }
 
-func (r *GormBulkJobItemRepository) ListIDsAfter(ctx context.Context, bulkJobID int64, lastID int64, limit int) ([]int64, error) {
+func (r *gormBulkJobItemRepository) ListIDsAfter(ctx context.Context, bulkJobID int64, lastID int64, limit int) ([]int64, error) {
 	var ids []int64
 	err := r.db.WithContext(ctx).
 		Model(&models.BulkJobItem{}).
@@ -58,7 +61,7 @@ func (r *GormBulkJobItemRepository) ListIDsAfter(ctx context.Context, bulkJobID 
 	return ids, nil
 }
 
-func (r *GormBulkJobItemRepository) FindByIDs(ctx context.Context, bulkJobID int64, ids []int64) ([]models.BulkJobItem, error) {
+func (r *gormBulkJobItemRepository) FindByIDs(ctx context.Context, bulkJobID int64, ids []int64) ([]models.BulkJobItem, error) {
 	if len(ids) == 0 {
 		return []models.BulkJobItem{}, nil
 	}
@@ -74,14 +77,14 @@ func (r *GormBulkJobItemRepository) FindByIDs(ctx context.Context, bulkJobID int
 	return items, nil
 }
 
-type GormBulkJobOutputRepository struct {
+type gormBulkJobOutputRepository struct {
 	db *gorm.DB
 }
 
-func NewGormBulkJobOutputRepository(db *gorm.DB) *GormBulkJobOutputRepository {
-	return &GormBulkJobOutputRepository{db: db}
+func NewGormBulkJobOutputRepository(db *gorm.DB) BulkJobOutputWriter {
+	return &gormBulkJobOutputRepository{db: db}
 }
 
-func (r *GormBulkJobOutputRepository) Create(ctx context.Context, output *models.BulkJobOutput) error {
+func (r *gormBulkJobOutputRepository) Create(ctx context.Context, output *models.BulkJobOutput) error {
 	return r.db.WithContext(ctx).Create(output).Error
 }

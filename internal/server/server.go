@@ -23,7 +23,7 @@ type FiberServer struct {
 	AppConfig         *config.AppConfig
 	Connect           *connect.ConnectDTO
 	UserWriterService userService.UserWriterService
-	QueueService      *queue.SQSService // 👈 Nuevo campo para acceso global
+	QueueService      queue.MessageQueue
 }
 
 // NewFiberServer crea e inicializa el servidor principal.
@@ -42,7 +42,7 @@ func NewFiberServer(
 	importHandler handlers.ImportHandler,
 	tokenService authService.TokenService,
 	userWriterService userService.UserWriterService,
-	queueService *queue.SQSService, // 👈 Nuevo parámetro
+	queueService queue.MessageQueue,
 ) (*FiberServer, func(), error) {
 
 	server := &FiberServer{
@@ -54,7 +54,7 @@ func NewFiberServer(
 		AppConfig:         appConfig,
 		Connect:           connect,
 		UserWriterService: userWriterService,
-		QueueService:      queueService, // 👈 Asignación
+		QueueService:      queueService,
 	}
 
 	allowOrigins := strings.TrimSpace(os.Getenv("CORS_ALLOW_ORIGINS"))

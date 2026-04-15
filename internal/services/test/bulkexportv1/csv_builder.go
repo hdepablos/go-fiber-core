@@ -8,13 +8,13 @@ import (
 	"go-fiber-core/internal/models"
 )
 
-type DefaultCSVBuilder struct{}
+type defaultCSVBuilder struct{}
 
-func NewDefaultCSVBuilder() *DefaultCSVBuilder {
-	return &DefaultCSVBuilder{}
+func NewDefaultCSVBuilder() CSVBuilder {
+	return &defaultCSVBuilder{}
 }
 
-func (b *DefaultCSVBuilder) Build(items []models.BulkJobItem, includeHeader bool) ([]byte, error) {
+func (b *defaultCSVBuilder) Build(items []models.BulkJobItem, includeHeader bool) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 	w.Comma = ','

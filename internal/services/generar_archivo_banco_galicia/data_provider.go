@@ -12,15 +12,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type DataProvider struct {
+type dataProvider struct {
 	readDB *gorm.DB
 }
 
-func NewDataProvider(readDB *gorm.DB) *DataProvider {
-	return &DataProvider{readDB: readDB}
+func NewDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
+	return &dataProvider{readDB: readDB}
 }
 
-func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
+func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	input := execCtx.Input
 	if input.ParentID <= 0 {
 		return exportmanager.LoadBatchesResult{}, fmt.Errorf("id invalido")

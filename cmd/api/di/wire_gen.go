@@ -88,8 +88,8 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
 	sessionReader := session.NewSessionReaderRepo()
 	sessionWriter := session.NewSessionWriterRepo()
-	paginationService := provideSessionPaginationService()
-	sessionPagination := session.NewSessionPaginationRepo(paginationService)
+	service := provideSessionPaginationService()
+	sessionPagination := session.NewSessionPaginationRepo(service)
 	sessionRepository := session.NewSessionRepository(sessionReader, sessionWriter, sessionPagination)
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
@@ -99,8 +99,8 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, authLogService, connectDTO)
 	authHandler := handlers.NewAuthHandler(authService)
 	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
-	paginationPaginationService := provideUserPaginationService()
-	userPaginator := user.NewUserPaginatorRepo(paginationPaginationService)
+	paginationService := provideUserPaginationService()
+	userPaginator := user.NewUserPaginatorRepo(paginationService)
 	userReaderService := user2.NewUserReaderService(connectDTO, userReader, userPaginator)
 	userHandler := handlers.NewUserHandler(userWriterService, userReaderService)
 	catalogRepository := catalog.NewCatalogRepository(client)
@@ -108,8 +108,8 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	bankReader := bank.NewBankReaderRepo()
 	bankWriterService := bank2.NewBankWriterService(connectDTO, bankWriter, bankReader)
 	bankReaderService := bank2.NewBankReaderService(connectDTO, bankReader)
-	paginationService2 := provideBankPaginationService()
-	bankPagination := bank.NewBankPaginationRepo(paginationService2)
+	service2 := provideBankPaginationService()
+	bankPagination := bank.NewBankPaginationRepo(service2)
 	bankPaginationService := bank2.NewBankPaginationService(connectDTO, bankPagination)
 	bankHandler := handlers.NewBankHandler(bankWriterService, bankReaderService, bankPaginationService)
 	catalogService := catalog2.NewCatalogService(catalogRepository, connectDTO)
@@ -118,21 +118,21 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	rolReader := rol.NewRolReaderRepo()
 	rolWriterService := rol2.NewRolWriterService(connectDTO, rolWriter, rolReader)
 	rolReaderService := rol2.NewRolReaderService(connectDTO, rolReader)
-	paginationService3 := provideRolPaginationService()
-	rolPagination := rol.NewRolPaginationRepo(paginationService3)
+	service3 := provideRolPaginationService()
+	rolPagination := rol.NewRolPaginationRepo(service3)
 	rolPaginationService := rol2.NewRolPaginationService(connectDTO, rolPagination)
 	rolHandler := handlers.NewRolHandler(rolWriterService, rolReaderService, rolPaginationService)
 	menuWriter := menu.NewMenuWriterRepository(connectDTO)
 	menuWriterService := menu2.NewMenuWriterService(menuWriter, connectDTO)
 	menuHandler := handlers.NewMenuHandler(menuWriterService, menuReaderService)
-	paginationService4 := provideMenuUserPaginationService()
-	menuUserPagination := menu_user.NewMenuUserPaginationRepository(paginationService4)
+	service4 := provideMenuUserPaginationService()
+	menuUserPagination := menu_user.NewMenuUserPaginationRepository(service4)
 	menuUserPaginationService := menu_user2.NewMenuUserPaginationService(connectDTO, menuUserPagination)
 	menuUserHandler := handlers.NewMenuUserHandler(menuUserPaginationService)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
 	databaseHandler := handlers.NewDatabaseHandler(databaseService)
-	service := processlifecycle.NewService(connectDTO)
-	processLifecycleHandler := handlers.NewProcessLifecycleHandler(service)
+	processlifecycleService := processlifecycle.NewService(connectDTO)
+	processLifecycleHandler := handlers.NewProcessLifecycleHandler(processlifecycleService)
 	bulkJobReader := bulkjob.NewBulkJobReaderRepo()
 	bulkJobWriter := bulkjob.NewBulkJobWriterRepo()
 	bulkJobItemReader := bulkjobitem.NewBulkJobItemReaderRepo()
@@ -140,7 +140,7 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 	bulkJobConfigReader := bulkjobconfig.NewBulkJobConfigReaderRepo()
 	importsService := imports.NewService(connectDTO, bulkJobReader, bulkJobWriter, bulkJobItemReader, bulkJobItemWriter, bulkJobConfigReader)
 	importHandler := handlers.NewImportHandler(importsService)
-	awsService, err := provideAWSService()
+	awsConfigProvider, err := provideAWSService()
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -148,8 +148,8 @@ func InitializeServer(configPath string) (*server.FiberServer, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	sqsService := provideSQSService(awsService)
-	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, importHandler, tokenService, userWriterService, sqsService)
+	messageQueue := provideSQSService(awsConfigProvider)
+	fiberServer, cleanup5, err := server.NewFiberServer(appConfig, connectDTO, authHandler, userHandler, bankHandler, catalogHandler, rolHandler, menuHandler, menuUserHandler, databaseHandler, processLifecycleHandler, importHandler, tokenService, userWriterService, messageQueue)
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -198,8 +198,8 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	userWriter := user.NewUserWriterRepo()
 	userReader := user.NewUserReaderRepo()
 	userWriterService := user2.NewUserWriterService(connectDTO, userWriter, userReader)
-	paginationService := provideUserPaginationService()
-	userPaginator := user.NewUserPaginatorRepo(paginationService)
+	service := provideUserPaginationService()
+	userPaginator := user.NewUserPaginatorRepo(service)
 	userReaderService := user2.NewUserReaderService(connectDTO, userReader, userPaginator)
 	catalogRepository := catalog.NewCatalogRepository(client)
 	bankWriter := bank.NewBankWriterRepo(catalogRepository)
@@ -211,8 +211,8 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	refreshTokenRepository := refreshtoken.NewRefreshTokenRepository(refreshTokenReader, refreshTokenWriter)
 	sessionReader := session.NewSessionReaderRepo()
 	sessionWriter := session.NewSessionWriterRepo()
-	paginationPaginationService := provideSessionPaginationService()
-	sessionPagination := session.NewSessionPaginationRepo(paginationPaginationService)
+	paginationService := provideSessionPaginationService()
+	sessionPagination := session.NewSessionPaginationRepo(paginationService)
 	sessionRepository := session.NewSessionRepository(sessionReader, sessionWriter, sessionPagination)
 	tokenService := provideTokenService(appConfig)
 	menuReader := menu.NewMenuReaderRepository(connectDTO)
@@ -221,7 +221,7 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 	authLogService := authlog.NewAuthLogService(connectDTO, authenticationLogWriter)
 	authService := auth.NewAuthService(userReader, userWriter, refreshTokenRepository, sessionRepository, tokenService, menuReaderService, authLogService, connectDTO)
 	databaseService := services.NewDatabaseService(appConfig, connectDTO)
-	awsService, err := provideAWSService()
+	awsConfigProvider, err := provideAWSService()
 	if err != nil {
 		cleanup4()
 		cleanup3()
@@ -229,8 +229,8 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	sqsService := provideSQSService(awsService)
-	service := processlifecycle.NewService(connectDTO)
+	messageQueue := provideSQSService(awsConfigProvider)
+	processlifecycleService := processlifecycle.NewService(connectDTO)
 	appContainer := &AppContainer{
 		Config:                  appConfig,
 		Connect:                 connectDTO,
@@ -240,8 +240,8 @@ func InitializeAppContainer(configPath string) (*AppContainer, func(), error) {
 		BankReaderService:       bankReaderService,
 		AuthService:             authService,
 		DatabaseService:         databaseService,
-		QueueService:            sqsService,
-		ProcessLifecycleService: service,
+		QueueService:            messageQueue,
+		ProcessLifecycleService: processlifecycleService,
 	}
 	return appContainer, func() {
 		cleanup4()
@@ -307,8 +307,8 @@ type AppContainer struct {
 	BankWriterService       bank2.BankWriterService
 	BankReaderService       bank2.BankReaderService
 	AuthService             auth.AuthService
-	DatabaseService         *services.DatabaseService
-	QueueService            *queue.SQSService
+	DatabaseService         services.DatabaseService
+	QueueService            queue.MessageQueue
 	ProcessLifecycleService processlifecycle.Service
 }
 
@@ -370,31 +370,31 @@ func provideTokenService(cfg *config.AppConfig) auth.TokenService {
 	return auth.NewTokenService(cfg)
 }
 
-func provideUserPaginationService() *pagination.PaginationService[models.User] {
+func provideUserPaginationService() pagination.Service[models.User] {
 	return pagination.NewPaginationService[models.User]()
 }
 
-func provideRolPaginationService() *pagination.PaginationService[models.Role] {
+func provideRolPaginationService() pagination.Service[models.Role] {
 	return pagination.NewPaginationService[models.Role]()
 }
 
-func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
+func provideBankPaginationService() pagination.Service[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
 
-func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+func provideMenuUserPaginationService() pagination.Service[models.MenuUser] {
 	return pagination.NewPaginationService[models.MenuUser]()
 }
 
-func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
+func provideSessionPaginationService() pagination.Service[models.Session] {
 	return pagination.NewPaginationService[models.Session]()
 }
 
-func provideAWSService() (*queue.AWSService, error) {
+func provideAWSService() (queue.AWSConfigProvider, error) {
 	return queue.NewAWSService(context.Background())
 }
 
-func provideSQSService(awsService *queue.AWSService) *queue.SQSService {
+func provideSQSService(awsService queue.AWSConfigProvider) queue.MessageQueue {
 	cfg := awsService.GetConfig()
 	client := sqs.NewFromConfig(cfg)
 	url := os.Getenv("SQS_QUEUE_URL")

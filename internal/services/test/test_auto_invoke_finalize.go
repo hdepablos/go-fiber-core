@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type TestAutoInvokeFinalize struct {
+type testAutoInvokeFinalize struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewTestAutoInvokeFinalize() contracts.Service {
-	return &TestAutoInvokeFinalize{}
+	return &testAutoInvokeFinalize{}
 }
 
-func (s *TestAutoInvokeFinalize) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *testAutoInvokeFinalize) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *TestAutoInvokeFinalize) Execute() error {
+func (s *testAutoInvokeFinalize) Execute() error {
 	// Lee el total acumulado (propagado por la cadena de ejecución) para exponerlo como resultado final.
 	var totalProcessed int
 	if s.ctx != nil {

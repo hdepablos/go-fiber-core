@@ -318,15 +318,10 @@ func renderProvider(data scaffoldData) string {
 import (
 	"context"
 	"fmt"
-	"os"
-	"sync"
-
-	gormconn "go-fiber-core/internal/database/connections/gorm"
-	redisconn "go-fiber-core/internal/database/connections/redis"
 	"go-fiber-core/internal/dtos/config"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/services/exportmanager"
-	"go-fiber-core/internal/services/queue"
+	"go-fiber-core/internal/services/runtimectx"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/redis/go-redis/v9"
@@ -341,6 +336,8 @@ type provider struct {
 	manager exportmanager.Manager
 	conn    *connect.ConnectDTO
 }
+
+const providerContextKey = %q
 
 func (p *provider) Manager() exportmanager.Manager {
 	return p.manager
@@ -392,79 +389,17 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 	return &provider{manager: manager, conn: conn}, nil
 }
 
-var (
-	defaultOnce sync.Once
-	defaultProv Provider
-	defaultErr  error
-	manualProv  Provider
-	manualMu    sync.RWMutex
-)
-
-func SetDefaultProvider(prov Provider) {
-	manualMu.Lock()
-	defer manualMu.Unlock()
-	manualProv = prov
+func WithProvider(ctx context.Context, prov Provider) context.Context {
+	return runtimectx.WithNamedValue(ctx, providerContextKey, prov)
 }
 
-func DefaultProvider(ctx context.Context) (Provider, error) {
-	manualMu.RLock()
-	if manualProv != nil {
-		prov := manualProv
-		manualMu.RUnlock()
+func ProviderFromContext(ctx context.Context) (Provider, error) {
+	if prov, ok := runtimectx.NamedValue[Provider](ctx, providerContextKey); ok && prov != nil {
 		return prov, nil
 	}
-	manualMu.RUnlock()
-
-	defaultOnce.Do(func() {
-		configPath := os.Getenv("CONFIG_PATH")
-		if configPath == "" {
-			configPath = "internal/appconfig/config.yml"
-		}
-		if _, err := os.Stat(configPath); err != nil {
-			if _, err2 := os.Stat("config.yml"); err2 == nil {
-				configPath = "config.yml"
-			}
-		}
-
-		appCfg, err := config.NewAppConfig(configPath)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-
-		gormSvc, _, err := gormconn.NewGormConnectService(appCfg.MultiDatabaseConfig)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		rdb, _, err := redisconn.NewRedisClient(appCfg.Redis)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		awsSvc, err := queue.NewAWSService(ctx)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-
-		conn := &connect.ConnectDTO{
-			ConnectGormWrite: gormSvc.GetWriteDB(),
-			ConnectGormRead:  gormSvc.GetReadDB(),
-			ConnectRedis:     rdb,
-		}
-
-		prov, err := NewProviderWithConfig(appCfg, conn, rdb, awsSvc.NewS3Client())
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		defaultProv = prov
-	})
-
-	return defaultProv, defaultErr
+	return nil, fmt.Errorf("provider no disponible en contexto")
 }
-`, data.PackageName, data.PartPrefix)
+`, data.PackageName, data.PartPrefix, data.PackageName+".provider")
 }
 
 func renderSteps(data scaffoldData) string {
@@ -517,7 +452,7 @@ func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 }
 
 func (s *StartStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -576,7 +511,7 @@ func (s *ProcessBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 }
 
 func (s *ProcessBatchStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -635,7 +570,7 @@ func (s *FinalizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 }
 
 func (s *FinalizeStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -735,15 +670,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type DataProvider struct {
+type dataProvider struct {
 	readDB *gorm.DB
 }
 
-func NewDataProvider(readDB *gorm.DB) *DataProvider {
-	return &DataProvider{readDB: readDB}
+func NewDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
+	return &dataProvider{readDB: readDB}
 }
 
-func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
+func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	input := execCtx.Input
 	if input.ParentID <= 0 {
 		return exportmanager.LoadBatchesResult{}, fmt.Errorf("id invalido")
@@ -837,15 +772,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type DataProvider struct {
+type dataProvider struct {
 	readDB *gorm.DB
 }
 
-func NewDataProvider(readDB *gorm.DB) *DataProvider {
-	return &DataProvider{readDB: readDB}
+func NewDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
+	return &dataProvider{readDB: readDB}
 }
 
-func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
+func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	_ = ctx
 	_ = execCtx
 	_ = batchSize
@@ -877,13 +812,13 @@ import (
 	"go-fiber-core/internal/utils"
 )
 
-type HeaderBuilder struct{}
+type headerBuilder struct{}
 
-func NewHeaderBuilder() *HeaderBuilder {
-	return &HeaderBuilder{}
+func NewHeaderBuilder() exportmanager.HeaderBuilder {
+	return &headerBuilder{}
 }
 
-func (b *HeaderBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+func (b *headerBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
 	_ = ctx
 	_ = execCtx
 
@@ -896,13 +831,13 @@ func (b *HeaderBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.E
 	return []string{line}, nil
 }
 
-type BodyBuilder struct{}
+type bodyBuilder struct{}
 
-func NewBodyBuilder() *BodyBuilder {
-	return &BodyBuilder{}
+func NewBodyBuilder() exportmanager.BodyBuilder {
+	return &bodyBuilder{}
 }
 
-func (b *BodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+func (b *bodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
 	_ = ctx
 	_ = execCtx
 
@@ -914,13 +849,13 @@ func (b *BodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.
 	return []string{line}, nil
 }
 
-type FooterBuilder struct{}
+type footerBuilder struct{}
 
-func NewFooterBuilder() *FooterBuilder {
-	return &FooterBuilder{}
+func NewFooterBuilder() exportmanager.FooterBuilder {
+	return &footerBuilder{}
 }
 
-func (b *FooterBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+func (b *footerBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
 	_ = ctx
 	_ = execCtx
 
@@ -951,16 +886,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type ParentLifecycle struct {
+type parentLifecycle struct {
 	readDB  *gorm.DB
 	writeDB *gorm.DB
 }
 
-func NewParentLifecycle(readDB, writeDB *gorm.DB) *ParentLifecycle {
-	return &ParentLifecycle{readDB: readDB, writeDB: writeDB}
+func NewParentLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &parentLifecycle{readDB: readDB, writeDB: writeDB}
 }
 
-func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+func (l *parentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
 	input := execCtx.Input
 	var job models.BulkJob
 	if err := l.readDB.WithContext(ctx).
@@ -978,29 +913,29 @@ func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.Execu
 		Update("status_code", models.BulkJobStatusProcessing).Error
 }
 
-func (l *ParentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
+func (l *parentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusProcessed).Error
 }
 
-func (l *ParentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
+func (l *parentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusErrorProcess).Error
 }
 
-type OutputRegistrar struct {
+type outputRegistrar struct {
 	writeDB *gorm.DB
 }
 
-func NewOutputRegistrar(writeDB *gorm.DB) *OutputRegistrar {
-	return &OutputRegistrar{writeDB: writeDB}
+func NewOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &outputRegistrar{writeDB: writeDB}
 }
 
-func (r *OutputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+func (r *outputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
 	metadata, err := json.Marshal(map[string]any{
 		"bucket":        output.Bucket,
 		"key":           output.Key,
@@ -1037,16 +972,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type ParentLifecycle struct {
+type parentLifecycle struct {
 	readDB  *gorm.DB
 	writeDB *gorm.DB
 }
 
-func NewParentLifecycle(readDB, writeDB *gorm.DB) *ParentLifecycle {
-	return &ParentLifecycle{readDB: readDB, writeDB: writeDB}
+func NewParentLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &parentLifecycle{readDB: readDB, writeDB: writeDB}
 }
 
-func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+func (l *parentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
 	_ = ctx
 	_ = execCtx
 	_ = l.readDB
@@ -1056,7 +991,7 @@ func (l *ParentLifecycle) Start(ctx context.Context, execCtx exportmanager.Execu
 	return nil
 }
 
-func (l *ParentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+func (l *parentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
 	_ = ctx
 	_ = execCtx
 	_ = output
@@ -1065,7 +1000,7 @@ func (l *ParentLifecycle) End(ctx context.Context, execCtx exportmanager.Executi
 	return nil
 }
 
-func (l *ParentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, cause error) error {
+func (l *parentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, cause error) error {
 	_ = ctx
 	_ = execCtx
 	_ = cause
@@ -1074,15 +1009,15 @@ func (l *ParentLifecycle) Fail(ctx context.Context, execCtx exportmanager.Execut
 	return nil
 }
 
-type OutputRegistrar struct {
+type outputRegistrar struct {
 	writeDB *gorm.DB
 }
 
-func NewOutputRegistrar(writeDB *gorm.DB) *OutputRegistrar {
-	return &OutputRegistrar{writeDB: writeDB}
+func NewOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &outputRegistrar{writeDB: writeDB}
 }
 
-func (r *OutputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+func (r *outputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
 	_ = ctx
 	_ = execCtx
 	_ = output

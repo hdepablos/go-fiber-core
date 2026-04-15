@@ -13,7 +13,7 @@ import (
 	"go-fiber-core/internal/utils"
 )
 
-type StartStep struct {
+type startStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 	batchSize   int
@@ -22,13 +22,13 @@ type StartStep struct {
 }
 
 func NewStartStep() contracts.Service {
-	return &StartStep{
+	return &startStep{
 		batchSize: 5000,
 		ttlHours:  24,
 	}
 }
 
-func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *startStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
@@ -46,8 +46,8 @@ func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	}
 }
 
-func (s *StartStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+func (s *startStep) Execute() error {
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -95,22 +95,22 @@ func (s *StartStep) Execute() error {
 	return nil
 }
 
-type ProcessBatchStep struct {
+type processBatchStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewProcessBatchStep() contracts.Service {
-	return &ProcessBatchStep{}
+	return &processBatchStep{}
 }
 
-func (s *ProcessBatchStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ProcessBatchStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+func (s *processBatchStep) Execute() error {
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}
@@ -146,17 +146,17 @@ func (s *ProcessBatchStep) Execute() error {
 	return nil
 }
 
-type FinalizeStep struct {
+type finalizeStep struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 	fileBase    string
 }
 
 func NewFinalizeStep() contracts.Service {
-	return &FinalizeStep{}
+	return &finalizeStep{}
 }
 
-func (s *FinalizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *finalizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
@@ -168,8 +168,8 @@ func (s *FinalizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	}
 }
 
-func (s *FinalizeStep) Execute() error {
-	prov, err := DefaultProvider(s.ctx.Ctx)
+func (s *finalizeStep) Execute() error {
+	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
 	}

@@ -6,21 +6,21 @@ import (
 	"time"
 )
 
-type BatchProcessorService struct {
+type batchProcessorService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewBatchProcessorService() contracts.Service {
-	return &BatchProcessorService{}
+	return &batchProcessorService{}
 }
 
-func (s *BatchProcessorService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *batchProcessorService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *BatchProcessorService) Execute() error {
+func (s *batchProcessorService) Execute() error {
 	// Simular procesamiento de lote
 	lastID, _ := s.ctx.GetInputValue("last_id_processed")
 
@@ -28,9 +28,9 @@ func (s *BatchProcessorService) Execute() error {
 
 	data := map[string]any{
 		"last_id_processed": lastID,
-		"processed_count": 100,
-		"next_id":         100,
-		"status":          "partial",
+		"processed_count":   100,
+		"next_id":           100,
+		"status":            "partial",
 	}
 
 	result := contracts.StepResult{

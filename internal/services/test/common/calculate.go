@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type CalculateService struct {
+type calculateService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewCalculateService() contracts.Service {
-	return &CalculateService{}
+	return &calculateService{}
 }
 
-func (s *CalculateService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *calculateService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *CalculateService) Execute() error {
+func (s *calculateService) Execute() error {
 	// Servicio de ejemplo: calcula un valor simple en base a "age".
 	age, _ := s.ctx.GetInputValue("age")
 	var result float64

@@ -11,14 +11,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// AWSService es una estructura simple para manejar la configuración de AWS.
-type AWSService struct {
+// AWSConfigProvider define el contrato mínimo para reutilizar configuración AWS.
+type AWSConfigProvider interface {
+	GetConfig() aws.Config
+	NewS3Client() *s3.Client
+}
+
+// awsService es una estructura simple para manejar la configuración de AWS.
+type awsService struct {
 	cfg aws.Config
 }
 
 // NewAWSService crea y retorna una nueva instancia de AWSService.
 // Se encarga de cargar la configuración de AWS.
-func NewAWSService(ctx context.Context) (*AWSService, error) {
+func NewAWSService(ctx context.Context) (AWSConfigProvider, error) {
 	// Carga la configuración por defecto de AWS.
 	// Esto buscará las credenciales en el orden estándar:
 	// - Variables de entorno (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -46,7 +52,7 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 		cfg.BaseEndpoint = aws.String(endpoint)
 	}
 
-	return &AWSService{
+	return &awsService{
 		cfg: cfg,
 	}, nil
 }
@@ -54,11 +60,11 @@ func NewAWSService(ctx context.Context) (*AWSService, error) {
 // GetConfig retorna la configuración de AWS cargada.
 // Es el método clave para la reutilización, ya que cualquier otro servicio
 // puede llamarlo para obtener la configuración y crear clientes de servicios específicos.
-func (s *AWSService) GetConfig() aws.Config {
+func (s *awsService) GetConfig() aws.Config {
 	return s.cfg
 }
 
-func (s *AWSService) NewS3Client() *s3.Client {
+func (s *awsService) NewS3Client() *s3.Client {
 	endpoint := resolveAWSEndpoint()
 	return s3.NewFromConfig(s.cfg, func(o *s3.Options) {
 		if endpoint != "" {

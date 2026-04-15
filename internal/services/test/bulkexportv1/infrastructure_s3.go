@@ -15,15 +15,15 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-type S3Store struct {
+type s3Store struct {
 	client *s3.Client
 }
 
-func NewS3Store(client *s3.Client) *S3Store {
-	return &S3Store{client: client}
+func NewS3Store(client *s3.Client) ObjectStore {
+	return &s3Store{client: client}
 }
 
-func (s *S3Store) EnsureBucket(ctx context.Context, bucket string) error {
+func (s *s3Store) EnsureBucket(ctx context.Context, bucket string) error {
 	if bucket == "" {
 		return fmt.Errorf("bucket inválido")
 	}
@@ -54,7 +54,7 @@ func (s *S3Store) EnsureBucket(ctx context.Context, bucket string) error {
 	return err
 }
 
-func (s *S3Store) PutObject(ctx context.Context, bucket string, key string, body []byte, contentType string) error {
+func (s *s3Store) PutObject(ctx context.Context, bucket string, key string, body []byte, contentType string) error {
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
@@ -78,7 +78,7 @@ func (s *S3Store) PutObject(ctx context.Context, bucket string, key string, body
 	return err
 }
 
-func (s *S3Store) GetObject(ctx context.Context, bucket string, key string) (io.ReadCloser, error) {
+func (s *s3Store) GetObject(ctx context.Context, bucket string, key string) (io.ReadCloser, error) {
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -89,7 +89,7 @@ func (s *S3Store) GetObject(ctx context.Context, bucket string, key string) (io.
 	return out.Body, nil
 }
 
-func (s *S3Store) HeadObject(ctx context.Context, bucket string, key string) (ObjectInfo, error) {
+func (s *s3Store) HeadObject(ctx context.Context, bucket string, key string) (ObjectInfo, error) {
 	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -100,7 +100,7 @@ func (s *S3Store) HeadObject(ctx context.Context, bucket string, key string) (Ob
 	return ObjectInfo{ContentLength: aws.ToInt64(out.ContentLength)}, nil
 }
 
-func (s *S3Store) DeletePrefix(ctx context.Context, bucket string, prefix string) error {
+func (s *s3Store) DeletePrefix(ctx context.Context, bucket string, prefix string) error {
 	if strings.TrimSpace(prefix) == "" {
 		return nil
 	}
@@ -143,7 +143,7 @@ func (s *S3Store) DeletePrefix(ctx context.Context, bucket string, prefix string
 	return nil
 }
 
-func (s *S3Store) CreateMultipartUpload(ctx context.Context, bucket string, key string, contentType string) (string, error) {
+func (s *s3Store) CreateMultipartUpload(ctx context.Context, bucket string, key string, contentType string) (string, error) {
 	out, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
@@ -155,7 +155,7 @@ func (s *S3Store) CreateMultipartUpload(ctx context.Context, bucket string, key 
 	return aws.ToString(out.UploadId), nil
 }
 
-func (s *S3Store) UploadPart(ctx context.Context, bucket string, key string, uploadID string, partNumber int32, body []byte) (string, error) {
+func (s *s3Store) UploadPart(ctx context.Context, bucket string, key string, uploadID string, partNumber int32, body []byte) (string, error) {
 	out, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
 		Bucket:        aws.String(bucket),
 		Key:           aws.String(key),
@@ -170,7 +170,7 @@ func (s *S3Store) UploadPart(ctx context.Context, bucket string, key string, upl
 	return aws.ToString(out.ETag), nil
 }
 
-func (s *S3Store) CompleteMultipartUpload(ctx context.Context, bucket string, key string, uploadID string, parts []CompletedPart) error {
+func (s *s3Store) CompleteMultipartUpload(ctx context.Context, bucket string, key string, uploadID string, parts []CompletedPart) error {
 	completed := make([]s3types.CompletedPart, 0, len(parts))
 	for _, p := range parts {
 		etag := p.ETag
@@ -190,7 +190,7 @@ func (s *S3Store) CompleteMultipartUpload(ctx context.Context, bucket string, ke
 	return err
 }
 
-func (s *S3Store) AbortMultipartUpload(ctx context.Context, bucket string, key string, uploadID string) error {
+func (s *s3Store) AbortMultipartUpload(ctx context.Context, bucket string, key string, uploadID string) error {
 	_, err := s.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(bucket),
 		Key:      aws.String(key),

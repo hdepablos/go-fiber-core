@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type BatchConsolidateService struct {
+type batchConsolidateService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewBatchConsolidateService() contracts.Service {
-	return &BatchConsolidateService{}
+	return &batchConsolidateService{}
 }
 
-func (s *BatchConsolidateService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *batchConsolidateService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *BatchConsolidateService) Execute() error {
+func (s *batchConsolidateService) Execute() error {
 	// Servicio de ejemplo: simula una consolidación al final de un batch.
 	data := map[string]any{
 		"status":          "success",

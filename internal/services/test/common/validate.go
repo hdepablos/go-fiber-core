@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type ValidateService struct {
+type validateService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewValidateService() contracts.Service {
-	return &ValidateService{}
+	return &validateService{}
 }
 
-func (s *ValidateService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *validateService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ValidateService) Execute() error {
+func (s *validateService) Execute() error {
 	// Lógica de validación real (simple)
 	// Podríamos validar inputs requeridos aquí, pero el framework ya lo hace.
 	// Simulamos una validación de negocio.

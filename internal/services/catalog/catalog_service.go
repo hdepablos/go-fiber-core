@@ -30,6 +30,6 @@ func NewCatalogService(
 
 func (s *catalogService) GetAll(ctx context.Context) (models.AllCatalogsResponse, error) {
 	// Usamos la conexión de lectura para obtener catálogos
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
 	return s.catalogRepo.GetAll(ctx, dbRead)
 }

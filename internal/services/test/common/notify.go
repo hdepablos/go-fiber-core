@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type NotifyService struct {
+type notifyService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewNotifyService() contracts.Service {
-	return &NotifyService{}
+	return &notifyService{}
 }
 
-func (s *NotifyService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *notifyService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *NotifyService) Execute() error {
+func (s *notifyService) Execute() error {
 	// Aquí se integraría con el servicio de email real (AWS SES / SMTP)
 	// Por ahora simulamos el envío exitoso.
 

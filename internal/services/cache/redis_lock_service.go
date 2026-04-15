@@ -16,14 +16,23 @@ var (
 	ErrCacheMiss = redis.Nil
 )
 
-// RedisLockService encapsula la lógica de Locking Cache-Aside
-type RedisLockService struct {
+// LockService define el contrato mínimo del cache con locking.
+type LockService interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+	Lock(ctx context.Context, key string, safetyTTL time.Duration) error
+	Unlock(ctx context.Context, key string) error
+	Invalidate(ctx context.Context, key string) error
+}
+
+// redisLockService encapsula la lógica de Locking Cache-Aside.
+type redisLockService struct {
 	client *redis.Client
 }
 
 // NewRedisLockService crea una nueva instancia del servicio
-func NewRedisLockService(client *redis.Client) *RedisLockService {
-	return &RedisLockService{
+func NewRedisLockService(client *redis.Client) LockService {
+	return &redisLockService{
 		client: client,
 	}
 }
@@ -32,7 +41,7 @@ func NewRedisLockService(client *redis.Client) *RedisLockService {
 // Si existe un lock para la key, retorna ErrCacheLocked (o nil, según prefieras manejarlo).
 // En este caso, retornamos ErrCacheLocked para que el consumidor sepa explícitamente por qué falló,
 // pero el consumidor debería tratarlo como un Cache Miss y consultar la BD.
-func (s *RedisLockService) Get(ctx context.Context, key string) (string, error) {
+func (s *redisLockService) Get(ctx context.Context, key string) (string, error) {
 	lockKey := s.getLockKey(key)
 
 	// 1. Verificar si existe bloqueo
@@ -57,13 +66,13 @@ func (s *RedisLockService) Get(ctx context.Context, key string) (string, error) 
 }
 
 // Set establece un valor en Redis (sin lógica de bloqueo especial, solo wrapper)
-func (s *RedisLockService) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (s *redisLockService) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	return s.client.Set(ctx, key, value, ttl).Err()
 }
 
 // Lock bloquea una key para indicar que se va a realizar una actualización crítica.
 // Crea una key 'lock:original_key' con un TTL corto de seguridad.
-func (s *RedisLockService) Lock(ctx context.Context, key string, safetyTTL time.Duration) error {
+func (s *redisLockService) Lock(ctx context.Context, key string, safetyTTL time.Duration) error {
 	lockKey := s.getLockKey(key)
 	// Valor arbitrario, lo importante es la existencia de la key
 	return s.client.Set(ctx, lockKey, "locked", safetyTTL).Err()
@@ -71,7 +80,7 @@ func (s *RedisLockService) Lock(ctx context.Context, key string, safetyTTL time.
 
 // Unlock elimina el bloqueo Y la key original para invalidar la caché antigua.
 // Debe llamarse después de que la transacción en BD haya sido exitosa.
-func (s *RedisLockService) Unlock(ctx context.Context, key string) error {
+func (s *redisLockService) Unlock(ctx context.Context, key string) error {
 	lockKey := s.getLockKey(key)
 
 	// Usamos Pipeline para borrar ambas keys en una sola ida y vuelta a Redis
@@ -87,11 +96,11 @@ func (s *RedisLockService) Unlock(ctx context.Context, key string) error {
 }
 
 // Invalidate simplemente borra una key (útil para casos sin lock explícito)
-func (s *RedisLockService) Invalidate(ctx context.Context, key string) error {
+func (s *redisLockService) Invalidate(ctx context.Context, key string) error {
 	return s.client.Del(ctx, key).Err()
 }
 
 // getLockKey genera el nombre de la key de bloqueo
-func (s *RedisLockService) getLockKey(key string) string {
+func (s *redisLockService) getLockKey(key string) string {
 	return fmt.Sprintf("lock:%s", key)
 }

@@ -26,6 +26,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [development-workflow.md](development/development-workflow.md): niveles de desarrollo y flujo de trabajo local.
 - [create-services-steps.md](development/create-services-steps.md): guia de implementacion de servicios/pasos.
 - [service-design-conventions.md](development/service-design-conventions.md): patron recomendado para diseñar servicios y casos de uso.
+- [service-runtime-and-scaffold.md](development/service-runtime-and-scaffold.md): runtime por contexto y scaffold de export managers sin globals.
 - [change-var.md](development/change-var.md): cambios de configuracion y notas de soporte relacionadas.
 
 ## Platform

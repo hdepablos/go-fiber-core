@@ -17,11 +17,11 @@ type DatabaseHandler interface {
 
 // databaseHandler es la implementación.
 type databaseHandler struct {
-	dbService *services.DatabaseService
+	dbService services.DatabaseService
 }
 
 // NewDatabaseHandler ahora acepta un puntero a DatabaseService.
-func NewDatabaseHandler(dbService *services.DatabaseService) DatabaseHandler {
+func NewDatabaseHandler(dbService services.DatabaseService) DatabaseHandler {
 	return &databaseHandler{
 		dbService: dbService,
 	}

@@ -16,19 +16,19 @@ type StateStore interface {
 	Cleanup(ctx context.Context, input Input, batchesListKey string, partsListKey string) error
 }
 
-type RedisStateStore struct {
+type redisStateStore struct {
 	cache Cache
 }
 
-func NewRedisStateStore(cache Cache) *RedisStateStore {
-	return &RedisStateStore{cache: cache}
+func NewRedisStateStore(cache Cache) StateStore {
+	return &redisStateStore{cache: cache}
 }
 
-func (s *RedisStateStore) RuntimeValues(input Input, ttl time.Duration) RuntimeValues {
+func (s *redisStateStore) RuntimeValues(input Input, ttl time.Duration) RuntimeValues {
 	return newRedisRuntimeValues(s.cache, input, ttl)
 }
 
-func (s *RedisStateStore) Initialize(ctx context.Context, input Input, batches []Batch, summary Summary, metadata map[string]any, ttl time.Duration) (string, string, error) {
+func (s *redisStateStore) Initialize(ctx context.Context, input Input, batches []Batch, summary Summary, metadata map[string]any, ttl time.Duration) (string, string, error) {
 	batchesListKey := fmt.Sprintf("%s:batches", input.RedisKey)
 	partsListKey := fmt.Sprintf("%s:parts", input.RedisKey)
 	summaryKey := fmt.Sprintf("%s:summary", input.RedisKey)
@@ -81,7 +81,7 @@ func (s *RedisStateStore) Initialize(ctx context.Context, input Input, batches [
 	return batchesListKey, partsListKey, nil
 }
 
-func (s *RedisStateStore) LoadSummary(ctx context.Context, input Input) (Summary, error) {
+func (s *redisStateStore) LoadSummary(ctx context.Context, input Input) (Summary, error) {
 	summaryKey := fmt.Sprintf("%s:summary", input.RedisKey)
 	payload, err := s.cache.GetBytes(ctx, summaryKey)
 	if err != nil {
@@ -97,7 +97,7 @@ func (s *RedisStateStore) LoadSummary(ctx context.Context, input Input) (Summary
 	return raw.Summary, nil
 }
 
-func (s *RedisStateStore) LoadBatch(ctx context.Context, batchesListKey string, batchIndex int) (Batch, error) {
+func (s *redisStateStore) LoadBatch(ctx context.Context, batchesListKey string, batchIndex int) (Batch, error) {
 	batchKey, err := s.cache.LIndex(ctx, batchesListKey, int64(batchIndex))
 	if err != nil {
 		return Batch{}, err
@@ -114,15 +114,15 @@ func (s *RedisStateStore) LoadBatch(ctx context.Context, batchesListKey string, 
 	return batch, nil
 }
 
-func (s *RedisStateStore) AppendPartKey(ctx context.Context, partsListKey string, partKey string) error {
+func (s *redisStateStore) AppendPartKey(ctx context.Context, partsListKey string, partKey string) error {
 	return s.cache.RPush(ctx, partsListKey, partKey)
 }
 
-func (s *RedisStateStore) LoadPartKeys(ctx context.Context, partsListKey string) ([]string, error) {
+func (s *redisStateStore) LoadPartKeys(ctx context.Context, partsListKey string) ([]string, error) {
 	return s.cache.LRange(ctx, partsListKey, 0, -1)
 }
 
-func (s *RedisStateStore) Cleanup(ctx context.Context, input Input, batchesListKey string, partsListKey string) error {
+func (s *redisStateStore) Cleanup(ctx context.Context, input Input, batchesListKey string, partsListKey string) error {
 	keysToDelete := []string{
 		fmt.Sprintf("%s:summary", input.RedisKey),
 		fmt.Sprintf("%s:runtime_keys", input.RedisKey),

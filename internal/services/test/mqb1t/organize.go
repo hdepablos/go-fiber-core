@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
-	"go-fiber-core/internal/services/dispatcher"
+	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
 	"github.com/google/uuid"
 )
 
-type OrganizeService struct {
+type organizeService struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 	batchSize   int64
@@ -23,13 +23,13 @@ type OrganizeService struct {
 
 func NewOrganizeService() contracts.Service {
 	// Crea el servicio con valores por defecto. Estos pueden ser sobreescritos desde CurrentStepConfig en Init.
-	return &OrganizeService{
+	return &organizeService{
 		batchSize: 50,
 		table:     "multi_queue_batch_one_table",
 	}
 }
 
-func (s *OrganizeService) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *organizeService) Init(ctx *contracts.ServiceContext, servicePath string) {
 	// Inyecta el contexto de ejecución (incluye config del step) y el path del servicio.
 	s.ctx = ctx
 	s.servicePath = servicePath
@@ -66,7 +66,7 @@ type bucketRangeRow struct {
 	RowCount int64 `gorm:"column:row_count"`
 }
 
-func (s *OrganizeService) Execute() error {
+func (s *organizeService) Execute() error {
 	// Este step:
 	// 1) Cuenta registros en "pending"
 	// 2) Planifica buckets (rangos de IDs) por batch_size
@@ -214,7 +214,11 @@ func (s *OrganizeService) Execute() error {
 		}
 
 		stepCtx := contracts.NewServiceContextFromInput(context.Background(), input)
-		if err := dispatcher.DefaultDispatcher.DispatchStep(execCtx, "test/mqb1t/process_batch", 2, policy, nil, stepCtx); err != nil {
+		dispatcherSvc, ok := runtimectx.Dispatcher(s.ctx.Ctx)
+		if !ok {
+			return fmt.Errorf("dispatcher no disponible en contexto")
+		}
+		if err := dispatcherSvc.DispatchStep(execCtx, "test/mqb1t/process_batch", 2, policy, nil, stepCtx); err != nil {
 			return fmt.Errorf("dispatch failed (bucket_id=%d): %w", b.BucketID, err)
 		}
 		dispatched++

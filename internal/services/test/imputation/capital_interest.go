@@ -6,24 +6,24 @@ import (
 )
 
 // CapitalInterest es la implementación del servicio.
-type CapitalInterest struct {
+type capitalInterest struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewCapitalInterestService es el constructor.
 func NewCapitalInterestService() contracts.Service {
-	return &CapitalInterest{}
+	return &capitalInterest{}
 }
 
 // Init inicializa el servicio con su contexto.
-func (s *CapitalInterest) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *capitalInterest) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
 // Execute contiene la lógica de negocio.
-func (s *CapitalInterest) Execute() error {
+func (s *capitalInterest) Execute() error {
 	// Servicio de ejemplo para pruebas: en un caso real aquí se calcularía capital/interés,
 	// leyendo inputs del contexto y escribiendo resultados en StepResult.
 

@@ -6,24 +6,24 @@ import (
 )
 
 // IsRenovation es un servicio de ejemplo para completar el flujo.
-type IsRenovation struct {
+type isRenovation struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewIsRenovationService es el constructor que se registrará.
 func NewIsRenovationService() contracts.Service {
-	return &IsRenovation{}
+	return &isRenovation{}
 }
 
 // Init inyecta el contexto y la ruta.
-func (r *IsRenovation) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (r *isRenovation) Init(ctx *contracts.ServiceContext, servicePath string) {
 	r.ctx = ctx
 	r.servicePath = servicePath
 }
 
 // Execute contiene la lógica del servicio.
-func (r *IsRenovation) Execute() error {
+func (r *isRenovation) Execute() error {
 	// Servicio de ejemplo: setea is_renovation en el input para que pasos posteriores lo usen.
 	r.ctx.SetInputValue("is_renovation", true)
 

@@ -19,16 +19,26 @@ type QueryModifier func(*gorm.DB) *gorm.DB
 // ExtrasCalculator es un tipo de función para calcular datos adicionales a partir de la consulta.
 type ExtrasCalculator func(query *gorm.DB) (map[string]any, error)
 
-// PaginationService es ahora una struct genérica.
-type PaginationService[T any] struct{}
+// Service define el contrato mínimo del paginador reutilizable.
+type Service[T any] interface {
+	Execute(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier, extrasCalc ExtrasCalculator) (*dtos.PaginationResponse[T], error)
+	GetAllFiltered(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier) ([]T, error)
+	ApplyFilters(db *gorm.DB, req dtos.PaginationRequest, dateColumns map[string]bool) *gorm.DB
+	ApplyOrder(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB
+	GetDateColumnsFromModel(model any) map[string]bool
+	GetFilteredBatch(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier, batchSize int, lastProcessedID uint) ([]T, error)
+}
+
+// paginationService es la implementación concreta del paginador genérico.
+type paginationService[T any] struct{}
 
 // NewPaginationService es el constructor genérico.
-func NewPaginationService[T any]() *PaginationService[T] {
-	return &PaginationService[T]{}
+func NewPaginationService[T any]() Service[T] {
+	return &paginationService[T]{}
 }
 
 // Execute es el método genérico principal para paginar resultados.
-func (p *PaginationService[T]) Execute(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier, extrasCalc ExtrasCalculator) (*dtos.PaginationResponse[T], error) {
+func (p *paginationService[T]) Execute(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier, extrasCalc ExtrasCalculator) (*dtos.PaginationResponse[T], error) {
 	var totalRows int64
 	var extras map[string]any
 	var modelInstance T
@@ -95,7 +105,7 @@ func (p *PaginationService[T]) Execute(db *gorm.DB, req dtos.PaginationRequest, 
 
 // GetAllFiltered obtiene TODOS los registros que coinciden con los filtros, sin paginación.
 // (Añadido para exportaciones o sumatorias en Go)
-func (p *PaginationService[T]) GetAllFiltered(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier) ([]T, error) {
+func (p *paginationService[T]) GetAllFiltered(db *gorm.DB, req dtos.PaginationRequest, modifier QueryModifier) ([]T, error) {
 	var modelInstance T
 	dateColumns := p.GetDateColumnsFromModel(modelInstance)
 	query := db.Model(new(T))
@@ -113,7 +123,7 @@ func (p *PaginationService[T]) GetAllFiltered(db *gorm.DB, req dtos.PaginationRe
 
 // ApplyFilters aplica los filtros de la solicitud a la consulta de GORM.
 // (Sin cambios)
-func (p *PaginationService[T]) ApplyFilters(db *gorm.DB, req dtos.PaginationRequest, dateColumns map[string]bool) *gorm.DB {
+func (p *paginationService[T]) ApplyFilters(db *gorm.DB, req dtos.PaginationRequest, dateColumns map[string]bool) *gorm.DB {
 	if len(req.FilterBy) == 0 {
 		return db
 	}
@@ -246,7 +256,7 @@ func (p *PaginationService[T]) ApplyFilters(db *gorm.DB, req dtos.PaginationRequ
 
 // ApplyOrder aplica el ordenamiento a la consulta.
 // (Sin cambios)
-func (p *PaginationService[T]) ApplyOrder(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
+func (p *paginationService[T]) ApplyOrder(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
 	if len(req.SortBy) > 0 {
 		for i, sortBy := range req.SortBy {
 			order := "ASC"
@@ -312,7 +322,7 @@ func (p *PaginationService[T]) ApplyOrder(db *gorm.DB, req dtos.PaginationReques
 
 // GetDateColumnsFromModel extrae las columnas de fecha a partir de los tags del modelo.
 // (Sin cambios)
-func (p *PaginationService[T]) GetDateColumnsFromModel(model any) map[string]bool {
+func (p *paginationService[T]) GetDateColumnsFromModel(model any) map[string]bool {
 	dateColumns := make(map[string]bool)
 	modelType := reflect.Indirect(reflect.ValueOf(model)).Type()
 	namingStrategy := schema.NamingStrategy{}
@@ -328,7 +338,7 @@ func (p *PaginationService[T]) GetDateColumnsFromModel(model any) map[string]boo
 
 // applyLimitOffset es una función helper interna.
 // (Sin cambios)
-func (p *PaginationService[T]) applyLimitOffset(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
+func (p *paginationService[T]) applyLimitOffset(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
 	if req.Page > 0 && req.RowsPerPage > 0 {
 		offset := (req.Page - 1) * req.RowsPerPage
 		db = db.Limit(req.RowsPerPage).Offset(offset)
@@ -338,7 +348,7 @@ func (p *PaginationService[T]) applyLimitOffset(db *gorm.DB, req dtos.Pagination
 
 // applySorting aplica solo el ordenamiento, incluyendo el fallback a PK.
 // (Esta es la función REFACTORIZADA)
-func (p *PaginationService[T]) applySorting(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
+func (p *paginationService[T]) applySorting(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
 	if len(req.SortBy) == 0 {
 		var model T
 		stmt := &gorm.Statement{DB: db}
@@ -368,14 +378,14 @@ func (p *PaginationService[T]) applySorting(db *gorm.DB, req dtos.PaginationRequ
 
 // applyStandardPagination aplica orden, límite y offset.
 // (Ahora usa el helper 'applySorting')
-func (p *PaginationService[T]) applyStandardPagination(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
+func (p *paginationService[T]) applyStandardPagination(db *gorm.DB, req dtos.PaginationRequest) *gorm.DB {
 	db = p.applySorting(db, req)
 	return p.applyLimitOffset(db, req)
 }
 
 // applyDeferredJoinPagination optimiza la paginación buscando primero los IDs.
 // (Ahora usa 'applySorting' y aplica el 'modifier' para los Preloads)
-func (p *PaginationService[T]) applyDeferredJoinPagination(db *gorm.DB, query *gorm.DB, req dtos.PaginationRequest, model any, modifier QueryModifier) *gorm.DB {
+func (p *paginationService[T]) applyDeferredJoinPagination(db *gorm.DB, query *gorm.DB, req dtos.PaginationRequest, model any, modifier QueryModifier) *gorm.DB {
 	tableName := query.Statement.Table
 	if tableName == "" {
 		stmt := &gorm.Statement{DB: query}
@@ -413,14 +423,14 @@ func (p *PaginationService[T]) applyDeferredJoinPagination(db *gorm.DB, query *g
 
 // isLike verifica si un valor es para una búsqueda con LIKE.
 // (Sin cambios)
-func (p *PaginationService[T]) isLike(value string) bool {
+func (p *paginationService[T]) isLike(value string) bool {
 	return len(value) > 2 && strings.HasPrefix(value, "%") && strings.HasSuffix(value, "%")
 }
 
 // GetFilteredBatch usa Keyset Pagination ("seek method") para procesar grandes
 // volúmenes de datos en lotes, evitando OOM y la lentitud de OFFSET.
 // NOTA: Este método IGNORA el 'SortBy' del request y SIEMPRE ordena por PK ASC.
-func (p *PaginationService[T]) GetFilteredBatch(
+func (p *paginationService[T]) GetFilteredBatch(
 	db *gorm.DB,
 	req dtos.PaginationRequest,
 	modifier QueryModifier,

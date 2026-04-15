@@ -12,16 +12,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type BulkJobLifecycle struct {
+type bulkJobLifecycle struct {
 	readDB  *gorm.DB
 	writeDB *gorm.DB
 }
 
-func NewBulkJobLifecycle(readDB, writeDB *gorm.DB) *BulkJobLifecycle {
-	return &BulkJobLifecycle{readDB: readDB, writeDB: writeDB}
+func NewBulkJobLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &bulkJobLifecycle{readDB: readDB, writeDB: writeDB}
 }
 
-func (l *BulkJobLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+func (l *bulkJobLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
 	input := execCtx.Input
 	var job models.BulkJob
 	if err := l.readDB.WithContext(ctx).
@@ -39,29 +39,29 @@ func (l *BulkJobLifecycle) Start(ctx context.Context, execCtx exportmanager.Exec
 		Update("status_code", models.BulkJobStatusProcessing).Error
 }
 
-func (l *BulkJobLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
+func (l *bulkJobLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusProcessed).Error
 }
 
-func (l *BulkJobLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
+func (l *bulkJobLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusErrorProcess).Error
 }
 
-type BulkJobOutputRegistrar struct {
+type bulkJobOutputRegistrar struct {
 	writeDB *gorm.DB
 }
 
-func NewBulkJobOutputRegistrar(writeDB *gorm.DB) *BulkJobOutputRegistrar {
-	return &BulkJobOutputRegistrar{writeDB: writeDB}
+func NewBulkJobOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &bulkJobOutputRegistrar{writeDB: writeDB}
 }
 
-func (r *BulkJobOutputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+func (r *bulkJobOutputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
 	metadata, err := json.Marshal(map[string]any{
 		"bucket":        output.Bucket,
 		"key":           output.Key,

@@ -61,8 +61,8 @@ type AppContainer struct {
 	BankWriterService       bank2.BankWriterService
 	BankReaderService       bank2.BankReaderService
 	AuthService             auth.AuthService
-	DatabaseService         *services.DatabaseService
-	QueueService            *queue.SQSService
+	DatabaseService         services.DatabaseService
+	QueueService            queue.MessageQueue
 	ProcessLifecycleService processlifecycle2.Service
 }
 
@@ -175,30 +175,30 @@ func provideTokenService(cfg *config.AppConfig) auth.TokenService {
 	return auth.NewTokenService(cfg)
 }
 
-func provideUserPaginationService() *pagination.PaginationService[models.User] {
+func provideUserPaginationService() pagination.Service[models.User] {
 	return pagination.NewPaginationService[models.User]()
 }
 
-func provideRolPaginationService() *pagination.PaginationService[models.Role] {
+func provideRolPaginationService() pagination.Service[models.Role] {
 	return pagination.NewPaginationService[models.Role]()
 }
 
-func provideBankPaginationService() *pagination.PaginationService[models.Bank] {
+func provideBankPaginationService() pagination.Service[models.Bank] {
 	return pagination.NewPaginationService[models.Bank]()
 }
-func provideMenuUserPaginationService() *pagination.PaginationService[models.MenuUser] {
+func provideMenuUserPaginationService() pagination.Service[models.MenuUser] {
 	return pagination.NewPaginationService[models.MenuUser]()
 }
 
-func provideSessionPaginationService() *pagination.PaginationService[models.Session] {
+func provideSessionPaginationService() pagination.Service[models.Session] {
 	return pagination.NewPaginationService[models.Session]()
 }
 
-func provideAWSService() (*queue.AWSService, error) {
+func provideAWSService() (queue.AWSConfigProvider, error) {
 	return queue.NewAWSService(context.Background())
 }
 
-func provideSQSService(awsService *queue.AWSService) *queue.SQSService {
+func provideSQSService(awsService queue.AWSConfigProvider) queue.MessageQueue {
 	cfg := awsService.GetConfig()
 	client := sqs.NewFromConfig(cfg)
 	url := os.Getenv("SQS_QUEUE_URL")

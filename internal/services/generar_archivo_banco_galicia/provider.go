@@ -3,15 +3,11 @@ package generar_archivo_banco_galicia
 import (
 	"context"
 	"fmt"
-	"os"
-	"sync"
 
-	gormconn "go-fiber-core/internal/database/connections/gorm"
-	redisconn "go-fiber-core/internal/database/connections/redis"
 	"go-fiber-core/internal/dtos/config"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/services/exportmanager"
-	"go-fiber-core/internal/services/queue"
+	"go-fiber-core/internal/services/runtimectx"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/redis/go-redis/v9"
@@ -23,10 +19,12 @@ type Provider interface {
 }
 
 type provider struct {
-	manager   exportmanager.Manager
-	conn      *connect.ConnectDTO
+	manager    exportmanager.Manager
+	conn       *connect.ConnectDTO
 	components exportmanager.PreviewComponents
 }
+
+const providerContextKey = "generar_archivo_banco_galicia.provider"
 
 func (p *provider) Manager() exportmanager.Manager {
 	return p.manager
@@ -92,84 +90,22 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 	}, nil
 }
 
-var (
-	defaultOnce sync.Once
-	defaultProv Provider
-	defaultErr  error
-	manualProv  Provider
-	manualMu    sync.RWMutex
-)
-
-func SetDefaultProvider(prov Provider) {
-	manualMu.Lock()
-	defer manualMu.Unlock()
-	manualProv = prov
+func WithProvider(ctx context.Context, prov Provider) context.Context {
+	return runtimectx.WithNamedValue(ctx, providerContextKey, prov)
 }
 
-func DefaultProvider(ctx context.Context) (Provider, error) {
-	manualMu.RLock()
-	if manualProv != nil {
-		prov := manualProv
-		manualMu.RUnlock()
+func ProviderFromContext(ctx context.Context) (Provider, error) {
+	if prov, ok := runtimectx.NamedValue[Provider](ctx, providerContextKey); ok && prov != nil {
 		return prov, nil
 	}
-	manualMu.RUnlock()
-
-	defaultOnce.Do(func() {
-		configPath := os.Getenv("CONFIG_PATH")
-		if configPath == "" {
-			configPath = "internal/appconfig/config.yml"
-		}
-		if _, err := os.Stat(configPath); err != nil {
-			if _, err2 := os.Stat("config.yml"); err2 == nil {
-				configPath = "config.yml"
-			}
-		}
-
-		appCfg, err := config.NewAppConfig(configPath)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-
-		gormSvc, _, err := gormconn.NewGormConnectService(appCfg.MultiDatabaseConfig)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		rdb, _, err := redisconn.NewRedisClient(appCfg.Redis)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		awsSvc, err := queue.NewAWSService(ctx)
-		if err != nil {
-			defaultErr = err
-			return
-		}
-
-		conn := &connect.ConnectDTO{
-			ConnectGormWrite: gormSvc.GetWriteDB(),
-			ConnectGormRead:  gormSvc.GetReadDB(),
-			ConnectRedis:     rdb,
-		}
-
-		prov, err := NewProviderWithConfig(appCfg, conn, rdb, awsSvc.NewS3Client())
-		if err != nil {
-			defaultErr = err
-			return
-		}
-		defaultProv = prov
-	})
-
-	return defaultProv, defaultErr
+	return nil, fmt.Errorf("provider de banco galicia no disponible en contexto")
 }
 
 const processTypeName = "generar archivo banco galicia"
 
 func init() {
 	exportmanager.RegisterPreviewProvider(processTypeName, func(ctx context.Context) (exportmanager.PreviewProvider, error) {
-		prov, err := DefaultProvider(ctx)
+		prov, err := ProviderFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}

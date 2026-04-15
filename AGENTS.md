@@ -2,7 +2,7 @@
 
 ## Documentacion por defecto
 
-Cuando una solicitud implique documentar, redocumentar, reorganizar o ampliar documentacion del proyecto, la convencion por defecto es:
+Cuando una solicitud implique documentar, redocumentar, reorganizar o ampliar documentacion del proyecto, la convencion por defecto es:https://docs.google.com/spreadsheets/d/1j6chmvLAwotcQnvTod6MZSZVi2nVoqlTLk3-vflN_RI/edit?gid=0#gid=0
 
 - Crear o actualizar documentacion para humanos en `doc/info/`.
 - Crear o actualizar documentacion normativa para IA y Spec-Driven Development en `doc/specs/`.
@@ -137,6 +137,8 @@ Todo endpoint nuevo o modificado debe evaluarse junto con su documentacion HTTP 
 - `doc/specs/documentation-governance-spec.md`
 - `doc/specs/documentation-defaults-spec.md`
 - `doc/info/development/service-design-conventions.md`
+- `doc/info/development/service-runtime-and-scaffold.md`
 - `doc/specs/architecture/service-design-spec.md`
+- `doc/specs/architecture/service-runtime-bootstrap-spec.md`
 - `doc/info/api/http-endpoints-guide.md`
 - `doc/specs/api/http-endpoints-spec.md`

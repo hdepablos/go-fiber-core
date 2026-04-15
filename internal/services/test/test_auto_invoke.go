@@ -9,24 +9,24 @@ import (
 )
 
 // TestAutoInvoke simulates a batch process with recursion capability.
-type TestAutoInvoke struct {
+type testAutoInvoke struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 // NewTestAutoInvoke creates a new instance of the service.
 func NewTestAutoInvoke() contracts.Service {
-	return &TestAutoInvoke{}
+	return &testAutoInvoke{}
 }
 
 // Init initializes the service with context.
-func (s *TestAutoInvoke) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *testAutoInvoke) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
 // Execute contains the business logic for the simulation.
-func (s *TestAutoInvoke) Execute() error {
+func (s *testAutoInvoke) Execute() error {
 	lastID := 0
 	if val, ok := s.ctx.GetInputValue("last_id_processed"); ok {
 		switch v := val.(type) {

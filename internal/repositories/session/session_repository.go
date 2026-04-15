@@ -60,10 +60,10 @@ func (r *SessionReaderRepo) GetActiveSessionsByUserID(ctx context.Context, db *g
 // --- Implementación Paginator ---
 
 type SessionPaginationRepo struct {
-	ps *pagination.PaginationService[models.Session]
+	ps pagination.Service[models.Session]
 }
 
-func NewSessionPaginationRepo(ps *pagination.PaginationService[models.Session]) SessionPagination {
+func NewSessionPaginationRepo(ps pagination.Service[models.Session]) SessionPagination {
 	return &SessionPaginationRepo{ps: ps}
 }
 

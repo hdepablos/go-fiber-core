@@ -119,11 +119,11 @@ func (p *bulkItemPayload) toRow(data exportData) ([]string, error) {
 // HeaderBuilder
 // ──────────────────────────────────────────────
 
-type HeaderBuilder struct{}
+type headerBuilder struct{}
 
-func NewHeaderBuilder() *HeaderBuilder { return &HeaderBuilder{} }
+func NewHeaderBuilder() exportmanager.HeaderBuilder { return &headerBuilder{} }
 
-func (b *HeaderBuilder) BuildHeader(_ context.Context, _ exportmanager.ExecutionContext) ([]string, error) {
+func (b *headerBuilder) BuildHeader(_ context.Context, _ exportmanager.ExecutionContext) ([]string, error) {
 	line, err := utils.BuildCSVLine(csvHeader, ';')
 	if err != nil {
 		return nil, fmt.Errorf("build header: %w", err)
@@ -135,11 +135,11 @@ func (b *HeaderBuilder) BuildHeader(_ context.Context, _ exportmanager.Execution
 // BodyBuilder
 // ──────────────────────────────────────────────
 
-type BodyBuilder struct{}
+type bodyBuilder struct{}
 
-func NewBodyBuilder() *BodyBuilder { return &BodyBuilder{} }
+func NewBodyBuilder() exportmanager.BodyBuilder { return &bodyBuilder{} }
 
-func (b *BodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+func (b *bodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
 	var payload bulkItemPayload
 	if err := json.Unmarshal(item, &payload); err != nil {
 		return nil, fmt.Errorf("unmarshal bulk item: %w", err)
@@ -166,11 +166,11 @@ func (b *BodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.Executio
 // FooterBuilder
 // ──────────────────────────────────────────────
 
-type FooterBuilder struct{}
+type footerBuilder struct{}
 
-func NewFooterBuilder() *FooterBuilder { return &FooterBuilder{} }
+func NewFooterBuilder() exportmanager.FooterBuilder { return &footerBuilder{} }
 
-func (b *FooterBuilder) BuildFooter(_ context.Context, _ exportmanager.ExecutionContext) ([]string, error) {
+func (b *footerBuilder) BuildFooter(_ context.Context, _ exportmanager.ExecutionContext) ([]string, error) {
 	// TODO: personalizar el footer.
 	// Si no deseas footer, reemplaza esto por: return []string{}, nil
 	line, err := utils.BuildCSVLine([]string{"footer"}, ';')

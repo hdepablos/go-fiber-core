@@ -12,10 +12,10 @@ import (
 )
 
 type MenuUserPaginationRepository struct {
-	ps *pagination.PaginationService[models.MenuUser]
+	ps pagination.Service[models.MenuUser]
 }
 
-func NewMenuUserPaginationRepository(ps *pagination.PaginationService[models.MenuUser]) MenuUserPagination {
+func NewMenuUserPaginationRepository(ps pagination.Service[models.MenuUser]) MenuUserPagination {
 	return &MenuUserPaginationRepository{ps: ps}
 }
 

@@ -8,7 +8,7 @@ import (
 )
 
 // Age es la implementación concreta para el servicio de validación de edad.
-type Age struct {
+type age struct {
 	// Contendrá una referencia al contexto que fluye por la cadena.
 	ctx         *contracts.ServiceContext
 	servicePath string
@@ -17,17 +17,17 @@ type Age struct {
 // NewAgeService es el constructor que se registrará en nuestra fábrica.
 // Devuelve el tipo de la interfaz, no el struct concreto.
 func NewAgeService() contracts.Service {
-	return &Age{}
+	return &age{}
 }
 
 // Init inyecta el contexto y la ruta. Cumple con la interfaz Service.
-func (a *Age) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (a *age) Init(ctx *contracts.ServiceContext, servicePath string) {
 	a.ctx = ctx
 	a.servicePath = servicePath
 }
 
 // Execute contiene la lógica específica de este servicio.
-func (a *Age) Execute() error {
+func (a *age) Execute() error {
 	// Servicio de ejemplo: valida edad mínima y expone flags derivados.
 	age := utils.GetIntInput(a.ctx, "age")
 	minAge := utils.GetIntConfig(a.ctx.CurrentStepConfig, "min_age", 18)

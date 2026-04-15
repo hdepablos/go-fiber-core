@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type ApplyBusinessRules struct {
+type applyBusinessRules struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewApplyBusinessRulesService() contracts.Service {
-	return &ApplyBusinessRules{}
+	return &applyBusinessRules{}
 }
 
-func (s *ApplyBusinessRules) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *applyBusinessRules) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *ApplyBusinessRules) Execute() error {
+func (s *applyBusinessRules) Execute() error {
 	res := contracts.StepResult{
 		Status: "ok",
 		Data: map[string]any{

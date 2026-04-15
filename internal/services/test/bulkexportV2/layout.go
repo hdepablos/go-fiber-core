@@ -9,13 +9,13 @@ import (
 	"go-fiber-core/internal/utils"
 )
 
-type HardcodedHeaderBuilder struct{}
+type hardcodedHeaderBuilder struct{}
 
-func NewHardcodedHeaderBuilder() *HardcodedHeaderBuilder {
-	return &HardcodedHeaderBuilder{}
+func NewHardcodedHeaderBuilder() exportmanager.HeaderBuilder {
+	return &hardcodedHeaderBuilder{}
 }
 
-func (b *HardcodedHeaderBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+func (b *hardcodedHeaderBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
 	if execCtx.Runtime != nil {
 		_ = execCtx.Runtime.Set(ctx, "total_records", execCtx.Summary.TotalRecords)
 		_ = execCtx.Runtime.Set(ctx, "total_amount", execCtx.Summary.TotalAmount)
@@ -27,13 +27,13 @@ func (b *HardcodedHeaderBuilder) BuildHeader(ctx context.Context, execCtx export
 	return []string{line}, nil
 }
 
-type JSONBodyBuilder struct{}
+type jsonBodyBuilder struct{}
 
-func NewJSONBodyBuilder() *JSONBodyBuilder {
-	return &JSONBodyBuilder{}
+func NewJSONBodyBuilder() exportmanager.BodyBuilder {
+	return &jsonBodyBuilder{}
 }
 
-func (b *JSONBodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+func (b *jsonBodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
 	var payload struct {
 		ID           int64           `json:"id"`
 		RowNumber    int             `json:"row_number"`
@@ -56,13 +56,13 @@ func (b *JSONBodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.Exec
 	return []string{line}, nil
 }
 
-type EmptyFooterBuilder struct{}
+type emptyFooterBuilder struct{}
 
-func NewEmptyFooterBuilder() *EmptyFooterBuilder {
-	return &EmptyFooterBuilder{}
+func NewEmptyFooterBuilder() exportmanager.FooterBuilder {
+	return &emptyFooterBuilder{}
 }
 
-func (b *EmptyFooterBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+func (b *emptyFooterBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
 	if execCtx.Runtime != nil {
 		var totalAmount float64
 		if err := execCtx.Runtime.Get(ctx, "total_amount", &totalAmount); err == nil {

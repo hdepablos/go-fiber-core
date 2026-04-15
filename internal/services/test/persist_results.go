@@ -5,21 +5,21 @@ import (
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
-type PersistResults struct {
+type persistResults struct {
 	ctx         *contracts.ServiceContext
 	servicePath string
 }
 
 func NewPersistResultsService() contracts.Service {
-	return &PersistResults{}
+	return &persistResults{}
 }
 
-func (s *PersistResults) Init(ctx *contracts.ServiceContext, servicePath string) {
+func (s *persistResults) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.ctx = ctx
 	s.servicePath = servicePath
 }
 
-func (s *PersistResults) Execute() error {
+func (s *persistResults) Execute() error {
 	res := contracts.StepResult{
 		Status: "ok",
 		Data: map[string]any{

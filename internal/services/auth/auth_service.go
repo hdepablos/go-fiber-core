@@ -135,7 +135,7 @@ func (s *localAuthService) buildRolesAndMenu(ctx context.Context, user *models.U
 // LOGIN
 // ────────────────────────────────────────────────
 func (s *localAuthService) Login(ctx context.Context, req requests.LoginRequest, userAgent, clientIP, origin, requestID string) (*responses.LoginResponse, error) {
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
 
 	// 1️⃣ Buscar usuario por email, incluyendo Roles
 	user, err := s.userReader.GetByEmailWithRoles(ctx, dbRead, req.Email)
@@ -218,7 +218,7 @@ func (s *localAuthService) Refresh(ctx context.Context, refreshTokenString strin
 		return "", "", errors.New("session ID inválido")
 	}
 
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
 
 	// 3. Verificar si la sesión es válida en DB
 	session, err := s.sessionRepo.GetByID(ctx, dbRead, sessionUUID)
@@ -237,7 +237,7 @@ func (s *localAuthService) Refresh(ctx context.Context, refreshTokenString strin
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Reuse detection? Podríamos bloquear la sesión aquí si se detecta reuso.
-			_ = s.sessionRepo.Revoke(ctx, s.TransactionManager.Conn.ConnectGormWrite, sessionUUID)
+			_ = s.sessionRepo.Revoke(ctx, s.TransactionManager.Connection().ConnectGormWrite, sessionUUID)
 			return "", "", domain.ErrAuthentication
 		}
 		return "", "", fmt.Errorf("error al buscar refresh token: %w", err)
@@ -299,7 +299,7 @@ func (s *localAuthService) Logout(ctx context.Context, userID uint64, userAgent,
 	}
 
 	// 2. Borrar refresh tokens (limpieza legacy)
-	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
+	dbWrite := s.TransactionManager.Connection().ConnectGormWrite
 	err := s.refreshTokenRepo.DeleteByUserID(ctx, dbWrite, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -417,9 +417,9 @@ func (s *localAuthService) RevokeSession(ctx context.Context, sessionIDStr strin
 		return domain.ErrInvalidArgument
 	}
 
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
-	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
+	dbWrite := s.TransactionManager.Connection().ConnectGormWrite
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 
 	// 1. Obtener sesión para calcular TTL de Redis
 	session, err := s.sessionRepo.GetByID(ctx, dbRead, sessionID)
@@ -452,9 +452,9 @@ func (s *localAuthService) RevokeSession(ctx context.Context, sessionIDStr strin
 }
 
 func (s *localAuthService) RevokeUserSessions(ctx context.Context, userID uint64) error {
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
-	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
+	dbWrite := s.TransactionManager.Connection().ConnectGormWrite
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 
 	// 1. Obtener sesiones activas para bloquearlas en Redis
 	sessions, err := s.sessionRepo.GetActiveSessionsByUserID(ctx, dbRead, userID)
@@ -482,9 +482,9 @@ func (s *localAuthService) RevokeUserSessions(ctx context.Context, userID uint64
 }
 
 func (s *localAuthService) RevokeAllSessions(ctx context.Context) error {
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
-	dbWrite := s.TransactionManager.Conn.ConnectGormWrite
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
+	dbWrite := s.TransactionManager.Connection().ConnectGormWrite
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 
 	// 1️⃣ Obtener TODAS las sesiones activas
 	var sessions []models.Session
@@ -519,7 +519,7 @@ func (s *localAuthService) RevokeAllSessions(ctx context.Context) error {
 // GET ACTIVE SESSIONS PAGINATED
 // ────────────────────────────────────────────────
 func (s *localAuthService) GetActiveSessions(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.Session], error) {
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
 	return s.sessionRepo.GetActiveSessionsPaginated(ctx, dbRead, req)
 }
 
@@ -597,7 +597,7 @@ func (s *localAuthService) GoogleCallbackLogin(ctx context.Context, code, userAg
 	}
 
 	log = log.With(zap.String("email", info.Email), zap.String("google_id", info.ID))
-	dbRead := s.TransactionManager.Conn.ConnectGormRead
+	dbRead := s.TransactionManager.Connection().ConnectGormRead
 
 	user, err := s.userReader.GetByEmailWithRoles(ctx, dbRead, info.Email)
 	if err != nil {
@@ -677,7 +677,7 @@ func (s *localAuthService) SaveGoogleOAuthState(ctx context.Context, state strin
 	if state == "" {
 		return domain.ErrInvalidArgument
 	}
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 	if redisClient == nil {
 		return errors.New("redis no configurado para oauth state")
 	}
@@ -691,7 +691,7 @@ func (s *localAuthService) ConsumeGoogleOAuthState(ctx context.Context, state st
 	if state == "" {
 		return false, domain.ErrInvalidArgument
 	}
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 	if redisClient == nil {
 		return false, errors.New("redis no configurado para oauth state")
 	}
@@ -719,7 +719,7 @@ func (s *localAuthService) SaveGoogleOAuthLoginResult(ctx context.Context, code 
 	if code == "" || result == nil {
 		return domain.ErrInvalidArgument
 	}
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 	if redisClient == nil {
 		return errors.New("redis no configurado para oauth exchange")
 	}
@@ -736,7 +736,7 @@ func (s *localAuthService) ConsumeGoogleOAuthLoginResult(ctx context.Context, co
 	if code == "" {
 		return nil, domain.ErrInvalidArgument
 	}
-	redisClient := s.TransactionManager.Conn.ConnectRedis
+	redisClient := s.TransactionManager.Connection().ConnectRedis
 	if redisClient == nil {
 		return nil, errors.New("redis no configurado para oauth exchange")
 	}
