@@ -2,11 +2,11 @@ package bulkexportv1
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 type OrganizeStep struct {
@@ -33,19 +33,19 @@ func (s *OrganizeStep) Execute() error {
 	}
 	pipeline := prov.Pipeline()
 
-	bulkJobID := getInt64(mustGet(s.ctx, "bulk_job_id"))
+	bulkJobID := utils.ToInt64(utils.MustGetInputValue(s.ctx, "bulk_job_id"))
 	if bulkJobID <= 0 {
 		return fmt.Errorf("bulk_job_id inválido")
 	}
 
-	batchSize := getInt(getDefault(s.ctx, "batch_size", 5000))
-	ttlHours := getInt(getDefault(s.ctx, "redis_ttl_hours", 24))
+	batchSize := utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_size", 5000))
+	ttlHours := utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "redis_ttl_hours", 24))
 	if ttlHours <= 0 {
 		ttlHours = 24
 	}
 
-	s3Prefix := fmt.Sprint(getDefault(s.ctx, "s3_prefix", ""))
-	s3Bucket := fmt.Sprint(getDefault(s.ctx, "s3_bucket", ""))
+	s3Prefix := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_prefix", ""))
+	s3Bucket := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", ""))
 
 	res, err := pipeline.Organize(s.ctx.Ctx, OrganizeRequest{
 		BulkJobID:     bulkJobID,
@@ -54,7 +54,7 @@ func (s *OrganizeStep) Execute() error {
 		S3Prefix:      s3Prefix,
 		S3Bucket:      s3Bucket,
 		ProjectPrefix: projectPrefix(),
-		RunID:         fmt.Sprint(getDefault(s.ctx, "run_id", "")),
+		RunID:         fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "run_id", "")),
 	})
 	if err != nil {
 		return err
@@ -104,18 +104,18 @@ func (s *WriteCSVBatchStep) Execute() error {
 	}
 	pipeline := prov.Pipeline()
 
-	bulkJobID := getInt64(mustGet(s.ctx, "bulk_job_id"))
+	bulkJobID := utils.ToInt64(utils.MustGetInputValue(s.ctx, "bulk_job_id"))
 	if bulkJobID <= 0 {
 		return fmt.Errorf("bulk_job_id inválido")
 	}
 
-	runID := fmt.Sprint(mustGet(s.ctx, "run_id"))
-	totalBatches := getInt(mustGet(s.ctx, "total_batches"))
-	batchIndex := getInt(getDefault(s.ctx, "batch_index", 0))
-	batchesListKey := fmt.Sprint(mustGet(s.ctx, "batches_list_key"))
-	partsListKey := fmt.Sprint(mustGet(s.ctx, "parts_list_key"))
-	s3Prefix := fmt.Sprint(getDefault(s.ctx, "s3_prefix", ""))
-	s3Bucket := fmt.Sprint(getDefault(s.ctx, "s3_bucket", ""))
+	runID := fmt.Sprint(utils.MustGetInputValue(s.ctx, "run_id"))
+	totalBatches := utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches"))
+	batchIndex := utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0))
+	batchesListKey := fmt.Sprint(utils.MustGetInputValue(s.ctx, "batches_list_key"))
+	partsListKey := fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key"))
+	s3Prefix := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_prefix", ""))
+	s3Bucket := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", ""))
 
 	res, err := pipeline.WriteCSVBatch(s.ctx.Ctx, WriteBatchRequest{
 		BulkJobID:      bulkJobID,
@@ -176,15 +176,15 @@ func (s *MergeMultipartStep) Execute() error {
 	}
 	pipeline := prov.Pipeline()
 
-	bulkJobID := getInt64(mustGet(s.ctx, "bulk_job_id"))
+	bulkJobID := utils.ToInt64(utils.MustGetInputValue(s.ctx, "bulk_job_id"))
 	if bulkJobID <= 0 {
 		return fmt.Errorf("bulk_job_id inválido")
 	}
 
-	runID := fmt.Sprint(mustGet(s.ctx, "run_id"))
-	partsListKey := fmt.Sprint(mustGet(s.ctx, "parts_list_key"))
-	s3Prefix := fmt.Sprint(getDefault(s.ctx, "s3_prefix", ""))
-	s3Bucket := fmt.Sprint(getDefault(s.ctx, "s3_bucket", ""))
+	runID := fmt.Sprint(utils.MustGetInputValue(s.ctx, "run_id"))
+	partsListKey := fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key"))
+	s3Prefix := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_prefix", ""))
+	s3Bucket := fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", ""))
 
 	res, err := pipeline.MergeMultipart(s.ctx.Ctx, MergeRequest{
 		BulkJobID:      bulkJobID,
@@ -193,7 +193,7 @@ func (s *MergeMultipartStep) Execute() error {
 		S3Prefix:       s3Prefix,
 		S3Bucket:       s3Bucket,
 		FileBase:       s.fileBase,
-		TotalProcessed: getInt(getDefault(s.ctx, "total_processed", 0)),
+		TotalProcessed: utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_processed", 0)),
 	})
 	if err != nil {
 		return err
@@ -211,37 +211,6 @@ func (s *MergeMultipartStep) Execute() error {
 		},
 	})
 	return nil
-}
-
-func mustGet(ctx *contracts.ServiceContext, key string) any {
-	v, _ := ctx.GetInputValue(key)
-	return v
-}
-
-func getDefault(ctx *contracts.ServiceContext, key string, def any) any {
-	if v, ok := ctx.GetInputValue(key); ok {
-		return v
-	}
-	return def
-}
-
-func getInt64(v any) int64 {
-	switch t := v.(type) {
-	case int:
-		return int64(t)
-	case int64:
-		return t
-	case float64:
-		return int64(t)
-	case string:
-		if t == "" {
-			return 0
-		}
-		n, _ := strconv.ParseInt(t, 10, 64)
-		return n
-	default:
-		return 0
-	}
 }
 
 func init() {

@@ -89,7 +89,7 @@ Este documento describe, en lenguaje funcional, cómo se diseñan, prueban y pon
 
 El siguiente diagrama muestra, de forma simplificada, cómo se mueven los escenarios entre estados:
 
-![Flujo de estados del escenario](images/state-lifecycle.png)
+![Flujo de estados del escenario](../images/state-lifecycle.png)
 
 Lectura del diagrama:
 
@@ -105,7 +105,7 @@ Lectura del diagrama:
 
 El siguiente diagrama muestra cómo se decide qué escenario usar cuando un sistema solicita ejecutar un proceso:
 
-![Resolución funcional del escenario](images/flow-lifecycle.png)
+![Resolución funcional del escenario](../images/flow-lifecycle.png)
 
 En términos funcionales:
 

@@ -9,6 +9,7 @@ import (
 	"go-fiber-core/internal/services/dispatcher"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -27,21 +28,6 @@ func (s *ProcessBatchService) Init(ctx *contracts.ServiceContext, servicePath st
 	s.servicePath = servicePath
 }
 
-func getInt64(v any) int64 {
-	switch n := v.(type) {
-	case int:
-		return int64(n)
-	case int64:
-		return n
-	case float64:
-		return int64(n)
-	case float32:
-		return int64(n)
-	default:
-		return 0
-	}
-}
-
 func (s *ProcessBatchService) Execute() error {
 	// 1) Dependencias: base de datos (para actualizar estados) y Redis (para coordinar batches).
 	db, rdb, err := getDeps(s.ctx.Ctx)
@@ -57,14 +43,14 @@ func (s *ProcessBatchService) Execute() error {
 	}
 
 	// 3) Rango del lote: cada mensaje representa un bucket con [start_id, end_id] reservado.
-	startID := getInt64(mustGet(s.ctx, "start_id"))
-	endID := getInt64(mustGet(s.ctx, "end_id"))
+	startID := utils.ToInt64(utils.MustGetInputValue(s.ctx, "start_id"))
+	endID := utils.ToInt64(utils.MustGetInputValue(s.ctx, "end_id"))
 	if startID <= 0 || endID <= 0 {
 		return fmt.Errorf("invalid batch range start_id=%d end_id=%d", startID, endID)
 	}
 
 	// 4) batch_size: viene del payload solo para trazabilidad (no controla la query del update).
-	batchSize := getInt64(mustGet(s.ctx, "batch_size"))
+	batchSize := utils.ToInt64(utils.MustGetInputValue(s.ctx, "batch_size"))
 
 	// 5) Tabla target: acotado por seguridad (evita updates arbitrarios).
 	table := "multi_queue_batch_one_table"
@@ -164,11 +150,6 @@ func (s *ProcessBatchService) Execute() error {
 		},
 	})
 	return nil
-}
-
-func mustGet(ctx *contracts.ServiceContext, key string) any {
-	v, _ := ctx.GetInputValue(key)
-	return v
 }
 
 func init() {

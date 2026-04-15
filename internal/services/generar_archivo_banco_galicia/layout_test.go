@@ -21,7 +21,7 @@ func TestHeaderBuilderUsesSemicolonAndProjectedDataColumns(t *testing.T) {
 		t.Fatalf("BuildHeader() lines = %d, want 1", len(lines))
 	}
 
-	want := "id;bulk_job_id;row_number;reference_key;status_code;last_detail_message;created_at;updated_at;amount;descount1;descount2;sweep_days;collection_file_id"
+	want := "id;bulk_job_id;row_number;reference_key;status_code;last_detail_message;created_at;updated_at;amount;descount1;descount2;sweep_days;collection_file_id;new_importe"
 	if lines[0] != want {
 		t.Fatalf("BuildHeader() line = %q, want %q", lines[0], want)
 	}
@@ -71,7 +71,7 @@ func TestBodyBuilderProjectsSelectedDataFields(t *testing.T) {
 		t.Fatalf("BuildBodyLines() lines = %d, want 1", len(lines))
 	}
 
-	want := "10;20;30;REF-1;ERROR_PROCESS;detalle;2026-04-13T10:00:00Z;2026-04-13T11:00:00Z;100.5;7;9;12;456"
+	want := "10;20;30;REF-1;ERROR_PROCESS;detalle;2026-04-13 07:00:00;13042026;100.5;7;9;12;456;84.5"
 	if lines[0] != want {
 		t.Fatalf("BuildBodyLines() line = %q, want %q", lines[0], want)
 	}
@@ -117,7 +117,7 @@ func TestBodyBuilderSupportsLegacyBase64EncodedData(t *testing.T) {
 		t.Fatalf("BuildBodyLines() lines = %d, want 1", len(lines))
 	}
 
-	want := "10;20;30;;ERROR_PROCESS;;2026-04-13T10:00:00Z;2026-04-13T11:00:00Z;100.5;7;9;12;456"
+	want := "10;20;30;;ERROR_PROCESS;;2026-04-13 07:00:00;13042026;100.5;7;9;12;456;84.5"
 	if lines[0] != want {
 		t.Fatalf("BuildBodyLines() line = %q, want %q", lines[0], want)
 	}

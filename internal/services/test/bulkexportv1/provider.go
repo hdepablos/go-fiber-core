@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 
 	gormconn "go-fiber-core/internal/database/connections/gorm"
@@ -150,23 +149,4 @@ func projectPrefix() string {
 		prefix = "go-fiber-core"
 	}
 	return prefix
-}
-
-func getInt(v any) int {
-	switch t := v.(type) {
-	case int:
-		return t
-	case int64:
-		return int(t)
-	case float64:
-		return int(t)
-	case string:
-		if t == "" {
-			return 0
-		}
-		n, _ := strconv.Atoi(t)
-		return n
-	default:
-		return 0
-	}
 }

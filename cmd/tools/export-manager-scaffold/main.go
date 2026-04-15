@@ -474,13 +474,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/exportmanager"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 type StartStep struct {
@@ -503,10 +503,10 @@ func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.servicePath = servicePath
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
 		if v, ok := s.ctx.CurrentStepConfig["batch_size"]; ok {
-			s.batchSize = getInt(v)
+			s.batchSize = utils.ToInt(v)
 		}
 		if v, ok := s.ctx.CurrentStepConfig["redis_ttl_hours"]; ok {
-			s.ttlHours = getInt(v)
+			s.ttlHours = utils.ToInt(v)
 		}
 		if v, ok := s.ctx.CurrentStepConfig["part_prefix"]; ok {
 			if str, ok := v.(string); ok {
@@ -531,7 +531,7 @@ func (s *StartStep) Execute() error {
 		Input:      input,
 		BatchSize:  s.batchSize,
 		RedisTTL:   time.Duration(s.ttlHours) * time.Hour,
-		S3Bucket:   fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
+		S3Bucket:   fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
 		PartPrefix: s.partPrefix,
 	})
 	if err != nil {
@@ -587,12 +587,12 @@ func (s *ProcessBatchStep) Execute() error {
 
 	res, err := prov.Manager().ProcessBatch(s.ctx.Ctx, exportmanager.ProcessBatchRequest{
 		Input:          input,
-		BatchesListKey: fmt.Sprint(mustGet(s.ctx, "batches_list_key")),
-		PartsListKey:   fmt.Sprint(mustGet(s.ctx, "parts_list_key")),
-		S3Bucket:       fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
-		PartPrefix:     fmt.Sprint(getDefault(s.ctx, "part_prefix", "")),
-		BatchIndex:     getInt(getDefault(s.ctx, "batch_index", 0)),
-		TotalBatches:   getInt(mustGet(s.ctx, "total_batches")),
+		BatchesListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "batches_list_key")),
+		PartsListKey:   fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:       fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
+		PartPrefix:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "part_prefix", "")),
+		BatchIndex:     utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0)),
+		TotalBatches:   utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches")),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -646,10 +646,10 @@ func (s *FinalizeStep) Execute() error {
 
 	output, err := prov.Manager().Finalize(s.ctx.Ctx, exportmanager.FinalizeRequest{
 		Input:        input,
-		PartsListKey: fmt.Sprint(mustGet(s.ctx, "parts_list_key")),
-		S3Bucket:     fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
+		PartsListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
 		FileBase:     s.fileBase,
-		TotalParts:   getInt(getDefault(s.ctx, "total_batches", 0)),
+		TotalParts:   utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_batches", 0)),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -671,8 +671,8 @@ func (s *FinalizeStep) Execute() error {
 
 func buildInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 	input := exportmanager.Input{
-		RedisKey: fmt.Sprint(mustGet(ctx, "key_redis")),
-		ParentID: getInt64(mustGet(ctx, "id")),
+		RedisKey: fmt.Sprint(utils.MustGetInputValue(ctx, "key_redis")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
 	}
 	if input.ParentID <= 0 {
 		return exportmanager.Input{}, fmt.Errorf("id invalido")
@@ -690,8 +690,8 @@ func buildInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 
 func buildStartInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 	input := exportmanager.Input{
-		RedisKey: fmt.Sprint(getDefault(ctx, "key_redis", "")),
-		ParentID: getInt64(mustGet(ctx, "id")),
+		RedisKey: fmt.Sprint(utils.GetInputValueOrDefault(ctx, "key_redis", "")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
 	}
 	if input.ParentID <= 0 {
 		return exportmanager.Input{}, fmt.Errorf("id invalido")
@@ -702,50 +702,6 @@ func buildStartInput(ctx *contracts.ServiceContext) (exportmanager.Input, error)
 		}
 	}
 	return input, nil
-}
-
-func mustGet(ctx *contracts.ServiceContext, key string) any {
-	v, _ := ctx.GetInputValue(key)
-	return v
-}
-
-func getDefault(ctx *contracts.ServiceContext, key string, def any) any {
-	if v, ok := ctx.GetInputValue(key); ok {
-		return v
-	}
-	return def
-}
-
-func getInt(v any) int {
-	switch t := v.(type) {
-	case int:
-		return t
-	case int64:
-		return int(t)
-	case float64:
-		return int(t)
-	case string:
-		n, _ := strconv.Atoi(t)
-		return n
-	default:
-		return 0
-	}
-}
-
-func getInt64(v any) int64 {
-	switch t := v.(type) {
-	case int:
-		return int64(t)
-	case int64:
-		return t
-	case float64:
-		return int64(t)
-	case string:
-		n, _ := strconv.ParseInt(t, 10, 64)
-		return n
-	default:
-		return 0
-	}
 }
 
 func markFailure(prov Provider, ctx context.Context, input exportmanager.Input, err error) {
@@ -771,10 +727,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/utils"
 
 	"gorm.io/gorm"
 )
@@ -804,7 +760,12 @@ func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 
 	statusFilterApplied := false
 	if input.Filters != nil {
-		query, statusFilterApplied = applyBulkJobItemFilters(query, input.Filters)
+		result, err := utils.ApplyBulkJobItemFilters(query, input.Filters)
+		if err != nil {
+			return exportmanager.LoadBatchesResult{}, err
+		}
+		query = result.Query
+		statusFilterApplied = result.StatusFilterApplied
 	}
 	if !statusFilterApplied {
 		query = query.Where("status_code = ?", models.BulkJobStatusImported)
@@ -831,7 +792,7 @@ func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 			return exportmanager.LoadBatchesResult{}, err
 		}
 		current.Items = append(current.Items, payload)
-		totalAmount += extractAmount(item.Data)
+		totalAmount += utils.ExtractAmount(item.Data)
 
 		if len(current.Items) == batchSize {
 			batches = append(batches, current)
@@ -862,66 +823,6 @@ func (p *DataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 			},
 		},
 	}, nil
-}
-
-func extractAmount(raw []byte) float64 {
-	if len(raw) == 0 {
-		return 0
-	}
-	var data map[string]any
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return 0
-	}
-	val, ok := data["amount"]
-	if !ok {
-		return 0
-	}
-	switch n := val.(type) {
-	case float64:
-		return n
-	case int:
-		return float64(n)
-	case int64:
-		return float64(n)
-	case string:
-		f, _ := strconv.ParseFloat(n, 64)
-		return f
-	default:
-		return 0
-	}
-}
-
-func applyBulkJobItemFilters(query *gorm.DB, filters map[string]any) (*gorm.DB, bool) {
-	statusFilterApplied := false
-
-	for key, value := range filters {
-		switch key {
-		case "bulk_job_items.status_code", "status_code":
-			if status, ok := value.(string); ok && status != "" {
-				query = query.Where("status_code = ?", status)
-				statusFilterApplied = true
-			}
-		case "bulk_job_items.reference_key", "reference_key":
-			if referenceKey, ok := value.(string); ok && referenceKey != "" {
-				query = query.Where("reference_key = ?", referenceKey)
-			}
-		case "bulk_job_items.row_number", "row_number":
-			switch v := value.(type) {
-			case int:
-				query = query.Where("row_number = ?", v)
-			case int64:
-				query = query.Where("row_number = ?", v)
-			case float64:
-				query = query.Where("row_number = ?", int(v))
-			case string:
-				if n, err := strconv.Atoi(v); err == nil {
-					query = query.Where("row_number = ?", n)
-				}
-			}
-		}
-	}
-
-	return query, statusFilterApplied
 }
 `, data.PackageName)
 	}
@@ -969,12 +870,11 @@ func renderLayout(data scaffoldData) string {
 	return fmt.Sprintf(`package %s
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 
 	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/utils"
 )
 
 type HeaderBuilder struct{}
@@ -989,7 +889,7 @@ func (b *HeaderBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.E
 
 	// TODO: personalizar el header del archivo.
 	// Aqui puedes usar execCtx.Input.ParentID y execCtx.Input.RedisKey.
-	line, err := toCSVLine([]string{"header"})
+	line, err := utils.BuildCSVLine([]string{"header"}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1007,7 +907,7 @@ func (b *BodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.
 	_ = execCtx
 
 	// TODO: transformar cada item en una o varias lineas del archivo.
-	line, err := toCSVLine([]string{string(item)})
+	line, err := utils.BuildCSVLine([]string{string(item)}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1026,28 +926,11 @@ func (b *FooterBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.E
 
 	// TODO: personalizar el footer.
 	// Si no deseas footer, reemplaza esto por: return []string{}, nil
-	line, err := toCSVLine([]string{"footer"})
+	line, err := utils.BuildCSVLine([]string{"footer"}, 0)
 	if err != nil {
 		return nil, err
 	}
 	return []string{line}, nil
-}
-
-func toCSVLine(fields []string) (string, error) {
-	var buf bytes.Buffer
-	w := csv.NewWriter(&buf)
-	if err := w.Write(fields); err != nil {
-		return "", err
-	}
-	w.Flush()
-	if err := w.Error(); err != nil {
-		return "", err
-	}
-	out := buf.String()
-	if len(out) > 0 && out[len(out)-1] == '\n' {
-		out = out[:len(out)-1]
-	}
-	return out, nil
 }
 `, data.PackageName)
 }

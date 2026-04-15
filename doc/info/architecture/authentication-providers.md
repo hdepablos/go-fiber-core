@@ -93,4 +93,4 @@ Actualmente, la estructura `cognitoAuthService` y `cognitoTokenService` están c
 
 *   [Código: Auth Service Factory](file:///internal/services/auth/auth_service.go)
 *   [Código: Cognito Placeholder](file:///internal/services/auth/cognito_auth_service.go)
-*   [Documentación: Gestión de Secretos](doc/architecture/configuration-secrets.md)
+*   [Documentación: Gestión de Secretos](configuration-secrets.md)

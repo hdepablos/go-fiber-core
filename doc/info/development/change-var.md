@@ -10,7 +10,7 @@ Contexto (ejemplo con DB_SLOW_SQL_ENABLED)
 - Para activarlo de forma segura en producción, usa además:
   - `DB_LOG_LEVEL=warn`
   - `DB_SLOW_THRESHOLD_MS=500` (o el umbral que definas)
-- Ver detalles en: [slow-sql.md](file:///private/var/www/go-fiber-core/doc/info/slow-sql.md) y [logs.md](file:///private/var/www/go-fiber-core/doc/info/logs.md).
+- Ver detalles en: [slow-sql.md](file:///private/var/www/go-fiber-core/doc/info/data/slow-sql.md) y [logs.md](file:///private/var/www/go-fiber-core/doc/info/operations/logs.md).
 
 Opción 1 — Terraform (global, recomendado)
 -----------------------------------------

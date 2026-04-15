@@ -1,13 +1,12 @@
 package bulkexportv2
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 
 	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/utils"
 )
 
 type HardcodedHeaderBuilder struct{}
@@ -21,7 +20,7 @@ func (b *HardcodedHeaderBuilder) BuildHeader(ctx context.Context, execCtx export
 		_ = execCtx.Runtime.Set(ctx, "total_records", execCtx.Summary.TotalRecords)
 		_ = execCtx.Runtime.Set(ctx, "total_amount", execCtx.Summary.TotalAmount)
 	}
-	line, err := toCSVLine([]string{"id", "row_number", "reference_key", "data"})
+	line, err := utils.BuildCSVLine([]string{"id", "row_number", "reference_key", "data"}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -45,12 +44,12 @@ func (b *JSONBodyBuilder) BuildBodyLines(_ context.Context, _ exportmanager.Exec
 		return nil, err
 	}
 
-	line, err := toCSVLine([]string{
+	line, err := utils.BuildCSVLine([]string{
 		fmt.Sprintf("%d", payload.ID),
 		fmt.Sprintf("%d", payload.RowNumber),
 		payload.ReferenceKey,
 		string(payload.Data),
-	})
+	}, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -71,21 +70,4 @@ func (b *EmptyFooterBuilder) BuildFooter(ctx context.Context, execCtx exportmana
 		}
 	}
 	return []string{}, nil
-}
-
-func toCSVLine(fields []string) (string, error) {
-	var buf bytes.Buffer
-	w := csv.NewWriter(&buf)
-	if err := w.Write(fields); err != nil {
-		return "", err
-	}
-	w.Flush()
-	if err := w.Error(); err != nil {
-		return "", err
-	}
-	out := buf.String()
-	if len(out) > 0 && out[len(out)-1] == '\n' {
-		out = out[:len(out)-1]
-	}
-	return out, nil
 }

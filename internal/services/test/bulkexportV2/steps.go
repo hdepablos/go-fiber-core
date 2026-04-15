@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/exportmanager"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
 )
 
 type StartStep struct {
@@ -33,10 +33,10 @@ func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 	s.servicePath = servicePath
 	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
 		if v, ok := s.ctx.CurrentStepConfig["batch_size"]; ok {
-			s.batchSize = getInt(v)
+			s.batchSize = utils.ToInt(v)
 		}
 		if v, ok := s.ctx.CurrentStepConfig["redis_ttl_hours"]; ok {
-			s.ttlHours = getInt(v)
+			s.ttlHours = utils.ToInt(v)
 		}
 		if v, ok := s.ctx.CurrentStepConfig["part_prefix"]; ok {
 			if str, ok := v.(string); ok {
@@ -61,7 +61,7 @@ func (s *StartStep) Execute() error {
 		Input:      input,
 		BatchSize:  s.batchSize,
 		RedisTTL:   time.Duration(s.ttlHours) * time.Hour,
-		S3Bucket:   fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
+		S3Bucket:   fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
 		PartPrefix: s.partPrefix,
 	})
 	if err != nil {
@@ -121,12 +121,12 @@ func (s *ProcessBatchStep) Execute() error {
 
 	res, err := prov.Manager().ProcessBatch(s.ctx.Ctx, exportmanager.ProcessBatchRequest{
 		Input:          input,
-		BatchesListKey: fmt.Sprint(mustGet(s.ctx, "batches_list_key")),
-		PartsListKey:   fmt.Sprint(mustGet(s.ctx, "parts_list_key")),
-		S3Bucket:       fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
-		PartPrefix:     fmt.Sprint(getDefault(s.ctx, "part_prefix", "")),
-		BatchIndex:     getInt(getDefault(s.ctx, "batch_index", 0)),
-		TotalBatches:   getInt(mustGet(s.ctx, "total_batches")),
+		BatchesListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "batches_list_key")),
+		PartsListKey:   fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:       fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
+		PartPrefix:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "part_prefix", "")),
+		BatchIndex:     utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0)),
+		TotalBatches:   utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches")),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -180,10 +180,10 @@ func (s *FinalizeStep) Execute() error {
 
 	output, err := prov.Manager().Finalize(s.ctx.Ctx, exportmanager.FinalizeRequest{
 		Input:        input,
-		PartsListKey: fmt.Sprint(mustGet(s.ctx, "parts_list_key")),
-		S3Bucket:     fmt.Sprint(getDefault(s.ctx, "s3_bucket", "")),
+		PartsListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
 		FileBase:     s.fileBase,
-		TotalParts:   getInt(getDefault(s.ctx, "total_batches", 0)),
+		TotalParts:   utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_batches", 0)),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -205,8 +205,8 @@ func (s *FinalizeStep) Execute() error {
 
 func buildInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 	input := exportmanager.Input{
-		RedisKey: fmt.Sprint(mustGet(ctx, "key_redis")),
-		ParentID: getInt64(mustGet(ctx, "id")),
+		RedisKey: fmt.Sprint(utils.MustGetInputValue(ctx, "key_redis")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
 	}
 	if input.ParentID <= 0 {
 		return exportmanager.Input{}, fmt.Errorf("id inválido")
@@ -223,8 +223,8 @@ func buildInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 
 func buildStartInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
 	input := exportmanager.Input{
-		RedisKey: fmt.Sprint(getDefault(ctx, "key_redis", "")),
-		ParentID: getInt64(mustGet(ctx, "id")),
+		RedisKey: fmt.Sprint(utils.GetInputValueOrDefault(ctx, "key_redis", "")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
 	}
 	if input.ParentID <= 0 {
 		return exportmanager.Input{}, fmt.Errorf("id inválido")
@@ -233,50 +233,6 @@ func buildStartInput(ctx *contracts.ServiceContext) (exportmanager.Input, error)
 		input.Filters = rawFilters
 	}
 	return input, nil
-}
-
-func mustGet(ctx *contracts.ServiceContext, key string) any {
-	v, _ := ctx.GetInputValue(key)
-	return v
-}
-
-func getDefault(ctx *contracts.ServiceContext, key string, def any) any {
-	if v, ok := ctx.GetInputValue(key); ok {
-		return v
-	}
-	return def
-}
-
-func getInt(v any) int {
-	switch t := v.(type) {
-	case int:
-		return t
-	case int64:
-		return int(t)
-	case float64:
-		return int(t)
-	case string:
-		n, _ := strconv.Atoi(t)
-		return n
-	default:
-		return 0
-	}
-}
-
-func getInt64(v any) int64 {
-	switch t := v.(type) {
-	case int:
-		return int64(t)
-	case int64:
-		return t
-	case float64:
-		return int64(t)
-	case string:
-		n, _ := strconv.ParseInt(t, 10, 64)
-		return n
-	default:
-		return 0
-	}
 }
 
 func markFailure(prov Provider, ctx context.Context, input exportmanager.Input, err error) {

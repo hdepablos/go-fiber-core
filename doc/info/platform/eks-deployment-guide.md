@@ -72,4 +72,4 @@ dial tcp ...:4566: connect: connection refused
 
 Para una gestión avanzada de infraestructura que soporte tanto Lambda como EKS usando el mismo código de Terraform, consulta la guía de arquitectura híbrida:
 
-👉 **[Estrategia de Despliegue Híbrido: Lambda vs EKS](./02-hybrid-deployment.md)**
+👉 **[Estrategia de Despliegue Híbrido: Lambda vs EKS](./hybrid-deployment.md)**
