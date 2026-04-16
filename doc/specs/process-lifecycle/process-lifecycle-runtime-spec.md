@@ -16,6 +16,7 @@ Sintetiza el dominio descrito en:
 - `doc/info/process-lifecycle/usage-guide.md`
 - `doc/info/process-lifecycle/scenarios.md`
 - `doc/info/process-lifecycle/testing-guide.md`
+- `doc/info/process-lifecycle/batch-preview-guide.md`
 - `doc/info/process-lifecycle/sql-cheatsheet.md`
 - `doc/info/process-lifecycle/advantages.md`
 

@@ -1,0 +1,41 @@
+meta {
+  name: post-batch-preview
+  type: http
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "process_type_id": {{process_type_id}},
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0,
+  "mode": "batch",
+  "limit": 20,
+  "offset": 0,
+  "input": {
+    "id": 2,
+    "key_redis": "preview-batch-demo",
+    "filters": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": "IMPORTED"
+      }
+    ]
+  }
+}
+}

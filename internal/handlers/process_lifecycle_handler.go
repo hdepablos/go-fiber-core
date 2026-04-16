@@ -2,13 +2,16 @@ package handlers
 
 import (
 	"errors"
+	"os"
 	"sort"
+	"strings"
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/dtos/responses"
 	"go-fiber-core/internal/logger"
+	"go-fiber-core/internal/services/batchflow"
 	"go-fiber-core/internal/services/exportmanager"
 	"go-fiber-core/internal/services/processlifecycle"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
@@ -28,6 +31,7 @@ type ProcessLifecycleHandler interface {
 	ListProcessVersions(c *fiber.Ctx) error
 	RunLoanRiskLifecycle(c *fiber.Ctx) error
 	PreviewExport(c *fiber.Ctx) error
+	PreviewBatch(c *fiber.Ctx) error
 }
 
 type processLifecycleHandler struct {
@@ -379,6 +383,84 @@ func (h *processLifecycleHandler) PreviewExport(c *fiber.Ctx) error {
 	}
 
 	return responses.Success(c, "Preview export ejecutado exitosamente", res)
+}
+
+func (h *processLifecycleHandler) PreviewBatch(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.PreviewBatchRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+	if req.Input == nil {
+		req.Input = make(map[string]any)
+	}
+	if req.ApplyChanges && !previewApplyChangesAllowed() {
+		return responses.Error(c, fiber.StatusUnprocessableEntity, "Preview batch con apply_changes no permitido en este entorno", fiber.Map{
+			"error": "apply_changes solo está disponible cuando APP_ENV=local",
+		})
+	}
+
+	input := batchflow.Input{
+		RedisKey: getStringFromMap(req.Input, "key_redis"),
+		ParentID: getInt64FromMap(req.Input, "id"),
+		Filters:  req.Input["filters"],
+	}
+
+	override := req.OverrideProcessVersionID
+	resolvedProcessVersionID, steps, err := h.service.ResolveProcessVersion(ctx, req.ProcessTypeID, req.SedeID, &override, req.Roadmap, true)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound), errors.Is(err, domain.ErrRoadmapNotFound), errors.Is(err, domain.ErrOverrideVersionNotFound):
+			return responses.Error(c, fiber.StatusNotFound, "No fue posible resolver la versión para preview batch", fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrInvalidArgument):
+			return responses.Error(c, fiber.StatusUnprocessableEntity, "Parámetros inválidos para preview batch", fiber.Map{"error": err.Error()})
+		default:
+			return responses.Error(c, fiber.StatusInternalServerError, "Error resolviendo versión para preview batch", fiber.Map{"error": err.Error()})
+		}
+	}
+
+	processVersion, err := h.service.GetProcessVersionByID(ctx, resolvedProcessVersionID)
+	if err != nil {
+		return responses.Error(c, fiber.StatusInternalServerError, "Error consultando process version para preview batch", fiber.Map{"error": err.Error()})
+	}
+
+	previewSvc, err := batchflow.DefaultPreviewService()
+	if err != nil {
+		return err
+	}
+
+	res, err := previewSvc.Preview(ctx, batchflow.PreviewRequest{
+		ProcessTypeID:            req.ProcessTypeID,
+		ProcessTypeName:          processVersion.ProcessTypeName,
+		ResolvedProcessVersionID: resolvedProcessVersionID,
+		ExecutionKeys:            extractExecutionKeys(steps),
+		Mode:                     req.Mode,
+		ApplyChanges:             req.ApplyChanges,
+		Input:                    input,
+		BatchSize:                req.BatchSize,
+		Limit:                    req.Limit,
+		Offset:                   req.Offset,
+		BatchIndex:               req.BatchIndex,
+		ItemIDs:                  req.ItemIDs,
+		RowNumbers:               req.RowNumbers,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotFound):
+			return responses.Error(c, fiber.StatusNotFound, "Preview batch no disponible", fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrInvalidArgument):
+			return responses.Error(c, fiber.StatusUnprocessableEntity, "Preview batch inválido", fiber.Map{"error": err.Error()})
+		default:
+			return responses.Error(c, fiber.StatusInternalServerError, "Error ejecutando preview batch", fiber.Map{"error": err.Error()})
+		}
+	}
+
+	return responses.Success(c, "Preview batch ejecutado exitosamente", res)
+}
+
+func previewApplyChangesAllowed() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "local")
 }
 
 func extractExecutionKeys(steps []processlifecycle.Step) []string {

@@ -1,0 +1,27 @@
+meta {
+  name: RunProc -> batch v2 (process_type_id = 19)
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 19,
+    "sede_id": 0,
+    "override_process_version_id": 22,
+    "roadmap": 0,
+    "input": {
+      "id": 2
+    }
+  }
+}

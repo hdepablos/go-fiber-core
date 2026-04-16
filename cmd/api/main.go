@@ -47,8 +47,10 @@ import (
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 
+	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
-)
+
+	_ "go-fiber-core/internal/services/punitorios")
 
 var fiberLambda *fiberadapter.FiberLambda
 

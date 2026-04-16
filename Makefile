@@ -159,6 +159,7 @@ redis-list-project-keys: ## 🧱 Lista todas las keys de Redis del proyecto (pre
 	REDISCLI_AUTH="$(REDIS_PASSWORD)" redis-cli -h "$$HOST" -p "$(REDIS_PORT)" -n "$(REDIS_DATABASE)" KEYS "$$APP_PREFIX:*"
 
 .PHONY: redis-get-key
+# redis-get-key: ## 🔎 Muestra el contenido de una key de Redis. Uso: make redis-get-key k="go-fiber-core:lifecycle-2"
 redis-get-key: ## 🔎 Muestra el contenido de una key de Redis. Uso: make redis-get-key k="go-fiber-core:lifecycle-2"
 	@if [ -z "$(k)" ]; then \
 		echo "$(ERROR)Debes pasar el nombre de la key con k=\"nombre_key\".$(RESET)"; \
@@ -208,6 +209,40 @@ create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make cr
 		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
 		-bulk-job-id "$(or $(bulk_job_id),0)"
 	@echo "$(SUCCESS)✨ Scaffold exportmanager generado correctamente.$(RESET)"
+
+.PHONY: create-batch-process
+create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x]
+	@if [ -z "$(process_name)" ]; then \
+		echo "$(ERROR)❌ Debes especificar process_name: make create-batch-process process_name=\"procesar x\" [service_slug=procesar_x]$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🚀 Generando scaffold batchflow para $(process_name)...$(RESET)"
+	@go run ./cmd/tools/batch-process-scaffold \
+		-process-name "$(process_name)" \
+		-service-slug "$(service_slug)" \
+		-batch-size "$(or $(batch_size),500)" \
+		-concurrent-batches "$(or $(concurrent_batches),1)" \
+		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
+		-bulk-job-id "$(or $(bulk_job_id),0)" \
+		-with-bruno false
+	@echo "$(SUCCESS)✨ Scaffold batchflow generado correctamente.$(RESET)"
+
+.PHONY: delete-process
+delete-process: ## 🧹 Elimina del codigo un proceso scaffold. Uso: make delete-process kind=batch-process service_slug=punitorios
+	@if [ -z "$(kind)" ]; then \
+		echo "$(ERROR)❌ Debes especificar kind: make delete-process kind=batch-process service_slug=punitorios$(RESET)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(service_slug)" ]; then \
+		echo "$(ERROR)❌ Debes especificar service_slug: make delete-process kind=batch-process service_slug=punitorios$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🧹 Eliminando proceso $(service_slug) de tipo $(kind)...$(RESET)"
+	@go run ./cmd/tools/process-cleanup \
+		-kind "$(kind)" \
+		-service-slug "$(service_slug)" \
+		$(if $(filter true,$(dry_run)),-dry-run,)
+	@echo "$(SUCCESS)✨ Limpieza del proceso completada.$(RESET)"
 
 ###############################################################################
 ## Golang

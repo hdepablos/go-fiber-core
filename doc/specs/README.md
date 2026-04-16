@@ -35,9 +35,11 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 
 - [platform-runtime-spec.md](platform/platform-runtime-spec.md)
 - [makefile-automation-spec.md](platform/makefile-automation-spec.md)
+- [process-scaffold-cleanup-spec.md](platform/process-scaffold-cleanup-spec.md)
 
 ### Process Lifecycle
 
+- [batch-preview-spec.md](process-lifecycle/batch-preview-spec.md)
 - [process-lifecycle-runtime-spec.md](process-lifecycle/process-lifecycle-runtime-spec.md)
 
 ### Exports

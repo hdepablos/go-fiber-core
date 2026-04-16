@@ -100,6 +100,25 @@ Reglas:
 - `roadmap`: usa la misma lógica de resolución del lifecycle normal
 - `mode`: `prepare`, `header`, `body`, `footer`, `all`
 
+## Preview de Batchflow
+
+Para procesos batch basados en `batchflow` existe el endpoint:
+
+- endpoint: `POST /api/v1/process-lifecycle/batch-preview`
+- requests históricos base: `bruno/legacy/process-lifecycle/test-batch-process/`
+
+Casos cubiertos:
+
+- `prepare`: prepara la sesión y guarda lotes temporales en Redis
+- `all`: inspecciona una ventana del universo preparado
+- `batch`: inspecciona por `batch_index`, `item_ids` o `row_numbers`
+- `apply_changes=true`: inspecciona y además ejecuta la persistencia real de la selección, solo en local
+- `run` filtrado: ejecuta el lifecycle real usando filtros del `DataProvider`
+
+Documento detallado:
+
+- `doc/info/process-lifecycle/batch-preview-guide.md`
+
 ## Caso 2: Ejecución Paralela y Recursiva (ASYNC Batching)
 
 **Descripción:** 4 Workers Async (Paralelos) + 1 Consolidación Final.

@@ -56,14 +56,24 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - Si se agrega una nueva familia de comandos, debe actualizarse esta spec o una spec relacionada.
 - Los comandos vinculados a otros dominios deben enlazarse con la documentación humana correspondiente cuando aplique.
 
+### 5. Scaffold y cleanup de procesos
+
+- Los comandos de scaffold y cleanup de procesos deben estar documentados en una guía humana específica.
+- Si existe un comando para crear un tipo de proceso, debe existir una estrategia documentada para revertir ese scaffold.
+- Los comandos destructivos de cleanup deben ofrecer una forma segura de inspección previa cuando aplique, por ejemplo `dry_run`.
+- Los cambios que afecten la convención de Bruno deben reflejarse tanto en la documentación humana como en la spec correspondiente.
+
 ## Acceptance Criteria
 
 - El equipo puede identificar el target correcto por dominio sin leer todo el `Makefile`.
 - Los objetivos peligrosos son distinguibles antes de ejecutarse.
 - La documentación del `Makefile` permanece sincronizada con las familias principales de targets.
+- Los comandos de scaffold y cleanup de procesos quedan trazados a documentación específica.
 
 ## Trazabilidad
 
 - `AGENTS.md`
 - `Makefile`
 - `doc/info/platform/makefile-guide.md`
+- `doc/info/development/process-scaffold-and-cleanup.md`
+- `doc/specs/platform/process-scaffold-cleanup-spec.md`

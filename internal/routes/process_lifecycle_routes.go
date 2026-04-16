@@ -62,4 +62,10 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 		utils.Validate(new(requests.PreviewExportRequest)),
 		handler.PreviewExport,
 	)
+
+	group.Post(
+		"/batch-preview",
+		utils.Validate(new(requests.PreviewBatchRequest)),
+		handler.PreviewBatch,
+	)
 }

@@ -104,11 +104,13 @@ Archivo relacionado:
 
 ## Impacto en el scaffold
 
-El scaffold de export managers tambien fue actualizado para que nuevo codigo no reintroduzca el patron viejo.
+El scaffold de export managers y el scaffold de batch processes fueron actualizados para que nuevo codigo no reintroduzca el patron viejo.
 
 Archivo relacionado:
 
 - [main.go](file:///private/var/www/go-fiber-core/cmd/tools/export-manager-scaffold/main.go)
+- [main.go](file:///private/var/www/go-fiber-core/cmd/tools/batch-process-scaffold/main.go)
+- [main.go](file:///private/var/www/go-fiber-core/cmd/tools/process-cleanup/main.go)
 
 Ahora el scaffold genera:
 
@@ -117,6 +119,14 @@ Ahora el scaffold genera:
 - `headerBuilder`, `bodyBuilder`, `footerBuilder` no exportados
 - `parentLifecycle` y `outputRegistrar` no exportados
 - constructores que devuelven interfaces del framework `exportmanager`
+
+Para `batch-process`, el scaffold tambien:
+
+- registra el provider en `runtimebootstrap`,
+- deja el proceso preparado para usar la carpeta Bruno genérica `test-batch-process`,
+- y evita crear una carpeta Bruno específica por proceso.
+
+Adicionalmente existe un comando de cleanup para revertir el scaffold de procesos siguiendo el mismo patrón.
 
 ## Beneficios practicos
 

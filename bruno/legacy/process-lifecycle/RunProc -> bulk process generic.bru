@@ -1,0 +1,30 @@
+meta {
+  name: RunProc -> bulk process generic
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 18,
+    "sede_id": 0,
+    "override_process_version_id": 21,
+    "roadmap": 0,
+    "input": {
+      "id": 2,
+      "filters": {
+        "bulk_job_items.status_code": "IMPORTED"
+      }
+    }
+  }
+}

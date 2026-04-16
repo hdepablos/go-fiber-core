@@ -27,6 +27,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [create-services-steps.md](development/create-services-steps.md): guia de implementacion de servicios/pasos.
 - [service-design-conventions.md](development/service-design-conventions.md): patron recomendado para diseñar servicios y casos de uso.
 - [service-runtime-and-scaffold.md](development/service-runtime-and-scaffold.md): runtime por contexto y scaffold de export managers sin globals.
+- [process-scaffold-and-cleanup.md](development/process-scaffold-and-cleanup.md): crear y eliminar procesos scaffold (batch/export) y convención Bruno genérica.
 - [change-var.md](development/change-var.md): cambios de configuracion y notas de soporte relacionadas.
 
 ## Platform
@@ -49,6 +50,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [usage-guide.md](process-lifecycle/usage-guide.md): como usar el modulo.
 - [scenarios.md](process-lifecycle/scenarios.md): escenarios de ejecucion.
 - [testing-guide.md](process-lifecycle/testing-guide.md): pruebas funcionales y requests.
+- [batch-preview-guide.md](process-lifecycle/batch-preview-guide.md): uso de batch preview, apply_changes local y run filtrado.
 - [sql-cheatsheet.md](process-lifecycle/sql-cheatsheet.md): apoyo SQL para analisis y operacion.
 - [advantages.md](process-lifecycle/advantages.md): motivacion y ventajas del enfoque.
 

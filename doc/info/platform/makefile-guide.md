@@ -64,6 +64,8 @@ Ejemplos:
 
 - `make create-step name=folder/service_name`
 - `make create-export-manager process_name="generar archivo x" file="exports/x/y"`
+- `make create-batch-process process_name="procesar x" service_slug="procesar_x"`
+- `make delete-process kind=batch-process service_slug=punitorios`
 - `make create-command name=nuevoComando`
 - `make create-migration name=create_users_table`
 - `make wire`
@@ -73,7 +75,15 @@ Uso:
 
 - scaffolding de servicios,
 - scaffolding de exportadores,
+- scaffolding de procesos batch,
+- limpieza de procesos scaffold,
 - generación de código de inyección.
+
+Notas:
+
+- `create-batch-process` ya no genera carpeta Bruno específica por proceso.
+- Para pruebas batch se usa la carpeta genérica `bruno/legacy/process-lifecycle/test-batch-process/`.
+- `delete-process` soporta `dry_run=true` para revisar el alcance antes de borrar archivos.
 
 ### 4. Dependencias, build y calidad
 
@@ -216,6 +226,7 @@ Requieren especial cuidado:
 - `make s3-rm-dir`
 - `make migrate-reset`
 - `make redis-del`
+- `make delete-process`
 
 Antes de ejecutarlos conviene revisar:
 

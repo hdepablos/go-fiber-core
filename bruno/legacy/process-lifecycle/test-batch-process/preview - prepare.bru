@@ -1,0 +1,29 @@
+meta {
+  name: preview - prepare
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "process_type_id": 18,
+    "sede_id": 0,
+    "override_process_version_id": 21,
+    "roadmap": 0,
+    "mode": "prepare",
+    "input": {
+      "id": 1,
+      "key_redis": "{{redis_key_export_preview}}"
+    }
+  }
+}

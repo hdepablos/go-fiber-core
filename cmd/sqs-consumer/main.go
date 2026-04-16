@@ -30,8 +30,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/joho/godotenv/autoload"
 
+	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
-)
+
+	_ "go-fiber-core/internal/services/punitorios")
 
 var (
 	appContainer *di.AppContainer
