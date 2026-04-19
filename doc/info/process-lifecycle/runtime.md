@@ -31,6 +31,24 @@ Regla práctica:
 - la cancelación debe comportarse igual en Lambda y EKS porque la fuente de verdad vive en Redis y no en memoria local.
 - si se agrega un proceso batch nuevo, debe registrar su `Manager` en el registry central de batchflow para que el auto-cancel pueda ejecutar `lifecycle.Fail(...)` sin tocar el consumer.
 
+## Refresco opcional de progreso batch
+
+Para procesos batch sobre `batchflow`, el runtime ahora puede exponer un hook opcional para refrescar progreso agregado del padre por lote procesado.
+
+Idea práctica:
+
+- el `BatchProcessor` sigue siendo la fuente de verdad del cambio de `status_code` por item;
+- el lifecycle puede implementar un refresco opcional que recibe el mismo `Batch` procesado por el worker;
+- ese refresco puede mantener estado derivado del padre o disparar lógica batch específica sin depender de columnas calculadas persistidas en `bulk_jobs`;
+- la semántica de "procesado" o "pendiente" sigue siendo custom por proceso, igual que hoy ocurre con `Fail(...)`;
+- el manager compartido no define qué status cuenta como procesado.
+
+Reglas recomendadas:
+
+- usar una lógica idempotente por lote, preferentemente recalculando desde los items persistidos del padre;
+- evitar incrementos ciegos por registro cuando hay fanout, shards o retries;
+- reutilizar la misma regla tanto en el refresco por lote como en `Finalize`, para no divergir entre progreso en caliente y cierre final.
+
 ---
 
 ## 1. ServiceContext: bolsa de datos de negocio

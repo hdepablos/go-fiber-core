@@ -97,6 +97,7 @@ Si el step `process_batch` tiene `dispatch_pacing`, `apply_changes` simula esa c
 - escribe en tablas del procesamiento real, por ejemplo `bulk_job_items` y `bulk_job_item_messages`,
 - no ejecuta el lifecycle completo del padre,
 - no corre `Start` ni `Finalize`,
+- si el proceso publica un hook opcional de progreso por lote, puede refrescar estado derivado usando exactamente la misma selección persistida,
 - no debe usarse para cerrar el estado global de un `bulk_job`.
 
 ### Metadata de `apply_changes`

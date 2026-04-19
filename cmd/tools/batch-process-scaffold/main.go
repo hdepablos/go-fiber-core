@@ -1039,6 +1039,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"strings"
 
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bulkjobitemmessage"
@@ -1076,21 +1077,11 @@ func (p *processor) ProcessBatch(ctx context.Context, execCtx batchflow.Executio
 	}
 
 	if err := p.writeDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := updateBatchItemStatuses(ctx, tx, items, previewItems); err != nil {
+			return err
+		}
 		for i, item := range items {
 			preview := previewItems[i]
-			var lastDetail *string
-			if preview.Message != "" {
-				message := preview.Message
-				lastDetail = &message
-			}
-			if err := tx.Model(&models.BulkJobItem{}).
-				Where("id = ?", item.ID).
-				Updates(map[string]any{
-					"status_code":         preview.Status,
-					"last_detail_message": lastDetail,
-				}).Error; err != nil {
-				return err
-			}
 			for _, msg := range preview.Messages {
 				record := &models.BulkJobItemMessage{
 					BulkJobItemID: item.ID,
@@ -1146,6 +1137,50 @@ func (p *processor) resolveItems(execCtx batchflow.ExecutionContext, batch batch
 		results = append(results, buildPreviewResult(execCtx.Input.RedisKey, item))
 	}
 	return items, results, nil
+}
+
+func updateBatchItemStatuses(ctx context.Context, tx *gorm.DB, items []batchItemPayload, previewItems []batchflow.PreviewItemResult) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	var statusCase strings.Builder
+	var detailCase strings.Builder
+	args := make([]any, 0, (len(items)*4)+1)
+	ids := make([]int64, 0, len(items))
+
+	statusCase.WriteString("CASE id")
+	detailCase.WriteString("CASE id")
+	for i, item := range items {
+		preview := previewItems[i]
+		var lastDetail any
+		if preview.Message != "" {
+			lastDetail = preview.Message
+		}
+
+		statusCase.WriteString(" WHEN ? THEN ?")
+		args = append(args, item.ID, preview.Status)
+
+		detailCase.WriteString(" WHEN ? THEN ?")
+		args = append(args, item.ID, lastDetail)
+
+		ids = append(ids, item.ID)
+	}
+	statusCase.WriteString(" ELSE status_code END")
+	detailCase.WriteString(" ELSE last_detail_message END")
+	args = append(args, ids)
+
+	query := fmt.Sprintf(
+		"UPDATE bulk_job_items "+
+			"SET status_code = %%s, "+
+			"last_detail_message = %%s, "+
+			"updated_at = NOW() "+
+			"WHERE id IN ?",
+		statusCase.String(),
+		detailCase.String(),
+	)
+
+	return tx.WithContext(ctx).Exec(query, args...).Error
 }
 
 // Reemplaza esta logica por la decision real del proceso.
@@ -1264,9 +1299,6 @@ func (l *parentLifecycle) End(ctx context.Context, execCtx batchflow.ExecutionCo
 	updates := map[string]any{
 		"status_code": status,
 	}
-	if raw, ok := result.Metadata["total_processed_items"]; ok {
-		updates["total_processed_items"] = raw
-	}
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
@@ -1308,7 +1340,11 @@ func (f *finalizer) Finalize(ctx context.Context, execCtx batchflow.ExecutionCon
 	var totalProcessed int64
 	for _, row := range rows {
 		counters[row.StatusCode] = row.Total
-		totalProcessed += row.Total
+		if row.StatusCode == models.BulkJobStatusProcessed ||
+			row.StatusCode == models.BulkJobStatusProcessedWithDetails ||
+			row.StatusCode == models.BulkJobStatusErrorProcess {
+			totalProcessed += row.Total
+		}
 	}
 
 	finalStatus := models.BulkJobStatusProcessed
@@ -1335,11 +1371,12 @@ func (f *finalizer) Finalize(ctx context.Context, execCtx batchflow.ExecutionCon
 	return batchflow.FinalizeResult{
 		Summary: summary,
 		Metadata: map[string]any{
-			"bulk_job_status":       string(finalStatus),
-			"total_processed_items": totalProcessed,
-			"processed_count":       processedCount,
-			"error_count":           errorCount,
-			"detail_count":          detailCount,
+			"bulk_job_status": string(finalStatus),
+			"processed_count": processedCount,
+			"error_count":     errorCount,
+			"detail_count":    detailCount,
+			"pending_count":   counters[models.BulkJobStatusImported],
+			"total_count":     totalProcessed + counters[models.BulkJobStatusImported],
 		},
 	}, nil
 }

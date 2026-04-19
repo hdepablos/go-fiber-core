@@ -121,6 +121,7 @@ Antes de diseñar, refactorizar o documentar cambios importantes, revisar `doc/s
 
 ### API
 
+- En endpoints multipart, preferir metadata del comando en el body y no en parámetros de ruta cuando represente datos de negocio del request.
 - `doc/specs/api/http-endpoints-spec.md`
 
 ### Platform
@@ -132,6 +133,7 @@ Antes de diseñar, refactorizar o documentar cambios importantes, revisar `doc/s
 
 ### Process Lifecycle
 
+- Para hooks opcionales de refresco por lote o semántica custom de pendientes derivada desde `bulk_job_items`, revisar `process-lifecycle-runtime-spec.md` y `batch-preview-spec.md` cuando también impacte `apply_changes`.
 - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
 - `doc/specs/process-lifecycle/batch-preview-spec.md`
 - `doc/specs/process-lifecycle/batch-fanout-spec.md`
@@ -189,6 +191,9 @@ No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedi
   - `doc/specs/platform/makefile-automation-spec.md`
 - Process lifecycle, manager, runtime del motor, resolución de versiones o execution keys:
   - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+- Refresco de progreso batch o semántica de pendientes por lote derivada desde `bulk_job_items`:
+  - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+  - `doc/specs/process-lifecycle/batch-preview-spec.md` si también cambia `apply_changes`
 - Batch preview, `apply_changes`, selección por `item_ids`, `row_numbers` o preview batch:
   - `doc/specs/process-lifecycle/batch-preview-spec.md`
 - Fanout, shards, capacidad, Redis batch, observabilidad batch, `auto_invoke` con delay o throttling/pacing del motor:
@@ -507,6 +512,8 @@ Todo endpoint nuevo o modificado debe evaluarse junto con su documentacion HTTP 
 - `doc/info/development/service-runtime-and-scaffold.md`
 - `doc/info/development/process-scaffold-and-cleanup.md`
 - `doc/info/platform/makefile-guide.md`
+- `doc/info/process-lifecycle/runtime.md`
+- `doc/info/process-lifecycle/batch-preview-guide.md`
 - `doc/info/process-lifecycle/batch-fanout-guide.md`
 - `doc/info/process-lifecycle/batch-capacity-and-stress-guide.md`
 - `doc/specs/architecture/service-design-spec.md`

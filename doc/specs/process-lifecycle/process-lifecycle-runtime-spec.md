@@ -65,6 +65,9 @@ Sintetiza el dominio descrito en:
 - El motor debe soportar escenarios secuenciales y asincronos dentro del mismo modelo mental.
 - La validacion de precondiciones debe ser declarativa siempre que sea posible.
 - Los errores deben poder clasificarse entre regla de negocio, configuracion y fallo tecnico.
+- Para procesos batch montados sobre `batchflow`, el runtime puede exponer un hook opcional de progreso por lote que reciba el mismo `Batch` efectivamente procesado por el `BatchProcessor`.
+- Ese hook opcional debe ser idempotente y seguro ante concurrencia entre shards; no debe depender de columnas derivadas persistidas en `bulk_jobs` para calcular avance si la fuente de verdad vive en `bulk_job_items`.
+- Si un proceso implementa ese hook, la definicion de "procesado" debe vivir en el lifecycle o estrategia del propio proceso y no hardcodearse en el manager compartido.
 
 ### 4. Observabilidad y pruebas
 
@@ -95,3 +98,5 @@ Sintetiza el dominio descrito en:
 - Las futuras implementaciones del motor deben referenciar esta spec antes de introducir nuevas invariantes.
 - Una corrida asincrona puede cancelarse manualmente sin seguir generando nuevos mensajes `auto_invoke`.
 - El runtime puede auto-cancelar una corrida por exceso de errores repetidos del mismo fingerprint.
+- Un proceso batch puede refrescar progreso agregado del padre por lote sin obligar a que todos los lifecycles implementen esa capacidad.
+- Si un proceso define una semantica custom de registros procesados o pendientes, `Finalize` y el refresco de progreso por lote deben reutilizar la misma regla.

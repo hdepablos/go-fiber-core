@@ -25,7 +25,6 @@ CREATE TABLE bulk_jobs (
     ref_code VARCHAR(255) NOT NULL,
     status_code bulk_job_status NOT NULL DEFAULT 'IMPORTING',
     total_detail_items INTEGER NOT NULL DEFAULT 0,
-    total_processed_items INTEGER NOT NULL DEFAULT 0,
     file_name VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

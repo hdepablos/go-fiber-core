@@ -1,14 +1,12 @@
+listo
 Estandarizar un servicio para la solicitud de apis externas y controlar desde ahí las respuesta y loguear en producción y llegará a
 recibir un erorr 429 o falla 500.
+
 
 ingresar en la tabla logger:
 paso el timepo de respuesta de las apis externas
 rate limit de procesos por lotes
 ... y los siguientes que creas importantes
-
-
-
-
 
 
 
@@ -18,83 +16,3 @@ rate limit de procesos por lotes
 
 3 - pending...
 Sí, exacto : con el código actual, el “paralelismo real distribuido” no está contemplado todavía .
-
-Qué sí está contemplado hoy
-
-- auto_invoke : una cadena secuencial de batches.
-- concurrent_batches : paralelismo intra-invocación dentro de un mismo worker.
-- ASYNC : ejecución desacoplada de la API, pero no sharding real.
-Qué no está contemplado aún
-
-- Fan-out de múltiples ramas independientes del mismo proceso.
-- Coordinación global para saber cuándo todas las ramas terminaron.
-- Finalización segura única después de varios workers paralelos.
-- Control de colisiones si dos ramas intentan tocar estados compartidos del mismo padre.
-Por qué digo que no está contemplado Porque hoy el contrato está armado alrededor de esta idea:
-
-- batch_index avanza linealmente
-- is_last_batch corta una sola cadena
-- next_step se dispara cuando esa cadena termina
-Eso sirve perfecto para:
-
-- secuencial
-- async desacoplado
-- algo de concurrencia local por worker
-Pero no para:
-
-- N ramas corriendo al mismo tiempo sobre el mismo proceso padre
-Para que exista fan-out real faltaría definir
-
-- cómo se parte el trabajo:
-  - por rango de batches
-  - por stride
-  - por shards explícitos
-- cómo se representa cada rama:
-  - shard_index
-  - total_shards
-  - cursor propio por shard
-- cómo se coordina el fin:
-  - contador de shards terminados
-  - lock de finalize
-  - condición de cierre única
-- cómo se evita doble finalize
-- cómo se reporta progreso consolidado
-Entonces hoy la arquitectura está en qué estado
-
-- Está preparada conceptualmente para crecer a eso.
-- Pero no implementa todavía ese modo como feature real.
-Mi lectura técnica No es que esté “mal diseñada”; está en una etapa intermedia:
-
-- ya resolvió reusable batch engine
-- ya resolvió preview
-- ya resolvió async + auto_invoke
-- ya resolvió concurrencia por invocación
-- pero todavía no resolvió el paso siguiente: orquestación distribuida multi-rama
-Si lo debatimos funcionalmente Yo lo separaría en 3 niveles:
-
-- Nivel 1: actual
-  
-  - auto_invoke secuencial
-  - concurrent_batches local
-- Nivel 2: fan-out controlado
-  
-  - parallel_shards: N
-  - cada shard procesa su subsecuencia
-  - finalize único
-- Nivel 3: fan-out + throttle distribuido
-  
-  - especialmente importante para API externa
-  - con rate limit global entre shards
-Conclusión
-
-- Sí, hoy no está contemplado completo .
-- Sí, hoy lo más cercano es concurrent_batches .
-- Y sí, para paralelismo real hace falta una implementación nueva de fan-out distribuido , no solo cambiar config.
-Si querés, en el próximo mensaje debatimos cómo debería ser ese diseño mínimo sin programar:
-
-- por shards
-- por rangos
-- o por stride , y cuál conviene más para tu caso.
-
-
-

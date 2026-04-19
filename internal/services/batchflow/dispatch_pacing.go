@@ -100,6 +100,7 @@ type DispatchPacingInvocationResult struct {
 func ProcessBatchWithDispatchPacing(
 	ctx context.Context,
 	processor BatchProcessor,
+	refresher BatchProgressRefresher,
 	execCtx ExecutionContext,
 	batch Batch,
 	batchIndex int,
@@ -112,6 +113,9 @@ func ProcessBatchWithDispatchPacing(
 	if !cfg.Enabled || len(batch.Items) == 0 {
 		res, err := processor.ProcessBatch(ctx, execCtx, batch)
 		if err != nil {
+			return DispatchPacingInvocationResult{}, err
+		}
+		if err := refreshBatchProgress(ctx, refresher, execCtx, batch); err != nil {
 			return DispatchPacingInvocationResult{}, err
 		}
 		return DispatchPacingInvocationResult{
@@ -136,8 +140,12 @@ func ProcessBatchWithDispatchPacing(
 	if end > len(batch.Items) {
 		end = len(batch.Items)
 	}
-	res, err := processor.ProcessBatch(ctx, execCtx, Batch{Items: batch.Items[offset:end]})
+	chunk := Batch{Items: batch.Items[offset:end]}
+	res, err := processor.ProcessBatch(ctx, execCtx, chunk)
 	if err != nil {
+		return DispatchPacingInvocationResult{}, err
+	}
+	if err := refreshBatchProgress(ctx, refresher, execCtx, chunk); err != nil {
 		return DispatchPacingInvocationResult{}, err
 	}
 
@@ -165,6 +173,7 @@ func ProcessBatchWithDispatchPacing(
 func SimulateDispatchPacingPreview(
 	ctx context.Context,
 	processor BatchProcessor,
+	refresher BatchProgressRefresher,
 	execCtx ExecutionContext,
 	batch Batch,
 	cfg DispatchPacingConfig,
@@ -173,7 +182,14 @@ func SimulateDispatchPacingPreview(
 		return ProcessBatchResult{}, fmt.Errorf("batch processor inválido")
 	}
 	if !cfg.Enabled || len(batch.Items) == 0 {
-		return processor.ProcessBatch(ctx, execCtx, batch)
+		res, err := processor.ProcessBatch(ctx, execCtx, batch)
+		if err != nil {
+			return ProcessBatchResult{}, err
+		}
+		if err := refreshBatchProgress(ctx, refresher, execCtx, batch); err != nil {
+			return ProcessBatchResult{}, err
+		}
+		return res, nil
 	}
 
 	totalProcessed := 0
@@ -187,8 +203,12 @@ func SimulateDispatchPacingPreview(
 		if end > len(batch.Items) {
 			end = len(batch.Items)
 		}
-		res, err := processor.ProcessBatch(ctx, execCtx, Batch{Items: batch.Items[start:end]})
+		chunk := Batch{Items: batch.Items[start:end]}
+		res, err := processor.ProcessBatch(ctx, execCtx, chunk)
 		if err != nil {
+			return ProcessBatchResult{}, err
+		}
+		if err := refreshBatchProgress(ctx, refresher, execCtx, chunk); err != nil {
 			return ProcessBatchResult{}, err
 		}
 		totalProcessed += res.ProcessedCount

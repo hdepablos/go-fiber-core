@@ -45,9 +45,6 @@ func (l *parentLifecycle) End(ctx context.Context, execCtx batchflow.ExecutionCo
 	updates := map[string]any{
 		"status_code": status,
 	}
-	if raw, ok := result.Metadata["total_processed_items"]; ok {
-		updates["total_processed_items"] = raw
-	}
 	return l.writeDB.WithContext(ctx).
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
@@ -59,6 +56,13 @@ func (l *parentLifecycle) Fail(ctx context.Context, execCtx batchflow.ExecutionC
 		Model(&models.BulkJob{}).
 		Where("id = ?", execCtx.Input.ParentID).
 		Update("status_code", models.BulkJobStatusErrorProcess).Error
+}
+
+func (l *parentLifecycle) RefreshProgress(ctx context.Context, execCtx batchflow.ExecutionContext, batch batchflow.Batch) error {
+	_ = ctx
+	_ = execCtx
+	_ = batch
+	return nil
 }
 
 type bulkJobFinalizer struct {
@@ -87,7 +91,9 @@ func (f *bulkJobFinalizer) Finalize(ctx context.Context, execCtx batchflow.Execu
 	var totalProcessed int64
 	for _, row := range rows {
 		counters[row.StatusCode] = row.Total
-		totalProcessed += row.Total
+		if isProcessedBulkJobStatus(row.StatusCode) {
+			totalProcessed += row.Total
+		}
 	}
 
 	finalStatus := models.BulkJobStatusProcessed
@@ -114,11 +120,29 @@ func (f *bulkJobFinalizer) Finalize(ctx context.Context, execCtx batchflow.Execu
 	return batchflow.FinalizeResult{
 		Summary: summary,
 		Metadata: map[string]any{
-			"bulk_job_status":      string(finalStatus),
-			"total_processed_items": totalProcessed,
-			"processed_count":      processedCount,
-			"error_count":          errorCount,
-			"detail_count":         detailCount,
+			"bulk_job_status": string(finalStatus),
+			"processed_count": processedCount,
+			"error_count":     errorCount,
+			"detail_count":    detailCount,
+			"pending_count":   counters[models.BulkJobStatusImported],
+			"total_count":     totalProcessed + counters[models.BulkJobStatusImported],
 		},
 	}, nil
+}
+
+func bulkJobProcessedStatuses() []models.BulkJobStatus {
+	return []models.BulkJobStatus{
+		models.BulkJobStatusProcessed,
+		models.BulkJobStatusProcessedWithDetails,
+		models.BulkJobStatusErrorProcess,
+	}
+}
+
+func isProcessedBulkJobStatus(status models.BulkJobStatus) bool {
+	for _, candidate := range bulkJobProcessedStatuses() {
+		if status == candidate {
+			return true
+		}
+	}
+	return false
 }

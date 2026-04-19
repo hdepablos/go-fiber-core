@@ -17,7 +17,6 @@ type BulkJobWriter interface {
 	Create(ctx context.Context, db *gorm.DB, job *models.BulkJob) error
 	UpdateStatus(ctx context.Context, db *gorm.DB, id int64, status models.BulkJobStatus) error
 	IncrementTotalDetailItems(ctx context.Context, db *gorm.DB, id int64, delta int) error
-	IncrementTotalProcessedItems(ctx context.Context, db *gorm.DB, id int64, delta int) error
 }
 
 type bulkJobReaderRepo struct{}
@@ -54,8 +53,4 @@ func (w *bulkJobWriterRepo) UpdateStatus(ctx context.Context, db *gorm.DB, id in
 
 func (w *bulkJobWriterRepo) IncrementTotalDetailItems(ctx context.Context, db *gorm.DB, id int64, delta int) error {
 	return db.WithContext(ctx).Model(&models.BulkJob{}).Where("id = ?", id).UpdateColumn("total_detail_items", gorm.Expr("total_detail_items + ?", delta)).Error
-}
-
-func (w *bulkJobWriterRepo) IncrementTotalProcessedItems(ctx context.Context, db *gorm.DB, id int64, delta int) error {
-	return db.WithContext(ctx).Model(&models.BulkJob{}).Where("id = ?", id).UpdateColumn("total_processed_items", gorm.Expr("total_processed_items + ?", delta)).Error
 }

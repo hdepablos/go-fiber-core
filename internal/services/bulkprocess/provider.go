@@ -50,6 +50,7 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 	stateStore := batchflow.NewRedisStateStore(cache)
 	runControl := batchflow.NewRunControl(cache, batchflowTTL(appCfg))
 	lifecycle := NewParentLifecycle(conn.ConnectGormRead, conn.ConnectGormWrite)
+	progressRefresher, _ := lifecycle.(batchflow.BatchProgressRefresher)
 	dataProvider := NewDataProvider(conn.ConnectGormRead)
 	processor := NewBulkJobProcessor(conn.ConnectGormWrite)
 	finalizer := NewBulkJobFinalizer(conn.ConnectGormRead)
@@ -69,10 +70,11 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 		manager: manager,
 		conn:    conn,
 		components: batchflow.PreviewComponents{
-			DataProvider:   dataProvider,
-			BatchProcessor: processor,
-			BatchPreviewer: processor,
-			StateStore:     stateStore,
+			DataProvider:      dataProvider,
+			BatchProcessor:    processor,
+			BatchPreviewer:    processor,
+			ProgressRefresher: progressRefresher,
+			StateStore:        stateStore,
 		},
 	}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"strings"
 
 	"go-fiber-core/internal/models"
 	"go-fiber-core/internal/repositories/bulkjobitemmessage"
@@ -42,21 +43,11 @@ func (p *bulkJobProcessor) ProcessBatch(ctx context.Context, execCtx batchflow.E
 	}
 
 	if err := p.writeDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := updateBatchItemStatuses(ctx, tx, items, previewItems); err != nil {
+			return err
+		}
 		for i, item := range items {
 			preview := previewItems[i]
-			var lastDetail *string
-			if preview.Message != "" {
-				message := preview.Message
-				lastDetail = &message
-			}
-			if err := tx.Model(&models.BulkJobItem{}).
-				Where("id = ?", item.ID).
-				Updates(map[string]any{
-					"status_code":         preview.Status,
-					"last_detail_message": lastDetail,
-				}).Error; err != nil {
-				return err
-			}
 			for _, msg := range preview.Messages {
 				record := &models.BulkJobItemMessage{
 					BulkJobItemID: item.ID,
@@ -112,6 +103,48 @@ func (p *bulkJobProcessor) resolveItems(execCtx batchflow.ExecutionContext, batc
 		results = append(results, buildPreviewResult(execCtx.Input.RedisKey, item))
 	}
 	return items, results, nil
+}
+
+func updateBatchItemStatuses(ctx context.Context, tx *gorm.DB, items []batchItemPayload, previewItems []batchflow.PreviewItemResult) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	var statusCase strings.Builder
+	var detailCase strings.Builder
+	args := make([]any, 0, (len(items)*4)+1)
+	ids := make([]int64, 0, len(items))
+
+	statusCase.WriteString("CASE id")
+	detailCase.WriteString("CASE id")
+	for i, item := range items {
+		preview := previewItems[i]
+		var lastDetail any
+		if preview.Message != "" {
+			lastDetail = preview.Message
+		}
+
+		statusCase.WriteString(" WHEN ? THEN ?")
+		args = append(args, item.ID, preview.Status)
+
+		detailCase.WriteString(" WHEN ? THEN ?")
+		args = append(args, item.ID, lastDetail)
+
+		ids = append(ids, item.ID)
+	}
+	statusCase.WriteString(" ELSE status_code END")
+	detailCase.WriteString(" ELSE last_detail_message END")
+	args = append(args, ids)
+
+	query := fmt.Sprintf(`
+		UPDATE bulk_job_items
+		SET status_code = %s,
+		    last_detail_message = %s,
+		    updated_at = NOW()
+		WHERE id IN ?
+	`, statusCase.String(), detailCase.String())
+
+	return tx.WithContext(ctx).Exec(query, args...).Error
 }
 
 func buildPreviewResult(redisKey string, item batchItemPayload) batchflow.PreviewItemResult {

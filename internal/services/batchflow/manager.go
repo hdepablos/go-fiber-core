@@ -171,6 +171,7 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 		return ProcessResult{}, err
 	}
 	execCtx := m.newExecutionContext(req.Input, summary, m.defaultTTL)
+	progressRefresher := batchProgressRefresherFromLifecycle(m.lifecycle)
 
 	type batchResult struct {
 		index int
@@ -183,7 +184,7 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 		if loadErr != nil {
 			return ProcessResult{}, loadErr
 		}
-		pacingRes, processErr := ProcessBatchWithDispatchPacing(ctx, m.processor, execCtx, batch, req.BatchIndex, req.DispatchPacing, req.TotalShards)
+		pacingRes, processErr := ProcessBatchWithDispatchPacing(ctx, m.processor, progressRefresher, execCtx, batch, req.BatchIndex, req.DispatchPacing, req.TotalShards)
 		if processErr != nil {
 			return ProcessResult{}, processErr
 		}
@@ -233,6 +234,9 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 					return
 				}
 				res, processErr := m.processor.ProcessBatch(ctx, execCtx, batch)
+				if processErr == nil {
+					processErr = refreshBatchProgress(ctx, progressRefresher, execCtx, batch)
+				}
 				results <- batchResult{index: idx, data: res, err: processErr}
 			}(batchIndex)
 		}
@@ -416,4 +420,22 @@ func cancelledProcessResult(req ProcessRequest, status RunStatus) ProcessResult 
 			"cancel_source": status.Source,
 		},
 	}
+}
+
+func batchProgressRefresherFromLifecycle(lifecycle ParentLifecycle) BatchProgressRefresher {
+	if lifecycle == nil {
+		return nil
+	}
+	refresher, ok := lifecycle.(BatchProgressRefresher)
+	if !ok {
+		return nil
+	}
+	return refresher
+}
+
+func refreshBatchProgress(ctx context.Context, refresher BatchProgressRefresher, execCtx ExecutionContext, batch Batch) error {
+	if refresher == nil || len(batch.Items) == 0 {
+		return nil
+	}
+	return refresher.RefreshProgress(ctx, execCtx, batch)
 }

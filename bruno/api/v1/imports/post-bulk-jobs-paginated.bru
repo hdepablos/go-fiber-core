@@ -1,0 +1,31 @@
+meta {
+  name: post-bulk-jobs-paginated
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}api/v1/imports/bulk-jobs/paginated
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+  {
+    "sortBy": ["created_at"],
+    "sortDesc": [true],
+    "filterBy": [],
+    "filterValues": [],
+    "rowsPerPage": 10,
+    "page": 1,
+    "optimize_with_key": ""
+  }
+}

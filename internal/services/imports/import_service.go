@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/dtos"
 	"go-fiber-core/internal/dtos/connect"
 	"go-fiber-core/internal/models"
 	bulkJobRepo "go-fiber-core/internal/repositories/bulkjob"
@@ -24,6 +25,7 @@ import (
 
 type Service interface {
 	Process(ctx context.Context, operatorID uint64, branchID int64, refCode string, total int, keyCode string, fileName string, file io.Reader) error
+	GetBulkJobsPaginated(ctx context.Context, req dtos.PaginationRequest) (*dtos.PaginationResponse[models.BulkJobListItem], error)
 }
 
 type service struct {
@@ -35,7 +37,7 @@ type service struct {
 	cfgReader  bulkJobConfigRepo.BulkJobConfigReader
 }
 
-//	Config pgx | gorm
+// Config pgx | gorm
 const bulkJobItemsInsertDriver = "pgx"
 
 func NewService(
@@ -256,14 +258,13 @@ func (s *service) getOrCreateJob(ctx context.Context, operatorID uint64, branchI
 
 	key := keyCode
 	job := &models.BulkJob{
-		OperatorID:          operatorID,
-		BranchID:            branchID,
-		KeyCode:             &key,
-		RefCode:             refCode,
-		StatusCode:          models.BulkJobStatusImporting,
-		TotalDetailItems:    total,
-		TotalProcessedItems: 0,
-		FileName:            f,
+		OperatorID:       operatorID,
+		BranchID:         branchID,
+		KeyCode:          &key,
+		RefCode:          refCode,
+		StatusCode:       models.BulkJobStatusImporting,
+		TotalDetailItems: total,
+		FileName:         f,
 	}
 	if err := s.jobWriter.Create(ctx, s.conn.ConnectGormWrite, job); err != nil {
 		return nil, err

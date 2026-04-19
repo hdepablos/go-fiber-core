@@ -1,11 +1,11 @@
 meta {
-  name: post-import-all
+  name: post-import-create
   type: http
   seq: 1
 }
 
 post {
-  url: {{urlBase}}api/v1/imports/all/{{branch_id}}/{{import_ref_code}}/{{import_total}}/{{import_key}}
+  url: {{urlBase}}api/v1/imports/
   body: multipartForm
   auth: bearer
 }
@@ -19,5 +19,9 @@ headers {
 }
 
 body:multipart-form {
+  branch_id: {{branch_id}}
+  ref_code: {{import_ref_code}}
+  total: {{import_total}}
+  key_code: {{import_key}}
   file: @file({{import_file_path}})
 }

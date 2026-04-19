@@ -85,6 +85,8 @@ Notas:
 - `bulk_job_outputs` representa artefactos o salidas generadas por el proceso.
 - `bulk_job_item_messages` conserva mensajes de detalle por ítem.
 - Existen enums SQL como `bulk_job_status` y `log_severity`.
+- Los contadores operativos de avance deben derivarse de `bulk_job_items` y no de columnas calculadas persistidas en `bulk_jobs`.
+- Para listados operativos, `bulk_job_items.status_code = 'IMPORTED'` se considera pendiente; `PROCESSED`, `ERROR_PROCESS` y `PROCESSED_WITH_DETAILS` se reportan por separado.
 
 ### 4. Catálogos y maestros
 

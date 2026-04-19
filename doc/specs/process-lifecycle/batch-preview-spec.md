@@ -117,7 +117,9 @@ Reglas adicionales:
 - `apply_changes` debe escribir solo sobre los items seleccionados.
 - `apply_changes` no debe ejecutar `ParentLifecycle.Start`.
 - `apply_changes` no debe ejecutar `Finalizer`.
-- `apply_changes` no debe cerrar ni recalcular el estado global del padre.
+- `apply_changes` no debe cerrar el estado global del padre ni marcarlo como finalizado.
+- Si el proceso expone un hook opcional de refresco de progreso por lote, `apply_changes` puede invocarlo sobre exactamente los mismos items persistidos para mantener estado derivado o contadores calculables desde `bulk_job_items`.
+- Ese refresco opcional no reemplaza `Finalize` y no debe cambiar por si solo la politica de cierre del padre.
 - La respuesta debe indicar `applied_changes = true` cuando la persistencia se haya ejecutado.
 - Cuando `dispatch_pacing` aplique, la respuesta debe incluir `apply_changes_metadata.dispatch_pacing`.
 - `apply_changes_metadata.dispatch_pacing` debe informar al menos:
@@ -147,6 +149,7 @@ Reglas adicionales:
 - El mismo conjunto de items renderizado por preview puede persistirse con `apply_changes=true`.
 - En local, un request con `item_ids` y `apply_changes=true` modifica solo esos registros.
 - En local, un request con `item_ids` y `apply_changes=true` refleja `dispatch_pacing` en `apply_changes_metadata` cuando el step lo define.
+- En local, si el proceso publica un refresco opcional de progreso por lote, `apply_changes` puede actualizar agregados del padre sin ejecutar `Start` ni `Finalize`.
 - En local, `apply_changes` con `dispatch_pacing` no debe depender del tiempo real transcurrido para completar la respuesta.
 - En entornos no locales, el mismo request se rechaza.
 - La colección Bruno debe exponer ejemplos de:

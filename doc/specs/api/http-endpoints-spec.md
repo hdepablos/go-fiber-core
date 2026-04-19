@@ -55,6 +55,7 @@ Y a sus artefactos asociados:
 - Todo endpoint con body JSON debe tener un ejemplo de request en la documentacion humana.
 - Los endpoints `paginated` deben reutilizar una estructura consistente basada en `PaginationRequest`.
 - Los endpoints multipart deben documentar el tipo de body y el nombre del campo archivo.
+- Los endpoints multipart no deben empujar por path parámetros de negocio que pertenecen al payload del comando salvo excepción muy justificada.
 
 ### 3. Auth
 
@@ -109,6 +110,7 @@ La capa documental y Bruno deben cubrir, como minimo:
 - Los endpoints protegidos reutilizan el token obtenido por login o variable equivalente.
 - Los requests historicos no bloquean la navegacion principal porque quedan separados en `legacy`.
 - Los endpoints operativos batch relevantes, como cancelacion de corrida, tienen request Bruno canonico alineado con sus DTOs.
+- Los endpoints paginados de dominios batch pueden usar `extras` para devolver contadores agregados calculados desde tablas hijas cuando esa sea la fuente de verdad operativa.
 
 ## Trazabilidad
 

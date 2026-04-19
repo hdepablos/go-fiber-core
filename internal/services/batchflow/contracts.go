@@ -66,6 +66,10 @@ type ParentLifecycle interface {
 	Fail(ctx context.Context, execCtx ExecutionContext, cause error) error
 }
 
+type BatchProgressRefresher interface {
+	RefreshProgress(ctx context.Context, execCtx ExecutionContext, batch Batch) error
+}
+
 type Finalizer interface {
 	Finalize(ctx context.Context, execCtx ExecutionContext, req FinalizeRequest) (FinalizeResult, error)
 }
@@ -176,10 +180,11 @@ type Manager interface {
 }
 
 type PreviewComponents struct {
-	DataProvider   DataProvider
-	BatchProcessor BatchProcessor
-	BatchPreviewer BatchPreviewer
-	StateStore     StateStore
+	DataProvider      DataProvider
+	BatchProcessor    BatchProcessor
+	BatchPreviewer    BatchPreviewer
+	ProgressRefresher BatchProgressRefresher
+	StateStore        StateStore
 }
 
 type PreviewProvider interface {

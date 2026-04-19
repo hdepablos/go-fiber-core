@@ -599,23 +599,65 @@ o bien:
 
 ### Imports
 
-#### `POST /api/v1/imports/all/:branchId/:refCode/:total/:key`
+#### `POST /api/v1/imports/`
 
 - auth: bearer
 - content-type: `multipart/form-data`
 - archivo requerido: `file`
 - extensiones aceptadas: `.csv`, `.txt`
 
-Parametros de ruta:
+Campos esperados en multipart:
 
-- `branchId`: sucursal
-- `refCode`: codigo de referencia funcional
+- `branch_id`: sucursal
+- `ref_code`: codigo de referencia funcional
 - `total`: total esperado de filas
-- `key`: clave logica del import
+- `key_code`: clave logica del import
+- `file`: archivo `.csv` o `.txt`
 
 Forma esperada:
 
-- body multipart con campo `file`
+- body multipart con metadata de negocio y campo `file`
+
+Ejemplo operativo:
+
+- `branch_id = 1`
+- `ref_code = imputaciones`
+- `total = 1000`
+- `key_code = import-20260419-001`
+
+Alias legacy todavía disponible por compatibilidad:
+
+- `POST /api/v1/imports/all/:branchId/:refCode/:total/:key`
+
+#### `POST /api/v1/imports/bulk-jobs/paginated`
+
+- auth: bearer
+- body: usa `PaginationRequest`
+- uso: lista `bulk_jobs` con contadores calculados desde `bulk_job_items`
+
+Campos calculados por fila:
+
+- `total_records`
+- `pending_records` donde `bulk_job_items.status_code = IMPORTED`
+- `processed_records`
+- `error_records`
+- `processed_with_details_records`
+
+`extras` devuelve los mismos contadores agregados sobre todo el conjunto filtrado, no solo sobre la página actual.
+
+Ejemplo:
+
+```json
+{
+  "sortBy": ["created_at"],
+  "sortDesc": [true],
+  "filterBy": ["status_code", "ref_code"],
+  "filterValues": ["PROCESSING", "imputaciones"],
+  "rowsPerPage": 10,
+  "page": 1,
+  "optimize_with_key": ""
+}
+```
 
 ## Bruno
 

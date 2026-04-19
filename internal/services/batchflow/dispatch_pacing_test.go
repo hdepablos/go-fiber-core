@@ -70,6 +70,15 @@ func newFakeStateStore() *fakeStateStore {
 	}
 }
 
+type fakeProgressRefresher struct {
+	sizes []int
+}
+
+func (r *fakeProgressRefresher) RefreshProgress(_ context.Context, _ ExecutionContext, batch Batch) error {
+	r.sizes = append(r.sizes, len(batch.Items))
+	return nil
+}
+
 func (s *fakeStateStore) RuntimeValues(Input, time.Duration) RuntimeValues {
 	return s.runtime
 }
@@ -194,6 +203,7 @@ func TestValidateDispatchPacingStepConfig_AllowsDerivedDelay(t *testing.T) {
 
 func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *testing.T) {
 	processor := &fakeBatchProcessor{}
+	refresher := &fakeProgressRefresher{}
 	runtime := &fakeRuntimeValues{values: make(map[string]any)}
 	execCtx := ExecutionContext{
 		Input: Input{
@@ -203,7 +213,7 @@ func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *tes
 		Runtime: runtime,
 	}
 
-	first, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+	first, err := ProcessBatchWithDispatchPacing(context.Background(), processor, refresher, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
 		Enabled:             true,
 		MessagesPerInterval: 3,
 		IntervalSeconds:     2,
@@ -213,7 +223,7 @@ func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *tes
 	assert.Equal(t, 0, first.NextBatchIndex)
 	assert.False(t, first.BatchComplete)
 
-	second, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+	second, err := ProcessBatchWithDispatchPacing(context.Background(), processor, refresher, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
 		Enabled:             true,
 		MessagesPerInterval: 3,
 		IntervalSeconds:     2,
@@ -223,7 +233,7 @@ func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *tes
 	assert.Equal(t, 0, second.NextBatchIndex)
 	assert.False(t, second.BatchComplete)
 
-	third, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+	third, err := ProcessBatchWithDispatchPacing(context.Background(), processor, refresher, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
 		Enabled:             true,
 		MessagesPerInterval: 3,
 		IntervalSeconds:     2,
@@ -233,7 +243,7 @@ func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *tes
 	assert.Equal(t, 0, third.NextBatchIndex)
 	assert.False(t, third.BatchComplete)
 
-	fourth, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+	fourth, err := ProcessBatchWithDispatchPacing(context.Background(), processor, refresher, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
 		Enabled:             true,
 		MessagesPerInterval: 3,
 		IntervalSeconds:     2,
@@ -243,10 +253,12 @@ func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *tes
 	assert.Equal(t, 1, fourth.NextBatchIndex)
 	assert.True(t, fourth.BatchComplete)
 	assert.Equal(t, []int{3, 3, 3, 1}, processor.sizes)
+	assert.Equal(t, []int{3, 3, 3, 1}, refresher.sizes)
 }
 
 func TestPreviewApplyChanges_UsesDispatchPacingSimulation(t *testing.T) {
 	processor := &fakeBatchProcessor{}
+	refresher := &fakeProgressRefresher{}
 	stateStore := newFakeStateStore()
 	registry := NewPreviewRegistry()
 	registry.Register("test pacing", func(context.Context) (PreviewProvider, error) {
@@ -258,9 +270,10 @@ func TestPreviewApplyChanges_UsesDispatchPacingSimulation(t *testing.T) {
 						Summary: Summary{TotalRecords: 10},
 					},
 				},
-				BatchProcessor: processor,
-				BatchPreviewer: fakeBatchPreviewer{},
-				StateStore:     stateStore,
+				BatchProcessor:    processor,
+				BatchPreviewer:    fakeBatchPreviewer{},
+				ProgressRefresher: refresher,
+				StateStore:        stateStore,
 			},
 		}, nil
 	})
@@ -285,6 +298,7 @@ func TestPreviewApplyChanges_UsesDispatchPacingSimulation(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, res.AppliedChanges)
 	assert.Equal(t, []int{3, 3, 3, 1}, processor.sizes)
+	assert.Equal(t, []int{3, 3, 3, 1}, refresher.sizes)
 
 	meta, ok := res.ApplyChangesMetadata["dispatch_pacing"].(map[string]any)
 	require.True(t, ok)

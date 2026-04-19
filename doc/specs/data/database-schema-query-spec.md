@@ -71,6 +71,8 @@ Debe quedar claro:
 
 - relación entre `bulk_jobs`, `bulk_job_items`, `bulk_job_outputs`, `bulk_job_item_messages` y `bulk_job_configs`,
 - significado de estados y artefactos,
+- qué contadores del padre son derivados y deben calcularse desde `bulk_job_items`,
+- que `bulk_job_items.status_code = 'IMPORTED'` representa pendiente operativo para los listados calculados,
 - rutas de join para análisis operativo y exportación.
 
 ## Reglas para generación futura de SQL
