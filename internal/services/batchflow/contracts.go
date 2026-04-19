@@ -93,6 +93,8 @@ type StateStore interface {
 	SetCounter(ctx context.Context, key string, value int64, ttl time.Duration) error
 	IncrCounter(ctx context.Context, key string, delta int64, ttl time.Duration) (int64, error)
 	GetCounter(ctx context.Context, key string) (int64, error)
+	RegisterShards(ctx context.Context, input Input, totalShards int, ttl time.Duration) error
+	CompleteShard(ctx context.Context, input Input, shardIndex int, totalShards int, ttl time.Duration) (ShardCompletion, error)
 }
 
 type StartRequest struct {
@@ -115,6 +117,9 @@ type ProcessRequest struct {
 	BatchIndex        int
 	TotalBatches      int
 	ConcurrentBatches int
+	ShardIndex        int
+	TotalShards       int
+	DispatchPacing    DispatchPacingConfig
 }
 
 type ProcessBatchResult struct {
@@ -123,11 +128,32 @@ type ProcessBatchResult struct {
 }
 
 type ProcessResult struct {
-	NextBatchIndex   int            `json:"next_batch_index"`
-	IsLastBatch      bool           `json:"is_last_batch"`
-	ProcessedCount   int            `json:"processed_count"`
-	BatchesProcessed int            `json:"batches_processed"`
-	Metadata         map[string]any `json:"metadata,omitempty"`
+	NextBatchIndex         int            `json:"next_batch_index"`
+	IsLastBatch            bool           `json:"is_last_batch"`
+	IsShardComplete        bool           `json:"is_shard_complete"`
+	ProcessedCount         int            `json:"processed_count"`
+	BatchesProcessed       int            `json:"batches_processed"`
+	ShardIndex             int            `json:"shard_index,omitempty"`
+	TotalShards            int            `json:"total_shards,omitempty"`
+	CompletedShards        int64          `json:"completed_shards,omitempty"`
+	ShouldDispatchNextStep bool           `json:"should_dispatch_next_step,omitempty"`
+	Metadata               map[string]any `json:"metadata,omitempty"`
+}
+
+type DispatchRequest struct {
+	Input          Input
+	TotalBatches   int
+	ParallelShards int
+}
+
+type DispatchResult struct {
+	TotalShards         int   `json:"total_shards"`
+	InitialBatchIndexes []int `json:"initial_batch_indexes"`
+}
+
+type ShardCompletion struct {
+	CompletedShards int64 `json:"completed_shards"`
+	ShouldFinalize  bool  `json:"should_finalize"`
 }
 
 type FinalizeRequest struct {
@@ -143,6 +169,7 @@ type FinalizeResult struct {
 
 type Manager interface {
 	Start(ctx context.Context, req StartRequest) (StartResult, error)
+	DispatchShards(ctx context.Context, req DispatchRequest) (DispatchResult, error)
 	ProcessBatch(ctx context.Context, req ProcessRequest) (ProcessResult, error)
 	Finalize(ctx context.Context, req FinalizeRequest) (FinalizeResult, error)
 	Fail(ctx context.Context, input Input, cause error) error
@@ -166,6 +193,7 @@ type PreviewRequest struct {
 	ExecutionKeys            []string
 	Mode                     string
 	ApplyChanges             bool
+	DispatchPacing           DispatchPacingConfig
 	Input                    Input
 	BatchSize                int
 	Limit                    int
@@ -205,6 +233,7 @@ type PreviewResponse struct {
 	ResolvedExecutionKeys    []string            `json:"resolved_execution_keys,omitempty"`
 	Mode                     string              `json:"mode"`
 	AppliedChanges           bool                `json:"applied_changes,omitempty"`
+	ApplyChangesMetadata     map[string]any      `json:"apply_changes_metadata,omitempty"`
 	RedisKey                 string              `json:"redis_key"`
 	Summary                  Summary             `json:"summary"`
 	AppliedFilters           any                 `json:"applied_filters,omitempty"`

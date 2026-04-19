@@ -18,16 +18,18 @@ type options struct {
 }
 
 type processConfig struct {
-	Kind               string
-	ServiceSlug        string
-	PascalName         string
-	ImportPath         string
-	SeedName           string
-	SeederFuncName     string
-	RuntimeFieldName   string
-	FilesToDelete      []string
-	DirsToDelete       []string
-	NeedsRuntimeWiring bool
+	Kind                 string
+	ServiceSlug          string
+	PascalName           string
+	ImportPath           string
+	SeedName             string
+	FanoutSeedName       string
+	SeederFuncName       string
+	FanoutSeederFuncName string
+	RuntimeFieldName     string
+	FilesToDelete        []string
+	DirsToDelete         []string
+	NeedsRuntimeWiring   bool
 }
 
 func main() {
@@ -78,7 +80,9 @@ func buildConfig(opts options) (processConfig, error) {
 	switch kind {
 	case "batch-process":
 		cfg.SeedName = "batch_process_" + slug
+		cfg.FanoutSeedName = "batch_process_" + slug + "_fanout"
 		cfg.SeederFuncName = "BatchProcess" + cfg.PascalName + "Seeder"
+		cfg.FanoutSeederFuncName = "BatchProcess" + cfg.PascalName + "FanoutSeeder"
 		cfg.RuntimeFieldName = cfg.PascalName
 		cfg.NeedsRuntimeWiring = true
 		cfg.FilesToDelete = []string{
@@ -88,6 +92,7 @@ func buildConfig(opts options) (processConfig, error) {
 			filepath.Join(repoRoot, "internal/services", slug, "processor.go"),
 			filepath.Join(repoRoot, "internal/services", slug, "lifecycle.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_seeder.go"),
+			filepath.Join(repoRoot, "internal/database/seeders", slug+"_fanout_seeder.go"),
 			filepath.Join(repoRoot, "bruno/legacy/process-lifecycle", "RunProc -> "+slug+".bru"),
 		}
 		cfg.DirsToDelete = []string{
@@ -164,13 +169,25 @@ func patchSeedService(cfg processConfig, dryRun bool) error {
 	if err := removeLiteral(filePath, listEntry, dryRun); err != nil {
 		return err
 	}
+	fanoutListEntry := fmt.Sprintf("\n\t\t%q,", cfg.FanoutSeedName)
+	if err := removeLiteral(filePath, fanoutListEntry, dryRun); err != nil {
+		return err
+	}
 
 	funcBlock := fmt.Sprintf(`
 	service.AddSeeder(%q, func() error {
 		return %s(pool)
 	})
 `, cfg.SeedName, cfg.SeederFuncName)
-	return removeLiteral(filePath, funcBlock, dryRun)
+	if err := removeLiteral(filePath, funcBlock, dryRun); err != nil {
+		return err
+	}
+	fanoutFuncBlock := fmt.Sprintf(`
+	service.AddSeeder(%q, func() error {
+		return %s(pool)
+	})
+`, cfg.FanoutSeedName, cfg.FanoutSeederFuncName)
+	return removeLiteral(filePath, fanoutFuncBlock, dryRun)
 }
 
 func patchRuntimeBootstrap(cfg processConfig, dryRun bool) error {

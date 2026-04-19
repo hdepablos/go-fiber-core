@@ -8,9 +8,18 @@ import (
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/batchflow"
+	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"go-fiber-core/internal/utils"
+)
+
+const (
+	startExecutionKey        = "bulk/process/punitorios/start"
+	dispatchExecutionKey     = "bulk/process/punitorios/dispatch_shards"
+	processBatchExecutionKey = "bulk/process/punitorios/process_batch"
+	finalizeExecutionKey     = "bulk/process/punitorios/finalize"
+	processBatchStepOrder    = 3
 )
 
 type startStep struct {
@@ -83,10 +92,80 @@ func (s *startStep) Execute() error {
 	return nil
 }
 
+type dispatchShardsStep struct {
+	ctx            *contracts.ServiceContext
+	servicePath    string
+	parallelShards int
+}
+
+func NewDispatchShardsStep() contracts.Service {
+	return &dispatchShardsStep{parallelShards: 1}
+}
+
+func (s *dispatchShardsStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+	s.ctx = ctx
+	s.servicePath = servicePath
+	s.parallelShards = resolveParallelShards(ctx)
+}
+
+func (s *dispatchShardsStep) Execute() error {
+	prov, err := ProviderFromContext(s.ctx.Ctx)
+	if err != nil {
+		return err
+	}
+	dispatcherSvc, ok := runtimectx.Dispatcher(s.ctx.Ctx)
+	if !ok {
+		return fmt.Errorf("dispatcher no disponible en contexto")
+	}
+	input, err := buildInput(s.ctx)
+	if err != nil {
+		return err
+	}
+
+	totalBatches := utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches"))
+	dispatchRes, err := prov.Manager().DispatchShards(s.ctx.Ctx, batchflow.DispatchRequest{
+		Input:          input,
+		TotalBatches:   totalBatches,
+		ParallelShards: s.parallelShards,
+	})
+	if err != nil {
+		markFailure(prov, s.ctx.Ctx, input, err)
+		return err
+	}
+
+	baseInput := s.ctx.SnapshotInput()
+	for shardIndex, batchIndex := range dispatchRes.InitialBatchIndexes {
+		shardInput := cloneInput(baseInput)
+		shardInput["batch_index"] = batchIndex
+		shardInput["shard_index"] = shardIndex
+		shardInput["total_shards"] = dispatchRes.TotalShards
+		shardInput["is_shard_complete"] = false
+
+		childCtx := contracts.NewServiceContextFromInput(s.ctx.Ctx, shardInput)
+		if err := dispatcherSvc.DispatchStep(s.ctx.Ctx, processBatchExecutionKey, processBatchStepOrder, contracts.ExecutionPolicy{}, nil, childCtx); err != nil {
+			return err
+		}
+	}
+
+	s.ctx.SetInputValue("__stop_chain", true)
+	s.ctx.SetResult(s.servicePath, contracts.StepResult{
+		Status:  "completed",
+		Message: "fan-out de shards despachado",
+		Data: map[string]any{
+			"parallel_shards":   dispatchRes.TotalShards,
+			"dispatched_shards": len(dispatchRes.InitialBatchIndexes),
+			"__stop_chain":      true,
+		},
+	})
+	return nil
+}
+
 type processBatchStep struct {
 	ctx               *contracts.ServiceContext
 	servicePath       string
 	concurrentBatches int
+	dispatchPacing    batchflow.DispatchPacingConfig
+	initErr           error
 }
 
 func NewProcessBatchStep() contracts.Service {
@@ -100,6 +179,7 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 		if v, ok := s.ctx.CurrentStepConfig["concurrent_batches"]; ok {
 			s.concurrentBatches = utils.ToInt(v)
 		}
+		s.dispatchPacing, s.initErr = batchflow.ResolveDispatchPacingConfig(s.ctx.CurrentStepConfig)
 	}
 	if s.concurrentBatches <= 0 {
 		s.concurrentBatches = 1
@@ -107,6 +187,9 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 }
 
 func (s *processBatchStep) Execute() error {
+	if s.initErr != nil {
+		return s.initErr
+	}
 	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
@@ -122,6 +205,9 @@ func (s *processBatchStep) Execute() error {
 		BatchIndex:        utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0)),
 		TotalBatches:      utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches")),
 		ConcurrentBatches: s.concurrentBatches,
+		ShardIndex:        utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "shard_index", 0)),
+		TotalShards:       utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_shards", 1)),
+		DispatchPacing:    s.dispatchPacing,
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -132,10 +218,15 @@ func (s *processBatchStep) Execute() error {
 		Status:  "completed",
 		Message: "batch procesado",
 		Data: map[string]any{
-			"batch_index":       res.NextBatchIndex,
-			"is_last_batch":     res.IsLastBatch,
-			"processed_count":   res.ProcessedCount,
-			"batches_processed": res.BatchesProcessed,
+			"batch_index":               res.NextBatchIndex,
+			"is_last_batch":             res.IsLastBatch,
+			"is_shard_complete":         res.IsShardComplete,
+			"processed_count":           res.ProcessedCount,
+			"batches_processed":         res.BatchesProcessed,
+			"shard_index":               res.ShardIndex,
+			"total_shards":              res.TotalShards,
+			"completed_shards":          res.CompletedShards,
+			"should_dispatch_next_step": res.ShouldDispatchNextStep,
 		},
 	})
 	return nil
@@ -224,8 +315,36 @@ func markFailure(prov Provider, ctx context.Context, input batchflow.Input, err 
 	_ = prov.Manager().Fail(ctx, input, err)
 }
 
+func resolveParallelShards(ctx *contracts.ServiceContext) int {
+	if ctx == nil || ctx.CurrentStepConfig == nil {
+		return 1
+	}
+	if v, ok := ctx.CurrentStepConfig["parallel_shards"]; ok {
+		if parsed := utils.ToInt(v); parsed > 0 {
+			return parsed
+		}
+	}
+	if rawMode, ok := ctx.CurrentStepConfig["execution_mode"].(map[string]any); ok {
+		if v, ok := rawMode["parallel_shards"]; ok {
+			if parsed := utils.ToInt(v); parsed > 0 {
+				return parsed
+			}
+		}
+	}
+	return 1
+}
+
+func cloneInput(input map[string]any) map[string]any {
+	out := make(map[string]any, len(input))
+	for k, v := range input {
+		out[k] = v
+	}
+	return out
+}
+
 func init() {
-	serviceconfig.Register("bulk/process/punitorios/start", NewStartStep)
-	serviceconfig.Register("bulk/process/punitorios/process_batch", NewProcessBatchStep)
-	serviceconfig.Register("bulk/process/punitorios/finalize", NewFinalizeStep)
+	serviceconfig.Register(startExecutionKey, NewStartStep)
+	serviceconfig.Register(dispatchExecutionKey, NewDispatchShardsStep)
+	serviceconfig.Register(processBatchExecutionKey, NewProcessBatchStep)
+	serviceconfig.Register(finalizeExecutionKey, NewFinalizeStep)
 }

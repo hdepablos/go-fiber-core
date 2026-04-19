@@ -45,6 +45,95 @@ Todo servicio nuevo o refactorizado debe estructurarse con:
 3. Exponer un constructor `New...` que reciba dependencias explicitas.
 4. Implementar la interface mediante method receivers sobre la struct concreta.
 
+## Convenciones de integraciones HTTP externas
+
+Toda nueva integracion HTTP reutilizable debe seguir una estructura estandar comun.
+
+### Fuente de configuracion
+
+- La configuracion de APIs externas debe salir de `internal/appconfig/config.yml`.
+- La fuente canonica debe ser la seccion `apis.xxx`.
+- La resolucion para nuevos casos debe hacerse con `appConfig.APIConfig("xxx")`.
+- Los adapters deben recibir `config.ApiConfig`; no deben hardcodear `url`, `token` ni leer variables de entorno por su cuenta.
+
+### Cliente HTTP compartido
+
+- Toda llamada HTTP externa reutilizable debe centralizarse en `internal/services/externalhttp/`.
+- El servicio comun debe encargarse de construir el cliente HTTP a partir de `config.ApiConfig`.
+- Los adapters deben delegar en `externalhttp.NewClientFromAPIConfig(...)`.
+- El adapter debe describir la integracion; no debe duplicar logging transversal, manejo de `429` ni errores de red.
+
+### Politica estricta
+
+- No usar `resty.New()` directamente dentro de adapters nuevos.
+- Si una integracion nueva necesita salirse del patron, debe dejar justificacion explicita en codigo y documentacion.
+- Si el servicio externo usa otro esquema de autenticacion distinto de bearer token, se debe extender el servicio comun en vez de romper el patron en el adapter.
+
+### Scaffold de adapters externos
+
+- Para nuevos adapters HTTP externos, usar `make create-external-adapter adapter_name=customer_api config_key=customer_api`.
+- Ese scaffold debe generar una base alineada con `config.ApiConfig`, `externalhttp` y la resolucion canonica desde `apis.xxx`.
+
+## Convenciones de batchflow y versiones
+
+Los procesos batch deben separar negocio de perfil tecnico.
+
+### Modelo de versionado
+
+- Debe existir un unico `process_type` por dominio de negocio.
+- Las diferencias `sequential` o `fanout` deben vivir en `process_versions` y su configuracion, no en nombres distintos de `process_type`.
+- La version base debe ser secuencial.
+- La version companion fanout debe reutilizar las mismas execution keys del negocio.
+
+### Scaffold y cleanup
+
+- Para procesos batch nuevos, usar `make create-batch-process ...`.
+- El scaffold batch debe generar:
+  - servicio del proceso,
+  - seeder base secuencial,
+  - seeder companion `_fanout`.
+- Para limpiar procesos scaffold, usar `make delete-process kind=batch-process service_slug=...`.
+- El scaffold batch no debe crear carpetas Bruno especificas por proceso; debe reutilizar `bruno/legacy/process-lifecycle/test-batch-process`.
+
+## Observabilidad operativa de batch e integraciones
+
+Cuando se modifique el core batch o integraciones HTTP externas, debe preservarse la observabilidad estructurada existente.
+
+## Convenciones de logger
+
+Cuando una solicitud pida "logger" o un ajuste de logging, debe asumirse esta convención por defecto.
+
+### Producción
+
+- En producción, Lambda o EKS, el logger debe escribir a `stdout`.
+- AWS debe capturar esos logs mediante CloudWatch.
+- No diseñar el logger productivo con archivos locales como destino principal.
+
+### Local
+
+- En local, el logger debe organizarse por proceso específico.
+- Preferir `logger.GetLogger("nombre_proceso")` para separar dominios.
+- Si hace falta un archivo dedicado por depuración puntual, usar `logger.GetLoggerToFile("nombre_proceso", "...")`.
+- Evitar un logger genérico único para todos los procesos cuando el flujo pertenece a un dominio identificable.
+
+### Regla práctica
+
+- Si piden logger para producción: asumir AWS via `stdout`.
+- Si piden logger para local: asumir logger por proceso específico.
+- Si hace falta depuración puntual: usar archivo local específico por proceso, no un archivo global para todo.
+
+### Tipos de logs obligatorios
+
+- `log_type=redis_guard` para errores relevantes de Redis en el core batch.
+- `log_type=rate_limit_guard` para rate limit interno del core y `429` externos.
+
+### Reglas de emision
+
+- Los errores Redis del motor batch no deben pasar silenciosamente.
+- Un `429` de dependencia externa no debe pasar silenciosamente.
+- El logging transversal debe vivir en el core compartido correspondiente, no repetirse por cada adapter o flujo.
+- Si una solicitud implica capacidad, estres, Redis o fanout, revisar y mantener alineados los documentos operativos y normativos de observabilidad batch.
+
 ### Ejemplo de referencia
 
 ```go
@@ -137,8 +226,17 @@ Todo endpoint nuevo o modificado debe evaluarse junto con su documentacion HTTP 
 - `doc/specs/documentation-governance-spec.md`
 - `doc/specs/documentation-defaults-spec.md`
 - `doc/info/development/service-design-conventions.md`
+- `doc/info/development/external-http-service-standard.md`
 - `doc/info/development/service-runtime-and-scaffold.md`
+- `doc/info/development/process-scaffold-and-cleanup.md`
+- `doc/info/platform/makefile-guide.md`
+- `doc/info/process-lifecycle/batch-fanout-guide.md`
+- `doc/info/process-lifecycle/batch-capacity-and-stress-guide.md`
 - `doc/specs/architecture/service-design-spec.md`
+- `doc/specs/architecture/external-http-client-spec.md`
+- `doc/specs/platform/logger-runtime-spec.md`
 - `doc/specs/architecture/service-runtime-bootstrap-spec.md`
+- `doc/specs/platform/process-scaffold-cleanup-spec.md`
+- `doc/specs/process-lifecycle/batch-observability-spec.md`
 - `doc/info/api/http-endpoints-guide.md`
 - `doc/specs/api/http-endpoints-spec.md`

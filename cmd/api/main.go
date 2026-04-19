@@ -35,7 +35,6 @@ import (
 	_ "go-fiber-core/internal/services/test/mqb1t"
 
 	// Servicios de prueba concurrente (no pertenecen al seed principal de Process Lifecycle)
-	_ "go-fiber-core/internal/services/test/imputation"
 	_ "go-fiber-core/internal/services/test/steps_concurrent"
 
 	// Servicios de prueba de auto-invoke (loop/batch)
@@ -50,7 +49,9 @@ import (
 	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
 
-	_ "go-fiber-core/internal/services/punitorios")
+	_ "go-fiber-core/internal/services/imputations"
+	_ "go-fiber-core/internal/services/punitorios"
+)
 
 var fiberLambda *fiberadapter.FiberLambda
 

@@ -29,6 +29,7 @@ La documentacion se divide en dos capas complementarias:
 - [Evolucion del motor de procesos](doc/info/architecture/process-architecture-evolution.md)
 - [Convenciones de diseño de servicios](doc/info/development/service-design-conventions.md)
 - [Runtime y scaffold de servicios](doc/info/development/service-runtime-and-scaffold.md)
+- [Estándar HTTP externo](doc/info/development/external-http-service-standard.md)
 - [Scaffold y cleanup de procesos](doc/info/development/process-scaffold-and-cleanup.md)
 
 ### API
@@ -43,6 +44,9 @@ La documentacion se divide en dos capas complementarias:
 - [Escenarios](doc/info/process-lifecycle/scenarios.md)
 - [Testing](doc/info/process-lifecycle/testing-guide.md)
 - [Batch Preview](doc/info/process-lifecycle/batch-preview-guide.md)
+- [Batch Fanout](doc/info/process-lifecycle/batch-fanout-guide.md)
+- [Capacidad y Stress Batch](doc/info/process-lifecycle/batch-capacity-and-stress-guide.md)
+- [Riesgos Fanout](doc/info/process-lifecycle/batch-fanout-risks.md)
 
 ### Exports
 

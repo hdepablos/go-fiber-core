@@ -1,3 +1,17 @@
+Estandarizar un servicio para la solicitud de apis externas y controlar desde ahí las respuesta y loguear en producción y llegará a
+recibir un erorr 429 o falla 500.
+
+ingresar en la tabla logger:
+paso el timepo de respuesta de las apis externas
+rate limit de procesos por lotes
+... y los siguientes que creas importantes
+
+
+
+
+
+
+
 1 - Cuando se importa se debe colocar un llamado igual al body por bruno pero en la tabla bulk_job_configs y en crar los procesos
 
 2 - crear el endpoint para que se pueda ejecutar el proceso desde el frontend

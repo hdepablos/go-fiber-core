@@ -24,6 +24,7 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 ### Architecture
 
 - [core-architecture-spec.md](architecture/core-architecture-spec.md)
+- [external-http-client-spec.md](architecture/external-http-client-spec.md)
 - [service-design-spec.md](architecture/service-design-spec.md)
 - [service-runtime-bootstrap-spec.md](architecture/service-runtime-bootstrap-spec.md)
 
@@ -34,11 +35,14 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 ### Platform
 
 - [platform-runtime-spec.md](platform/platform-runtime-spec.md)
+- [logger-runtime-spec.md](platform/logger-runtime-spec.md)
 - [makefile-automation-spec.md](platform/makefile-automation-spec.md)
 - [process-scaffold-cleanup-spec.md](platform/process-scaffold-cleanup-spec.md)
 
 ### Process Lifecycle
 
+- [batch-fanout-spec.md](process-lifecycle/batch-fanout-spec.md)
+- [batch-observability-spec.md](process-lifecycle/batch-observability-spec.md)
 - [batch-preview-spec.md](process-lifecycle/batch-preview-spec.md)
 - [process-lifecycle-runtime-spec.md](process-lifecycle/process-lifecycle-runtime-spec.md)
 

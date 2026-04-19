@@ -118,6 +118,71 @@ Casos cubiertos:
 Documento detallado:
 
 - `doc/info/process-lifecycle/batch-preview-guide.md`
+- `doc/info/process-lifecycle/dispatch-pacing-guide.md`
+
+## Dispatch Pacing en `process_batch`
+
+Los procesos batch pueden dosificar el procesamiento por tandas usando `dispatch_pacing` dentro del config del step `process_batch`.
+
+Ejemplo:
+
+```json
+{
+  "dispatch_pacing": {
+    "enabled": true,
+    "messages_per_interval": 3,
+    "interval_seconds": 5
+  }
+}
+```
+
+Esto permite probar escenarios como:
+
+- procesar `3` items,
+- esperar `5` segundos,
+- continuar con los siguientes `3`.
+
+### Qué probar en local
+
+1. Configurar el step `process_batch` con `dispatch_pacing`.
+2. Ejecutar `preview apply_changes` con `10` registros.
+3. Confirmar que la respuesta contiene `apply_changes_metadata.dispatch_pacing`.
+4. Verificar:
+   - `chunk_count`
+   - `chunk_sizes`
+   - `waits_ms`
+   - `slots`
+
+Requests recomendados:
+
+- `bruno/api/v1/process-lifecycle/post-batch-preview-apply-changes-pacing.bru`
+- `bruno/legacy/process-lifecycle/test-batch-process/preview - batch - item_ids - apply_changes.bru`
+
+### Qué diferencia hay entre `preview` y `run`
+
+- `preview apply_changes`:
+  - sirve para validar el pacing con una muestra controlada,
+  - devuelve metadata detallada del pacing,
+  - no ejecuta el lifecycle completo del padre.
+- `run`:
+  - ejecuta el lifecycle completo,
+  - respeta el mismo `dispatch_pacing` del step,
+  - pero ya no está acotado a la muestra del preview.
+
+## Fan-out Batch para Lambda/EKS
+
+Los procesos batch ya contemplan un modo de fan-out distribuido basado en:
+
+- `start`
+- `dispatch_shards`
+- `process_batch`
+- `finalize`
+
+Documentos relacionados:
+
+- `doc/info/process-lifecycle/batch-fanout-guide.md`
+- `doc/info/process-lifecycle/batch-fanout-risks.md`
+- `doc/specs/process-lifecycle/batch-fanout-spec.md`
 
 ## Caso 2: Ejecución Paralela y Recursiva (ASYNC Batching)
 

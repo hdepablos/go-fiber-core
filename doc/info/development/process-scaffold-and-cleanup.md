@@ -40,11 +40,18 @@ Uso típico:
 make create-batch-process process_name="procesar x" service_slug="procesar_x"
 ```
 
+Si el scaffold ya existe y se quiere regenerar sobrescribiendo archivos generados:
+
+```bash
+make create-batch-process process_name="procesar x" service_slug="procesar_x" force=true
+```
+
 Uso típico:
 
 - genera el servicio batch,
 - registra imports necesarios,
-- registra el seeder,
+- genera el seeder base secuencial,
+- genera el seeder adicional `_fanout`,
 - cablea `runtimebootstrap`,
 - y deja el proceso listo para probarse con la carpeta genérica de Bruno.
 
@@ -120,9 +127,31 @@ El scaffold de batch crea normalmente:
 - `data_provider.go`
 - `processor.go`
 - `lifecycle.go`
-- seeder del proceso
+- seeder base del proceso: `batch_process_<service_slug>`
+- seeder fanout del proceso: `batch_process_<service_slug>_fanout`
 
 No crea una carpeta Bruno nueva por proceso.
+
+## Modelo recomendado para versiones batch
+
+La convención actual para un batch nuevo es:
+
+- un solo `process_type` por negocio, por ejemplo `imputations`
+- una versión base secuencial
+- una versión adicional fanout
+
+Ejemplo:
+
+- `process_type`: `imputations`
+- seeder base: `batch_process_imputations`
+- seeder fanout: `batch_process_imputations_fanout`
+- label base recomendado: `imputations`
+- label fanout recomendado: `imputations fanout`
+
+La idea es no mezclar:
+
+- nombre del proceso de negocio
+- nombre del perfil técnico de ejecución
 
 ## Qué elimina `delete-process`
 
@@ -132,6 +161,7 @@ El cleanup elimina, cuando existen:
 
 - carpeta `internal/services/<service_slug>/`
 - archivo de seeder del proceso
+- archivo de seeder fanout del proceso
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
 - wiring en `internal/runtimebootstrap/bootstrap.go`
@@ -156,7 +186,8 @@ El cleanup elimina, cuando existen:
 ### Caso 1: batch process nuevo
 
 1. crear el scaffold con `make create-batch-process`
-2. ejecutar el seeder
+2. ejecutar el seeder base secuencial
+3. ejecutar el seeder fanout si se quiere comparar rendimiento
 3. abrir `test-batch-process`
 4. ajustar `process_type_id`, `process_version_id`, `sede_id`, `bulk_job_id`
 5. probar `prepare`
@@ -195,6 +226,11 @@ Revisar:
 - wiring en `internal/runtimebootstrap/bootstrap.go`
 - registro del seeder
 - `process_type_id` y `override_process_version_id` usados en Bruno
+
+### `create-batch-process force=true` no sobrescribe
+
+Revisar que el comando Makefile ejecute el flag booleano como `-with-bruno=false`.
+El scaffold batch usa flags booleanos de Go, por lo que la forma `-with-bruno false` puede cortar el parseo antes de llegar a `-force`.
 
 ### El request Bruno apunta a otro proceso
 

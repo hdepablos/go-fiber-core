@@ -1,0 +1,42 @@
+meta {
+  name: post-batch-preview-apply-changes-pacing
+  type: http
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "process_type_id": {{process_type_id}},
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0,
+  "mode": "all",
+  "apply_changes": true,
+  "limit": 10,
+  "item_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "input": {
+    "id": 2,
+    "key_redis": "preview-batch-pacing-demo",
+    "filters": [
+      {
+        "field": "status_code",
+        "operator": "eq",
+        "value": "IMPORTED"
+      }
+    ]
+  }
+}
+}

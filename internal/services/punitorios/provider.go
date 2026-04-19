@@ -105,6 +105,7 @@ func init() {
 		return previewable, nil
 	},
 		"bulk/process/punitorios/start",
+		"bulk/process/punitorios/dispatch_shards",
 		"bulk/process/punitorios/process_batch",
 		"bulk/process/punitorios/finalize",
 	)

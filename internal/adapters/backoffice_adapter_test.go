@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"go-fiber-core/internal/dtos"
+	"go-fiber-core/internal/dtos/config"
+	"go-fiber-core/internal/services/externalhttp"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,7 +24,7 @@ func setupTestServer(handler http.HandlerFunc) (*httptest.Server, *BackofficeAda
 	// Creamos un cliente Resty que apunta a la URL de nuestro servidor de prueba.
 	httpClient := resty.New().SetBaseURL(server.URL)
 
-	adapter := NewBackofficeAdapter(httpClient)
+	adapter := NewBackofficeAdapterWithService(config.ApiConfig{Url: server.URL}, externalhttp.NewClient(httpClient, nil))
 
 	return server, adapter
 }

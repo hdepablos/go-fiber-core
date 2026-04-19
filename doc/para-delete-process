@@ -1,0 +1,8 @@
+make delete-process kind=batch-process service_slug=imputations dry_run=true
+make delete-process kind=batch-process service_slug=imputations_sequential dry_run=true
+make delete-process kind=batch-process service_slug=imputations
+make delete-process kind=batch-process service_slug=imputations_sequential
+
+
+
+make create-batch-process process_name="imputations" service_slug="imputations" force=true

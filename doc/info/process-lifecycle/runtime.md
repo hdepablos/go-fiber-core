@@ -9,6 +9,11 @@ Este documento describe cómo funciona en tiempo de ejecución el **Process Life
 - Manejo de errores (`ErrCritical`, `ErrTolerable`, `error_tolerance`).
 - Comandos CLI de ejemplo.
 
+Para el modo batch distribuido con fan-out sobre Lambda/EKS ver además:
+
+- `doc/info/process-lifecycle/batch-fanout-guide.md`
+- `doc/info/process-lifecycle/batch-fanout-risks.md`
+
 ---
 
 ## 1. ServiceContext: bolsa de datos de negocio

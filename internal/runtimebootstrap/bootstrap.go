@@ -15,7 +15,9 @@ import (
 	bulkexportv2 "go-fiber-core/internal/services/test/bulkexportV2"
 	bulkexportv1 "go-fiber-core/internal/services/test/bulkexportv1"
 
-	"go-fiber-core/internal/services/punitorios")
+	"go-fiber-core/internal/services/imputations"
+	"go-fiber-core/internal/services/punitorios"
+)
 
 type Dependencies struct {
 	Dispatcher  dispatcher.Dispatcher
@@ -23,7 +25,8 @@ type Dependencies struct {
 	BulkV1      bulkexportv1.Provider
 	BulkV2      bulkexportv2.Provider
 	Galicia     galicia.Provider
-	Punitorios punitorios.Provider
+	Imputations imputations.Provider
+	Punitorios  punitorios.Provider
 }
 
 func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectDTO, queueService queue.MessageQueue) (*Dependencies, error) {
@@ -70,11 +73,16 @@ func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectD
 		errs = append(errs, fmt.Sprintf("galicia: %v", err))
 	}
 
-
 	if prov, err := punitorios.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis); err == nil {
 		deps.Punitorios = prov
 	} else {
 		errs = append(errs, fmt.Sprintf("punitorios: %v", err))
+	}
+
+	if prov, err := imputations.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis); err == nil {
+		deps.Imputations = prov
+	} else {
+		errs = append(errs, fmt.Sprintf("imputations: %v", err))
 	}
 
 	if len(errs) > 0 {
@@ -102,6 +110,10 @@ func (d *Dependencies) Inject(ctx context.Context) context.Context {
 	if d.Galicia != nil {
 		ctx = galicia.WithProvider(ctx, d.Galicia)
 	}
+	if d.Imputations != nil {
+		ctx = imputations.WithProvider(ctx, d.Imputations)
+	}
+
 	if d.Punitorios != nil {
 		ctx = punitorios.WithProvider(ctx, d.Punitorios)
 	}

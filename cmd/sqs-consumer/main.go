@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"log/slog" // Uso de logger estructurado (Go 1.21+)
+	"log/slog" // Uso de logger estructurado (Go 1.21+
 	"os"
 	"runtime"
 	"time"
@@ -33,7 +33,9 @@ import (
 	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
 
-	_ "go-fiber-core/internal/services/punitorios")
+	_ "go-fiber-core/internal/services/imputations"
+	_ "go-fiber-core/internal/services/punitorios"
+)
 
 var (
 	appContainer *di.AppContainer
@@ -260,6 +262,15 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 	if stepReq.ServicePath != "" {
 		slog.Info("🔄 Executing Async Step", "service", stepReq.ServicePath, "order", stepReq.StepOrder)
 
+		if stepReq.ServiceConfig == nil {
+			stepReq.ServiceConfig = resolveStepConfig(ctx, stepReq.ServicePath, stepReq.Input)
+		}
+		if !stepReq.ExecutionPolicy.AutoInvoke.Enabled && stepReq.ExecutionPolicy.NextStep == "" && len(stepReq.ExecutionPolicy.Mode) == 0 {
+			if cfgPolicy := extractExecutionPolicy(stepReq.ServiceConfig); cfgPolicy != nil {
+				stepReq.ExecutionPolicy = *cfgPolicy
+			}
+		}
+
 		// Reconstruir ServiceContext
 		// Nota: El input viene serializado, necesitamos asegurarnos de que los tipos se respeten.
 		// json.Unmarshal decodifica números como float64, hay que tenerlo en cuenta en los servicios.
@@ -404,13 +415,30 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 				} else {
 					slog.Info("✅ [Auto-Invoke] All batches finished (stop_condition=true)", "stop_field", stopField, "cursor", nextCursor)
 
-					if policy.NextStep != "" {
+					shouldDispatchNextStep := true
+					if raw, ok := stepReq.Input["should_dispatch_next_step"]; ok {
+						if parsed, ok := raw.(bool); ok {
+							shouldDispatchNextStep = parsed
+						}
+					}
+					if stepRes, ok := svcCtx.GetResult(stepReq.ServicePath); ok && stepRes.Data != nil {
+						if raw, ok := stepRes.Data["should_dispatch_next_step"]; ok {
+							if parsed, ok := raw.(bool); ok {
+								shouldDispatchNextStep = parsed
+							}
+						}
+					}
+
+					if policy.NextStep != "" && shouldDispatchNextStep {
 						finalReq := DispatchStepRequest{
 							ServicePath:        policy.NextStep,
 							ProcessExecutionID: stepReq.ProcessExecutionID,
 							Input:              stepReq.Input,
 							StepOrder:          stepReq.StepOrder + 1,
 							ServiceConfig:      resolveStepConfig(ctx, policy.NextStep, stepReq.Input),
+						}
+						if cfgPolicy := extractExecutionPolicy(finalReq.ServiceConfig); cfgPolicy != nil {
+							finalReq.ExecutionPolicy = *cfgPolicy
 						}
 
 						finalBytes, err := json.Marshal(finalReq)
@@ -431,6 +459,8 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 							return err
 						}
 						slog.Info("✅ [Auto-Invoke] Finalize step message queued", "service", policy.NextStep, "total_processed", stepReq.Input["total_processed"])
+					} else if policy.NextStep != "" && !shouldDispatchNextStep {
+						slog.Info("ℹ️ [Auto-Invoke] Shard finalizado sin disparar next_step global", "service", stepReq.ServicePath)
 					}
 				}
 			} else {
@@ -495,6 +525,25 @@ func resolveStepConfig(ctx context.Context, servicePath string, input map[string
 	}
 
 	return nil
+}
+
+func extractExecutionPolicy(cfg map[string]any) *contracts.ExecutionPolicy {
+	if cfg == nil {
+		return nil
+	}
+	raw, ok := cfg["execution_policy"]
+	if !ok || raw == nil {
+		return nil
+	}
+	bytes, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var policy contracts.ExecutionPolicy
+	if err := json.Unmarshal(bytes, &policy); err != nil {
+		return nil
+	}
+	return &policy
 }
 
 func getInt64FromAny(v any) int64 {

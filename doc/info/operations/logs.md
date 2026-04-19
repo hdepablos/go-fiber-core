@@ -25,6 +25,82 @@ Recomendaciones:
   - `APP_ENV=local`
   - `LOG_OUTPUT=both` para mantener archivos locales y enviar a CloudWatch (LocalStack)
 
+### Convención operativa por entorno
+
+Para nuevas solicitudes de logger del proyecto, la convención canónica es:
+
+- producción: escribir a `stdout` para que AWS capture los logs en CloudWatch,
+- local: usar logger por proceso específico,
+- local con archivo dedicado: usar un logger explícito orientado al proceso o dominio que se quiere depurar.
+
+Esto significa:
+
+- no se debe diseñar el logger de producción pensando en escribir archivos locales,
+- no se debe usar un logger genérico sin nombre cuando el flujo pertenece a un proceso identificable,
+- y en local se debe preferir `GetLogger("nombre_proceso")` o `GetLoggerToFile("nombre_proceso", "...")` según el caso.
+
+### Producción en AWS
+
+En producción, EKS o Lambda, la salida esperada es `stdout`.
+
+AWS y/o la infraestructura contenedorizada son responsables de:
+
+- capturar `stdout`,
+- enrutarlo a CloudWatch Logs,
+- aplicar retención,
+- y permitir filtros o alarmas posteriores.
+
+Patrón esperado:
+
+- `APP_ENV != local`
+- `LOG_OUTPUT=stdout`, o dejarlo vacío para usar el default no local
+
+Esto aplica también a logs estructurados como:
+
+- `redis_guard`
+- `rate_limit_guard`
+- logs de adapters externos
+- logs batch por proceso
+
+### Local por proceso específico
+
+En local, la unidad mínima recomendada de logging es el proceso o caso de uso.
+
+Ejemplos:
+
+```go
+log := logger.GetLogger("punitorios")
+```
+
+```go
+log := logger.GetLogger("process-lifecycle")
+```
+
+```go
+log := logger.GetLoggerToFile("imputations", "pkg/logs/imputations-debug.log")
+```
+
+Objetivo:
+
+- separar debugging por proceso,
+- evitar ruido cruzado entre dominios,
+- y facilitar soporte puntual sin contaminar todos los logs locales.
+
+### Regla práctica para nuevas implementaciones
+
+Si te piden "logger" para una funcionalidad nueva:
+
+1. En producción, asumir salida a AWS via `stdout`.
+2. En local, usar logger por proceso específico.
+3. Si se necesita archivo local dedicado, usar `GetLoggerToFile(...)`.
+4. Mantener nombres de logger estables y alineados con el proceso, servicio o integración.
+
+No conviene:
+
+- crear un logger local genérico para todo el sistema,
+- mezclar un mismo archivo para múltiples procesos pesados,
+- o desviar producción a archivos locales como estrategia principal.
+
 ### Variables de Terraform
 
 - `project_name`: nombre del proyecto (usado en nombres y tags)
@@ -78,6 +154,42 @@ Retorna un mapa con los nombres de los Log Groups por servicio para fácil refer
 - Producción: usa `log_retention_in_days` bajo para reducir costos (p. ej. 7 a 14 días).
 - Depuración puntual: activa `enable_cloudwatch_in_local` en local y `DB_LOG_LEVEL=warn` con `DB_SLOW_THRESHOLD_MS` para identificar consultas lentas.
 - Seguridad: evita `info` en producción para no exponer datos sensibles en los logs.
+
+## Filtros recomendados para batch fanout
+
+El motor batch usa dos familias de logs estructurados para observabilidad operativa:
+
+- `log_type=redis_guard`
+- `log_type=rate_limit_guard`
+
+Filtros sugeridos en CloudWatch Logs Insights o filtros de patrones:
+
+```text
+{ $.log_type = "redis_guard" }
+```
+
+```text
+{ $.log_type = "rate_limit_guard" }
+```
+
+```text
+{ $.log_type = "rate_limit_guard" && $.event_type = "external_http_429" }
+```
+
+```text
+{ $.log_type = "rate_limit_guard" && $.scope = "internal" }
+```
+
+```text
+{ $.log_type = "rate_limit_guard" && $.event_type = "external_dependency_timeout" }
+```
+
+Esto permite separar rápidamente:
+
+- errores Redis del núcleo batch,
+- rate limit interno del core,
+- respuestas `429` de APIs internas o externas,
+- y timeouts de dependencias HTTP externas.
 
 ## Configuración de Logs de Base de Datos
 

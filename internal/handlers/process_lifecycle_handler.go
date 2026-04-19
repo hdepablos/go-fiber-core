@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"sort"
@@ -424,6 +425,10 @@ func (h *processLifecycleHandler) PreviewBatch(c *fiber.Ctx) error {
 	if err != nil {
 		return responses.Error(c, fiber.StatusInternalServerError, "Error consultando process version para preview batch", fiber.Map{"error": err.Error()})
 	}
+	dispatchPacing, err := resolveDispatchPacingFromSteps(steps)
+	if err != nil {
+		return responses.Error(c, fiber.StatusUnprocessableEntity, "Config inválido de dispatch_pacing para preview batch", fiber.Map{"error": err.Error()})
+	}
 
 	previewSvc, err := batchflow.DefaultPreviewService()
 	if err != nil {
@@ -437,6 +442,7 @@ func (h *processLifecycleHandler) PreviewBatch(c *fiber.Ctx) error {
 		ExecutionKeys:            extractExecutionKeys(steps),
 		Mode:                     req.Mode,
 		ApplyChanges:             req.ApplyChanges,
+		DispatchPacing:           dispatchPacing,
 		Input:                    input,
 		BatchSize:                req.BatchSize,
 		Limit:                    req.Limit,
@@ -472,6 +478,23 @@ func extractExecutionKeys(steps []processlifecycle.Step) []string {
 		keys = append(keys, step.ExecutionKey)
 	}
 	return keys
+}
+
+func resolveDispatchPacingFromSteps(steps []processlifecycle.Step) (batchflow.DispatchPacingConfig, error) {
+	for _, step := range steps {
+		if !strings.Contains(strings.ToLower(strings.TrimSpace(step.ExecutionKey)), "process_batch") {
+			continue
+		}
+		if len(step.Config) == 0 {
+			return batchflow.DispatchPacingConfig{}, nil
+		}
+		var cfg map[string]any
+		if err := json.Unmarshal(step.Config, &cfg); err != nil {
+			return batchflow.DispatchPacingConfig{}, err
+		}
+		return batchflow.ResolveDispatchPacingConfig(cfg)
+	}
+	return batchflow.DispatchPacingConfig{}, nil
 }
 
 func getStringFromMap(input map[string]any, key string) string {

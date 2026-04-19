@@ -17,6 +17,7 @@ Complementa la guia humana:
 
 - `doc/info/process-lifecycle/batch-preview-guide.md`
 - `doc/info/process-lifecycle/testing-guide.md`
+- `doc/info/process-lifecycle/dispatch-pacing-guide.md`
 
 ## Contratos de entrada
 
@@ -40,6 +41,7 @@ Campos opcionales:
 - `item_ids`
 - `row_numbers`
 - `apply_changes`
+- `apply_changes_metadata`
 
 ## Reglas de resolucion
 
@@ -84,6 +86,7 @@ Reglas adicionales:
   1. resolver la misma seleccion del preview,
   2. ejecutar `BatchPreviewer.PreviewBatch`,
   3. ejecutar `BatchProcessor.ProcessBatch` sobre exactamente los mismos items.
+- Si el step `process_batch` resuelto tiene `dispatch_pacing`, `apply_changes` debe respetar esa configuración.
 
 ## Invariantes de persistencia
 
@@ -92,6 +95,15 @@ Reglas adicionales:
 - `apply_changes` no debe ejecutar `Finalizer`.
 - `apply_changes` no debe cerrar ni recalcular el estado global del padre.
 - La respuesta debe indicar `applied_changes = true` cuando la persistencia se haya ejecutado.
+- Cuando `dispatch_pacing` aplique, la respuesta debe incluir `apply_changes_metadata.dispatch_pacing`.
+- `apply_changes_metadata.dispatch_pacing` debe informar al menos:
+  - `enabled`
+  - `messages_per_interval`
+  - `interval_seconds`
+  - `chunk_count`
+  - `chunk_sizes`
+  - `waits_ms`
+  - `slots`
 
 ## Errores esperados
 
@@ -109,6 +121,7 @@ Reglas adicionales:
 - Un proceso `batchflow` con provider completo permite `prepare`, `all` y `batch`.
 - El mismo conjunto de items renderizado por preview puede persistirse con `apply_changes=true`.
 - En local, un request con `item_ids` y `apply_changes=true` modifica solo esos registros.
+- En local, un request con `item_ids` y `apply_changes=true` refleja `dispatch_pacing` en `apply_changes_metadata` cuando el step lo define.
 - En entornos no locales, el mismo request se rechaza.
 - La colección Bruno debe exponer ejemplos de:
   - `prepare`
@@ -117,6 +130,7 @@ Reglas adicionales:
   - `item_ids`
   - `row_numbers`
   - `item_ids + apply_changes`
+  - `item_ids + apply_changes + dispatch_pacing`
   - `run` filtrado
 
 ## Trazabilidad
@@ -131,3 +145,4 @@ Reglas adicionales:
 - Documentacion humana:
   - `doc/info/process-lifecycle/batch-preview-guide.md`
   - `doc/info/process-lifecycle/testing-guide.md`
+  - `doc/info/process-lifecycle/dispatch-pacing-guide.md`

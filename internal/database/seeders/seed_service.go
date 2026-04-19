@@ -48,8 +48,12 @@ func ListSeedersNames() []string {
 		"multi_queue_batch_one_table_process_lifecycle",
 		"multi_queue_batch_one_table_recreate_records",
 		"bulk_process_generic",
+		"bulk_process_generic_fanout",
 		"export_manager_generar_archivo_banco_galicia",
 		"batch_process_punitorios",
+		"batch_process_punitorios_fanout",
+		"batch_process_imputations",
+		"batch_process_imputations_fanout",
 		"all_menus",
 	}
 }
@@ -316,12 +320,28 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return BulkProcessGenericSeeder(pool)
 	})
 
+	service.AddSeeder("bulk_process_generic_fanout", func() error {
+		return BulkProcessGenericFanoutSeeder(pool)
+	})
+
 	service.AddSeeder("export_manager_generar_archivo_banco_galicia", func() error {
 		return ExportManagerGenerarArchivoBancoGaliciaSeeder(pool)
 	})
 
 	service.AddSeeder("batch_process_punitorios", func() error {
 		return BatchProcessPunitoriosSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_punitorios_fanout", func() error {
+		return BatchProcessPunitoriosFanoutSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_imputations", func() error {
+		return BatchProcessImputationsSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_imputations_fanout", func() error {
+		return BatchProcessImputationsFanoutSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {

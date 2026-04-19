@@ -16,50 +16,43 @@ type options struct {
 	ServiceSlug       string
 	BatchSize         int
 	ConcurrentBatches int
+	ParallelShards    int
 	RedisTTLHours     int
-	BulkJobID         int64
 	WithBruno         bool
 	Force             bool
 }
 
 type scaffoldData struct {
-	ProcessName       string
-	ServiceSlug       string
-	PackageName       string
-	PascalName        string
-	DependencyField   string
-	SeedName          string
-	SeederFuncName    string
-	ExecutionBase     string
-	StartKey          string
-	ProcessBatchKey   string
-	FinalizeKey       string
-	BatchSize         int
-	ConcurrentBatches int
-	RedisTTLHours     int
-	BulkJobID         int64
-	ProcessTypeVar    string
-	BulkJobVar        string
-	RedisKeyVar       string
-	ImportPath        string
+	ProcessName          string
+	ServiceSlug          string
+	PackageName          string
+	PascalName           string
+	DependencyField      string
+	SeedName             string
+	FanoutSeedName       string
+	SeederFuncName       string
+	FanoutSeederFuncName string
+	ExecutionBase        string
+	StartKey             string
+	DispatchKey          string
+	ProcessBatchKey      string
+	FinalizeKey          string
+	BatchSize            int
+	ConcurrentBatches    int
+	ParallelShards       int
+	RedisTTLHours        int
+	ImportPath           string
 }
 
 type generatedPaths struct {
-	serviceDir              string
-	providerFile            string
-	stepsFile               string
-	dataProviderFile        string
-	processorFile           string
-	lifecycleFile           string
-	seederFile              string
-	runBrunoFile            string
-	previewFolderFile       string
-	previewPrepareFile      string
-	previewAllFile          string
-	previewBatchIndexFile   string
-	previewItemIDsFile      string
-	previewApplyItemIDsFile string
-	previewRowNumbersFile   string
+	serviceDir       string
+	providerFile     string
+	stepsFile        string
+	dataProviderFile string
+	processorFile    string
+	lifecycleFile    string
+	seederFile       string
+	fanoutSeederFile string
 }
 
 func main() {
@@ -91,7 +84,8 @@ func main() {
 		paths.dataProviderFile: renderDataProvider(data),
 		paths.processorFile:    renderProcessor(data),
 		paths.lifecycleFile:    renderLifecycle(data),
-		paths.seederFile:       renderSeeder(data),
+		paths.seederFile:       renderSequentialSeeder(data),
+		paths.fanoutSeederFile: renderFanoutSeeder(data),
 	}
 
 	for path, content := range files {
@@ -118,6 +112,7 @@ func main() {
 	fmt.Printf("Service Slug: %s\n", data.ServiceSlug)
 	fmt.Println("Execution Keys:")
 	fmt.Printf("- %s\n", data.StartKey)
+	fmt.Printf("- %s\n", data.DispatchKey)
 	fmt.Printf("- %s\n", data.ProcessBatchKey)
 	fmt.Printf("- %s\n", data.FinalizeKey)
 	fmt.Println("Archivos creados:")
@@ -129,7 +124,8 @@ func main() {
 	fmt.Println("2. Reemplazar la logica de ProcessBatch/PreviewBatch")
 	fmt.Println("3. Ajustar el ParentLifecycle/Finalizer si el padre no es bulk_jobs")
 	fmt.Printf("4. Ejecutar el seeder: make seed-one name=%s\n", data.SeedName)
-	fmt.Println("5. Usar bruno/legacy/process-lifecycle/test-batch-process con process_type_id, override_process_version_id y sede_id")
+	fmt.Printf("5. Ejecutar el seeder fanout: make seed-one name=%s\n", data.FanoutSeedName)
+	fmt.Println("6. Usar bruno/legacy/process-lifecycle/test-batch-process con process_type_id, override_process_version_id y sede_id")
 }
 
 func parseOptions() options {
@@ -138,8 +134,8 @@ func parseOptions() options {
 	flag.StringVar(&opts.ServiceSlug, "service-slug", "", "Slug tecnico del servicio")
 	flag.IntVar(&opts.BatchSize, "batch-size", 500, "Tamano del lote")
 	flag.IntVar(&opts.ConcurrentBatches, "concurrent-batches", 1, "Cantidad de lotes por invocacion")
+	flag.IntVar(&opts.ParallelShards, "parallel-shards", 4, "Cantidad de shards distribuidos para la version fanout")
 	flag.IntVar(&opts.RedisTTLHours, "redis-ttl-hours", 24, "TTL de Redis en horas")
-	flag.Int64Var(&opts.BulkJobID, "bulk-job-id", 0, "BulkJobID sugerido para Bruno")
 	flag.BoolVar(&opts.WithBruno, "with-bruno", false, "Genera requests Bruno base (deshabilitado por defecto: usar test-batch-process parametrizado)")
 	flag.BoolVar(&opts.Force, "force", false, "Sobrescribe archivos generados si existen")
 	flag.Parse()
@@ -174,6 +170,9 @@ func enrichOptions(opts *options) error {
 	if opts.ConcurrentBatches <= 0 {
 		opts.ConcurrentBatches = 1
 	}
+	if opts.ParallelShards <= 0 {
+		opts.ParallelShards = 4
+	}
 	if opts.RedisTTLHours <= 0 {
 		opts.RedisTTLHours = 24
 	}
@@ -184,25 +183,25 @@ func buildScaffoldData(opts options) scaffoldData {
 	pascal := toPascal(opts.ServiceSlug)
 	execBase := fmt.Sprintf("bulk/process/%s", opts.ServiceSlug)
 	return scaffoldData{
-		ProcessName:       opts.ProcessName,
-		ServiceSlug:       opts.ServiceSlug,
-		PackageName:       opts.ServiceSlug,
-		PascalName:        pascal,
-		DependencyField:   pascal,
-		SeedName:          "batch_process_" + opts.ServiceSlug,
-		SeederFuncName:    "BatchProcess" + pascal + "Seeder",
-		ExecutionBase:     execBase,
-		StartKey:          execBase + "/start",
-		ProcessBatchKey:   execBase + "/process_batch",
-		FinalizeKey:       execBase + "/finalize",
-		BatchSize:         opts.BatchSize,
-		ConcurrentBatches: opts.ConcurrentBatches,
-		RedisTTLHours:     opts.RedisTTLHours,
-		BulkJobID:         opts.BulkJobID,
-		ProcessTypeVar:    "process_type_id_" + opts.ServiceSlug,
-		BulkJobVar:        "bulk_job_id_" + opts.ServiceSlug,
-		RedisKeyVar:       "redis_key_" + opts.ServiceSlug,
-		ImportPath:        "go-fiber-core/internal/services/" + opts.ServiceSlug,
+		ProcessName:          opts.ProcessName,
+		ServiceSlug:          opts.ServiceSlug,
+		PackageName:          opts.ServiceSlug,
+		PascalName:           pascal,
+		DependencyField:      pascal,
+		SeedName:             "batch_process_" + opts.ServiceSlug,
+		FanoutSeedName:       "batch_process_" + opts.ServiceSlug + "_fanout",
+		SeederFuncName:       "BatchProcess" + pascal + "Seeder",
+		FanoutSeederFuncName: "BatchProcess" + pascal + "FanoutSeeder",
+		ExecutionBase:        execBase,
+		StartKey:             execBase + "/start",
+		DispatchKey:          execBase + "/dispatch_shards",
+		ProcessBatchKey:      execBase + "/process_batch",
+		FinalizeKey:          execBase + "/finalize",
+		BatchSize:            opts.BatchSize,
+		ConcurrentBatches:    opts.ConcurrentBatches,
+		ParallelShards:       opts.ParallelShards,
+		RedisTTLHours:        opts.RedisTTLHours,
+		ImportPath:           "go-fiber-core/internal/services/" + opts.ServiceSlug,
 	}
 }
 
@@ -216,6 +215,7 @@ func scaffoldPaths(data scaffoldData) generatedPaths {
 		processorFile:    filepath.Join(serviceDir, "processor.go"),
 		lifecycleFile:    filepath.Join(serviceDir, "lifecycle.go"),
 		seederFile:       filepath.Join("/private/var/www/go-fiber-core/internal/database/seeders", data.ServiceSlug+"_seeder.go"),
+		fanoutSeederFile: filepath.Join("/private/var/www/go-fiber-core/internal/database/seeders", data.ServiceSlug+"_fanout_seeder.go"),
 	}
 }
 
@@ -231,6 +231,7 @@ func ensurePaths(paths generatedPaths, withBruno bool, force bool) error {
 		paths.processorFile,
 		paths.lifecycleFile,
 		paths.seederFile,
+		paths.fanoutSeederFile,
 	}
 	for _, path := range all {
 		if _, err := os.Stat(path); err == nil {
@@ -256,10 +257,29 @@ func patchImportBlock(filePath, importLine string) error {
 	}
 	rest := fileStr[start:]
 	end := strings.Index(rest, "\n)")
-	if end == -1 {
+	insertPos := -1
+	if end != -1 {
+		insertPos = start + end + 1
+	} else {
+		// Compatibilidad con archivos dañados donde el cierre quedó pegado al último import.
+		searchStart := start + len("import (")
+		for i := searchStart; i < len(fileStr); i++ {
+			if fileStr[i] != ')' {
+				continue
+			}
+			lineStart := strings.LastIndex(fileStr[:i], "\n") + 1
+			line := fileStr[lineStart:i]
+			trimmed := strings.TrimSpace(line)
+			if strings.Contains(trimmed, "\"") {
+				insertPos = i
+				break
+			}
+		}
+	}
+	if insertPos == -1 {
 		return fmt.Errorf("no se encontro cierre de imports en %s", filePath)
 	}
-	insertPos := start + end + 1
+
 	newContent := fileStr[:insertPos] + "\n\t" + importLine + fileStr[insertPos:]
 	return os.WriteFile(filePath, []byte(newContent), 0o644)
 }
@@ -272,8 +292,14 @@ func patchSeedService(data scaffoldData) error {
 	}
 	fileStr := string(content)
 
-	listEntry := fmt.Sprintf("\t\t%q,", data.SeedName)
-	if !strings.Contains(fileStr, listEntry) {
+	listEntries := []string{
+		fmt.Sprintf("\t\t%q,", data.SeedName),
+		fmt.Sprintf("\t\t%q,", data.FanoutSeedName),
+	}
+	for _, listEntry := range listEntries {
+		if strings.Contains(fileStr, listEntry) {
+			continue
+		}
 		anchor := "\t\t\"all_menus\","
 		if !strings.Contains(fileStr, anchor) {
 			return fmt.Errorf("no se encontro anchor para ListSeedersNames")
@@ -281,12 +307,22 @@ func patchSeedService(data scaffoldData) error {
 		fileStr = strings.Replace(fileStr, anchor, listEntry+"\n"+anchor, 1)
 	}
 
-	funcBlock := fmt.Sprintf(`	service.AddSeeder(%q, func() error {
+	funcBlocks := []string{
+		fmt.Sprintf(`	service.AddSeeder(%q, func() error {
 		return %s(pool)
 	})
 
-`, data.SeedName, data.SeederFuncName)
-	if !strings.Contains(fileStr, data.SeedName) || !strings.Contains(fileStr, data.SeederFuncName) {
+`, data.SeedName, data.SeederFuncName),
+		fmt.Sprintf(`	service.AddSeeder(%q, func() error {
+		return %s(pool)
+	})
+
+`, data.FanoutSeedName, data.FanoutSeederFuncName),
+	}
+	for _, funcBlock := range funcBlocks {
+		if strings.Contains(fileStr, strings.TrimSpace(funcBlock)) {
+			continue
+		}
 		anchor := `	service.AddSeeder("all_menus", func() error {`
 		if !strings.Contains(fileStr, anchor) {
 			return fmt.Errorf("no se encontro anchor para registerSeeders")
@@ -503,9 +539,10 @@ func init() {
 		%q,
 		%q,
 		%q,
+		%q,
 	)
 }
-`, data.PackageName, data.PackageName+".provider", data.RedisTTLHours, data.ProcessName, data.StartKey, data.ProcessBatchKey, data.FinalizeKey)
+`, data.PackageName, data.PackageName+".provider", data.RedisTTLHours, data.ProcessName, data.StartKey, data.DispatchKey, data.ProcessBatchKey, data.FinalizeKey)
 }
 
 func renderSteps(data scaffoldData) string {
@@ -519,9 +556,18 @@ import (
 
 	"go-fiber-core/internal/domain"
 	"go-fiber-core/internal/services/batchflow"
+	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 	"go-fiber-core/internal/utils"
+)
+
+const (
+	startExecutionKey        = %q
+	dispatchExecutionKey     = %q
+	processBatchExecutionKey = %q
+	finalizeExecutionKey     = %q
+	processBatchStepOrder    = 3
 )
 
 type startStep struct {
@@ -594,10 +640,80 @@ func (s *startStep) Execute() error {
 	return nil
 }
 
+type dispatchShardsStep struct {
+	ctx            *contracts.ServiceContext
+	servicePath    string
+	parallelShards int
+}
+
+func NewDispatchShardsStep() contracts.Service {
+	return &dispatchShardsStep{parallelShards: 1}
+}
+
+func (s *dispatchShardsStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+	s.ctx = ctx
+	s.servicePath = servicePath
+	s.parallelShards = resolveParallelShards(ctx)
+}
+
+func (s *dispatchShardsStep) Execute() error {
+	prov, err := ProviderFromContext(s.ctx.Ctx)
+	if err != nil {
+		return err
+	}
+	dispatcherSvc, ok := runtimectx.Dispatcher(s.ctx.Ctx)
+	if !ok {
+		return fmt.Errorf("dispatcher no disponible en contexto")
+	}
+	input, err := buildInput(s.ctx)
+	if err != nil {
+		return err
+	}
+
+	totalBatches := utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches"))
+	dispatchRes, err := prov.Manager().DispatchShards(s.ctx.Ctx, batchflow.DispatchRequest{
+		Input:          input,
+		TotalBatches:   totalBatches,
+		ParallelShards: s.parallelShards,
+	})
+	if err != nil {
+		markFailure(prov, s.ctx.Ctx, input, err)
+		return err
+	}
+
+	baseInput := s.ctx.SnapshotInput()
+	for shardIndex, batchIndex := range dispatchRes.InitialBatchIndexes {
+		shardInput := cloneInput(baseInput)
+		shardInput["batch_index"] = batchIndex
+		shardInput["shard_index"] = shardIndex
+		shardInput["total_shards"] = dispatchRes.TotalShards
+		shardInput["is_shard_complete"] = false
+
+		childCtx := contracts.NewServiceContextFromInput(s.ctx.Ctx, shardInput)
+		if err := dispatcherSvc.DispatchStep(s.ctx.Ctx, processBatchExecutionKey, processBatchStepOrder, contracts.ExecutionPolicy{}, nil, childCtx); err != nil {
+			return err
+		}
+	}
+
+	s.ctx.SetInputValue("__stop_chain", true)
+	s.ctx.SetResult(s.servicePath, contracts.StepResult{
+		Status:  "completed",
+		Message: "fan-out de shards despachado",
+		Data: map[string]any{
+			"parallel_shards":   dispatchRes.TotalShards,
+			"dispatched_shards": len(dispatchRes.InitialBatchIndexes),
+			"__stop_chain":      true,
+		},
+	})
+	return nil
+}
+
 type processBatchStep struct {
 	ctx               *contracts.ServiceContext
 	servicePath       string
 	concurrentBatches int
+	dispatchPacing    batchflow.DispatchPacingConfig
+	initErr           error
 }
 
 func NewProcessBatchStep() contracts.Service {
@@ -611,6 +727,7 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 		if v, ok := s.ctx.CurrentStepConfig["concurrent_batches"]; ok {
 			s.concurrentBatches = utils.ToInt(v)
 		}
+		s.dispatchPacing, s.initErr = batchflow.ResolveDispatchPacingConfig(s.ctx.CurrentStepConfig)
 	}
 	if s.concurrentBatches <= 0 {
 		s.concurrentBatches = 1
@@ -618,6 +735,9 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 }
 
 func (s *processBatchStep) Execute() error {
+	if s.initErr != nil {
+		return s.initErr
+	}
 	prov, err := ProviderFromContext(s.ctx.Ctx)
 	if err != nil {
 		return err
@@ -633,6 +753,9 @@ func (s *processBatchStep) Execute() error {
 		BatchIndex:        utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0)),
 		TotalBatches:      utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches")),
 		ConcurrentBatches: s.concurrentBatches,
+		ShardIndex:        utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "shard_index", 0)),
+		TotalShards:       utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_shards", 1)),
+		DispatchPacing:    s.dispatchPacing,
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -643,10 +766,15 @@ func (s *processBatchStep) Execute() error {
 		Status:  "completed",
 		Message: "batch procesado",
 		Data: map[string]any{
-			"batch_index":       res.NextBatchIndex,
-			"is_last_batch":     res.IsLastBatch,
-			"processed_count":   res.ProcessedCount,
-			"batches_processed": res.BatchesProcessed,
+			"batch_index":               res.NextBatchIndex,
+			"is_last_batch":             res.IsLastBatch,
+			"is_shard_complete":         res.IsShardComplete,
+			"processed_count":           res.ProcessedCount,
+			"batches_processed":         res.BatchesProcessed,
+			"shard_index":               res.ShardIndex,
+			"total_shards":              res.TotalShards,
+			"completed_shards":          res.CompletedShards,
+			"should_dispatch_next_step": res.ShouldDispatchNextStep,
 		},
 	})
 	return nil
@@ -735,12 +863,40 @@ func markFailure(prov Provider, ctx context.Context, input batchflow.Input, err 
 	_ = prov.Manager().Fail(ctx, input, err)
 }
 
-func init() {
-	serviceconfig.Register(%q, NewStartStep)
-	serviceconfig.Register(%q, NewProcessBatchStep)
-	serviceconfig.Register(%q, NewFinalizeStep)
+func resolveParallelShards(ctx *contracts.ServiceContext) int {
+	if ctx == nil || ctx.CurrentStepConfig == nil {
+		return 1
+	}
+	if v, ok := ctx.CurrentStepConfig["parallel_shards"]; ok {
+		if parsed := utils.ToInt(v); parsed > 0 {
+			return parsed
+		}
+	}
+	if rawMode, ok := ctx.CurrentStepConfig["execution_mode"].(map[string]any); ok {
+		if v, ok := rawMode["parallel_shards"]; ok {
+			if parsed := utils.ToInt(v); parsed > 0 {
+				return parsed
+			}
+		}
+	}
+	return 1
 }
-`, data.PackageName, data.BatchSize, data.RedisTTLHours, data.ConcurrentBatches, data.StartKey, data.ProcessBatchKey, data.FinalizeKey)
+
+func cloneInput(input map[string]any) map[string]any {
+	out := make(map[string]any, len(input))
+	for k, v := range input {
+		out[k] = v
+	}
+	return out
+}
+
+func init() {
+	serviceconfig.Register(startExecutionKey, NewStartStep)
+	serviceconfig.Register(dispatchExecutionKey, NewDispatchShardsStep)
+	serviceconfig.Register(processBatchExecutionKey, NewProcessBatchStep)
+	serviceconfig.Register(finalizeExecutionKey, NewFinalizeStep)
+}
+`, data.PackageName, data.StartKey, data.DispatchKey, data.ProcessBatchKey, data.FinalizeKey, data.BatchSize, data.RedisTTLHours, data.ConcurrentBatches)
 }
 
 func renderDataProvider(data scaffoldData) string {
@@ -1153,8 +1309,67 @@ func (f *finalizer) Finalize(ctx context.Context, execCtx batchflow.ExecutionCon
 `, data.PackageName)
 }
 
-func renderSeeder(data scaffoldData) string {
-	bt := "`"
+func renderSequentialSeeder(data scaffoldData) string {
+	return renderSeederVariant(data, false)
+}
+
+func renderFanoutSeeder(data scaffoldData) string {
+	return renderSeederVariant(data, true)
+}
+
+func renderSeederVariant(data scaffoldData, fanout bool) string {
+	seederName := data.SeedName
+	seederFuncName := data.SeederFuncName
+	versionNumber := 1
+	step2Name := "Step 2: Continuar proceso secuencial"
+	step2Config := `{
+					"parallel_shards": 1
+				}`
+	step3Config := fmt.Sprintf(`{
+					"concurrent_batches": %d,
+					"execution_mode": {
+						"type": "sequential"
+					},
+					"execution_policy": {
+						"mode": "ASYNC",
+						"label": %q,
+						"auto_invoke": {
+							"enabled": true,
+							"cursor_field": "batch_index",
+							"stop_condition": "is_last_batch"
+						},
+						"next_step": %q
+					}
+				}`, data.ConcurrentBatches, data.ProcessName, data.FinalizeKey)
+	if fanout {
+		seederName = data.FanoutSeedName
+		seederFuncName = data.FanoutSeederFuncName
+		versionNumber = 2
+		step2Name = "Step 2: Dispatch shards"
+		step2Config = fmt.Sprintf(`{
+					"parallel_shards": %d
+				}`, data.ParallelShards)
+		step3Config = fmt.Sprintf(`{
+					"concurrent_batches": %d,
+					"parallel_shards": %d,
+					"execution_mode": {
+						"type": "fanout",
+						"parallel_shards": %d,
+						"strategy": "stride"
+					},
+					"execution_policy": {
+						"mode": "ASYNC",
+						"label": %q,
+						"auto_invoke": {
+							"enabled": true,
+							"cursor_field": "batch_index",
+							"stop_condition": "is_shard_complete"
+						},
+						"next_step": %q
+					}
+				}`, data.ConcurrentBatches, data.ParallelShards, data.ParallelShards, data.ProcessName+" fanout", data.FinalizeKey)
+	}
+
 	return fmt.Sprintf(`package seeders
 
 import (
@@ -1182,9 +1397,9 @@ func %s(pool *pgxpool.Pool) error {
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				if err := tx.QueryRow(ctx,
-					%sINSERT INTO process_types (name, description, is_visible)
+					`+"`"+`INSERT INTO process_types (name, description, is_visible)
 					VALUES ($1, $2, $3)
-					RETURNING id%s,
+					RETURNING id`+"`"+`,
 					processTypeName,
 					processDescription,
 					true,
@@ -1198,19 +1413,20 @@ func %s(pool *pgxpool.Pool) error {
 
 		var versionID int64
 		err = tx.QueryRow(ctx,
-			%sSELECT id
+			`+"`"+`SELECT id
 			 FROM process_versions
-			 WHERE process_type_id = $1 AND version_number = 1 AND sede_id IS NULL AND archived_at IS NULL%s,
+			 WHERE process_type_id = $1 AND version_number = $2 AND sede_id IS NULL AND archived_at IS NULL`+"`"+`,
 			processTypeID,
+			%d,
 		).Scan(&versionID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				if err := tx.QueryRow(ctx,
-					%sINSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
+					`+"`"+`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
 					VALUES ($1, $2, $3, $4, NULL)
-					RETURNING id%s,
+					RETURNING id`+"`"+`,
 					processTypeID,
-					1,
+					%d,
 					"TEST",
 					1,
 				).Scan(&versionID); err != nil {
@@ -1231,29 +1447,23 @@ func %s(pool *pgxpool.Pool) error {
 				Order:        1,
 				Name:         "Step 1: Preparar lotes",
 				ExecutionKey: %q,
-				Config:       %s{"batch_size":%d,"redis_ttl_hours":%d}%s,
+				Config:       `+"`"+`{"batch_size":%d,"redis_ttl_hours":%d}`+"`"+`,
 			},
 			{
 				Order:        2,
-				Name:         "Step 2: Procesar lotes",
+				Name:         %q,
 				ExecutionKey: %q,
-				Config: %s{
-					"concurrent_batches": %d,
-					"execution_policy": {
-						"mode": "ASYNC",
-						"label": %q,
-						"auto_invoke": {
-							"enabled": true,
-							"cursor_field": "batch_index",
-							"stop_condition": "is_last_batch"
-						},
-						"next_step": %q
-					}
-				}%s,
+				Config:       `+"`"+`%s`+"`"+`,
 			},
 			{
 				Order:        3,
-				Name:         "Step 3: Finalizar",
+				Name:         "Step 3: Procesar lotes",
+				ExecutionKey: %q,
+				Config:       `+"`"+`%s`+"`"+`,
+			},
+			{
+				Order:        4,
+				Name:         "Step 4: Finalizar",
 				ExecutionKey: %q,
 				Config:       "{}",
 			},
@@ -1265,9 +1475,9 @@ func %s(pool *pgxpool.Pool) error {
 		}
 
 		if _, err := tx.Exec(ctx,
-			%sDELETE FROM process_steps
+			`+"`"+`DELETE FROM process_steps
 			 WHERE process_version_id = $1
-			   AND NOT (execution_key = ANY($2))%s,
+			   AND NOT (execution_key = ANY($2))`+"`"+`,
 			versionID,
 			validExecutionKeys,
 		); err != nil {
@@ -1284,303 +1494,7 @@ func %s(pool *pgxpool.Pool) error {
 		return nil
 	})
 }
-`, data.SeederFuncName, data.SeedName, data.ProcessName, bt, bt, bt, bt, bt, bt, data.StartKey, bt, data.BatchSize, data.RedisTTLHours, bt, data.ProcessBatchKey, bt, data.ConcurrentBatches, data.ProcessName, data.FinalizeKey, bt, data.FinalizeKey, bt, bt)
-}
-
-func renderRunBruno(data scaffoldData) string {
-	idValue := 1
-	if data.BulkJobID > 0 {
-		idValue = int(data.BulkJobID)
-	}
-	return fmt.Sprintf(`meta {
-  name: RunProc -> %s
-  type: http
-}
-
-vars {
-  %s: 0
-  %s: %d
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/run
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "input": {
-      "id": {{%s}}
-    }
-  }
-}
-`, data.ServiceSlug, data.ProcessTypeVar, data.BulkJobVar, idValue, data.ProcessTypeVar, data.BulkJobVar)
-}
-
-func renderPreviewFolder(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: %s
-}
-`, data.ServiceSlug)
-}
-
-func renderPreviewPrepareBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - prepare
-  type: http
-  seq: 1
-}
-
-vars {
-  %s: 0
-  %s: %d
-  %s: preview-%s
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "prepare",
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, brunoBulkJobID(data), data.RedisKeyVar, data.ServiceSlug, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func renderPreviewAllBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - all
-  type: http
-  seq: 2
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "all",
-    "limit": 10,
-    "offset": 0,
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func renderPreviewBatchIndexBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - batch - batch_index
-  type: http
-  seq: 3
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "batch",
-    "batch_index": 0,
-    "limit": 10,
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func renderPreviewItemIDsBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - batch - item_ids
-  type: http
-  seq: 4
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "batch",
-    "limit": 10,
-    "item_ids": [1],
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func renderPreviewApplyItemIDsBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - batch - item_ids - apply_changes
-  type: http
-  seq: 5
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "batch",
-    "apply_changes": true,
-    "limit": 10,
-    "item_ids": [1],
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func renderPreviewRowNumbersBruno(data scaffoldData) string {
-	return fmt.Sprintf(`meta {
-  name: preview - batch - row_numbers
-  type: http
-  seq: 5
-}
-
-post {
-  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
-  body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{access_token}}
-}
-
-headers {
-  X-Client-Code: bruno
-}
-
-body:json {
-  {
-    "process_type_id": {{%s}},
-    "sede_id": 0,
-    "override_process_version_id": 0,
-    "roadmap": 0,
-    "mode": "batch",
-    "limit": 10,
-    "row_numbers": [1],
-    "input": {
-      "id": {{%s}},
-      "key_redis": "{{%s}}"
-    }
-  }
-}
-`, data.ProcessTypeVar, data.BulkJobVar, data.RedisKeyVar)
-}
-
-func brunoBulkJobID(data scaffoldData) int64 {
-	if data.BulkJobID > 0 {
-		return data.BulkJobID
-	}
-	return 1
+`, seederFuncName, seederName, data.ProcessName, versionNumber, versionNumber, data.StartKey, data.BatchSize, data.RedisTTLHours, step2Name, data.DispatchKey, step2Config, data.ProcessBatchKey, step3Config, data.FinalizeKey)
 }
 
 func ask(reader *bufio.Reader, label string) string {
@@ -1635,6 +1549,7 @@ func sortedFileList(paths generatedPaths, withBruno bool) []string {
 		paths.processorFile,
 		paths.lifecycleFile,
 		paths.seederFile,
+		paths.fanoutSeederFile,
 	}
 	return out
 }

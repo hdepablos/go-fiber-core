@@ -107,10 +107,12 @@ func (s *previewService) Preview(ctx context.Context, req PreviewRequest) (Previ
 		return PreviewResponse{}, err
 	}
 	if req.ApplyChanges {
-		if _, err := components.BatchProcessor.ProcessBatch(ctx, execCtx, Batch{Items: items}); err != nil {
+		processResult, err := ProcessBatchWithDispatchPacing(ctx, components.BatchProcessor, components.StateStore, execCtx, Batch{Items: items}, req.DispatchPacing, s.sessionTTL)
+		if err != nil {
 			return PreviewResponse{}, err
 		}
 		response.AppliedChanges = true
+		response.ApplyChangesMetadata = processResult.Metadata
 	}
 	response.Items = result.Items
 	response.RenderedCount = len(result.Items)

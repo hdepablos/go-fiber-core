@@ -24,15 +24,15 @@ func BulkProcessGenericSeeder(pool *pgxpool.Pool) error {
 		err := tx.QueryRow(ctx, "SELECT id FROM process_types WHERE name = $1 AND archived_at IS NULL", processTypeName).Scan(&processTypeID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
-				if err := tx.QueryRow(ctx,
+				if insertErr := tx.QueryRow(ctx,
 					`INSERT INTO process_types (name, description, is_visible)
 					VALUES ($1, $2, $3)
 					RETURNING id`,
 					processTypeName,
 					processDescription,
 					true,
-				).Scan(&processTypeID); err != nil {
-					return fmt.Errorf("insert process_types '%s': %w", processTypeName, err)
+				).Scan(&processTypeID); insertErr != nil {
+					return fmt.Errorf("insert process_types '%s': %w", processTypeName, insertErr)
 				}
 			} else {
 				return fmt.Errorf("select process_types '%s': %w", processTypeName, err)
@@ -48,7 +48,7 @@ func BulkProcessGenericSeeder(pool *pgxpool.Pool) error {
 		).Scan(&versionID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
-				if err := tx.QueryRow(ctx,
+				if insertErr := tx.QueryRow(ctx,
 					`INSERT INTO process_versions (process_type_id, version_number, status, operator_id, sede_id)
 					VALUES ($1, $2, $3, $4, NULL)
 					RETURNING id`,
@@ -56,8 +56,8 @@ func BulkProcessGenericSeeder(pool *pgxpool.Pool) error {
 					1,
 					"TEST",
 					1,
-				).Scan(&versionID); err != nil {
-					return fmt.Errorf("insert process_versions '%s': %w", processTypeName, err)
+				).Scan(&versionID); insertErr != nil {
+					return fmt.Errorf("insert process_versions '%s': %w", processTypeName, insertErr)
 				}
 			} else {
 				return fmt.Errorf("select process_versions '%s': %w", processTypeName, err)
@@ -78,10 +78,21 @@ func BulkProcessGenericSeeder(pool *pgxpool.Pool) error {
 			},
 			{
 				Order:        2,
+				Name:         "Step 2: Continuar proceso secuencial",
+				ExecutionKey: "bulk/process/generic/dispatch_shards",
+				Config: `{
+					"parallel_shards": 1
+				}`,
+			},
+			{
+				Order:        3,
 				Name:         "Step 2: Procesar lotes de registros",
 				ExecutionKey: "bulk/process/generic/process_batch",
 				Config: `{
 					"concurrent_batches": 4,
+					"execution_mode": {
+						"type": "sequential"
+					},
 					"execution_policy": {
 						"mode": "ASYNC",
 						"label": "procesar lote generico",
@@ -95,8 +106,8 @@ func BulkProcessGenericSeeder(pool *pgxpool.Pool) error {
 				}`,
 			},
 			{
-				Order:        3,
-				Name:         "Step 3: Finalizar procesamiento batch",
+				Order:        4,
+				Name:         "Step 4: Finalizar procesamiento batch",
 				ExecutionKey: "bulk/process/generic/finalize",
 				Config:       `{}`,
 			},

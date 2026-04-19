@@ -27,6 +27,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [create-services-steps.md](development/create-services-steps.md): guia de implementacion de servicios/pasos.
 - [service-design-conventions.md](development/service-design-conventions.md): patron recomendado para diseñar servicios y casos de uso.
 - [service-runtime-and-scaffold.md](development/service-runtime-and-scaffold.md): runtime por contexto y scaffold de export managers sin globals.
+- [external-http-service-standard.md](development/external-http-service-standard.md): estándar obligatorio para adapters y requests HTTP externos reutilizables.
 - [process-scaffold-and-cleanup.md](development/process-scaffold-and-cleanup.md): crear y eliminar procesos scaffold (batch/export) y convención Bruno genérica.
 - [change-var.md](development/change-var.md): cambios de configuracion y notas de soporte relacionadas.
 
@@ -51,6 +52,9 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [scenarios.md](process-lifecycle/scenarios.md): escenarios de ejecucion.
 - [testing-guide.md](process-lifecycle/testing-guide.md): pruebas funcionales y requests.
 - [batch-preview-guide.md](process-lifecycle/batch-preview-guide.md): uso de batch preview, apply_changes local y run filtrado.
+- [batch-fanout-guide.md](process-lifecycle/batch-fanout-guide.md): fan-out batch para Lambda/EKS y configuración de steps.
+- [batch-capacity-and-stress-guide.md](process-lifecycle/batch-capacity-and-stress-guide.md): checklist de capacidad, stress test y filtros de logs para Redis/rate limit.
+- [batch-fanout-risks.md](process-lifecycle/batch-fanout-risks.md): riesgos, anti-patrones y alertas del fan-out.
 - [sql-cheatsheet.md](process-lifecycle/sql-cheatsheet.md): apoyo SQL para analisis y operacion.
 - [advantages.md](process-lifecycle/advantages.md): motivacion y ventajas del enfoque.
 

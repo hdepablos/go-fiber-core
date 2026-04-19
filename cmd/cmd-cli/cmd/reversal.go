@@ -11,7 +11,6 @@ import (
 	"os"
 	"time"
 
-	resty "github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -52,11 +51,12 @@ go run main.go getreversaladapter --customer-id 564526 --start-date 2024-02-21`,
 		}
 
 		// --- 3. Creación de Dependencias (Inyección de Dependencias) ---
-		httpClient := resty.New().
-			SetTimeout(10 * time.Second).
-			SetBaseURL(appConfig.ApiBackoffice.Url)
+		backofficeCfg, err := appConfig.APIConfig("backoffice")
+		if err != nil {
+			return fmt.Errorf("❌ error obteniendo configuracion de backoffice: %w", err)
+		}
 
-		adapter := adapters.NewBackofficeAdapter(httpClient)
+		adapter := adapters.NewBackofficeAdapter(backofficeCfg)
 
 		// --- 4. Ejecución de la Lógica de Negocio ---
 		reversalRequest := dtos.Config{

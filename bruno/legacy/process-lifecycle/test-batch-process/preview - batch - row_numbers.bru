@@ -1,15 +1,7 @@
 meta {
   name: preview - batch - row_numbers
   type: http
-  seq: 5
-}
-
-vars {
-  process_type_id_batch_current: 19
-  process_version_id_batch_current: 22
-  sede_id_batch_current: 0
-  bulk_job_id_batch_current: 1
-  redis_key_batch_current: preview-punitorios-root
+  seq: 1
 }
 
 post {
@@ -18,26 +10,26 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{access_token}}
-}
-
 headers {
   X-Client-Code: bruno
 }
 
+auth:bearer {
+  token: {{access_token}}
+}
+
 body:json {
   {
-    "process_type_id": {{process_type_id_batch_current}},
-    "sede_id": {{sede_id_batch_current}},
-    "override_process_version_id": {{process_version_id_batch_current}},
+    "process_type_id": 19,
+    "sede_id": 0,
+    "override_process_version_id": 22,
     "roadmap": 0,
     "mode": "batch",
-    "limit": 10,
-    "row_numbers": [2],
+    "limit": 1,
+    "row_numbers": [1],
     "input": {
-      "id": {{bulk_job_id_batch_current}},
-      "key_redis": "{{redis_key_batch_current}}"
+      "id": 1,
+      "key_redis": "{{redis_key_export_preview}}"
     }
   }
 }

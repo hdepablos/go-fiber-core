@@ -42,8 +42,10 @@ Opcionales típicos:
 - `service_slug`
 - `batch_size`
 - `concurrent_batches`
+- `parallel_shards`
 - `redis_ttl_hours`
 - `bulk_job_id`
+- `force`
 
 ### `delete-process`
 
@@ -73,11 +75,15 @@ El scaffold de export debe generar:
 El scaffold de batch debe generar:
 
 - archivos del servicio batch,
-- archivo de seeder,
+- archivo de seeder base secuencial,
+- archivo de seeder fanout,
 - wiring de imports requerido,
 - wiring en `runtimebootstrap`.
 
 El scaffold de batch no debe requerir una carpeta Bruno específica por proceso.
+El scaffold debe usar un único `process_type` por negocio y separar el modo técnico a nivel de `process_version`.
+- La versión base debe usar como `execution_policy.label` el nombre del proceso de negocio sin sufijo técnico.
+- La versión fanout puede usar un label técnico explícito, por ejemplo `<process_name> fanout`.
 
 ## Reglas de Bruno para batch
 
@@ -111,6 +117,7 @@ El cleanup debe remover, cuando existan:
 
 - carpeta del servicio
 - archivo de seeder
+- archivo de seeder fanout
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
 - wiring en `internal/runtimebootstrap/bootstrap.go`
@@ -136,6 +143,9 @@ El cleanup debe remover, cuando existan:
 - `delete-process` debe tolerar paths inexistentes sin fallar por ello.
 - El cleanup no debe borrar documentación o wiring de otros procesos.
 - El scaffold batch no debe generar nuevas carpetas Bruno específicas por proceso.
+- El scaffold batch debe producir un seeder base `sequential` y un seeder adicional `_fanout`.
+- Los seeders base y fanout deben apuntar al mismo `process_type`.
+- `force=true` debe permitir sobrescribir el scaffold existente.
 - La documentación humana y normativa debe reflejar el modelo Bruno genérico.
 
 ## Limitaciones explícitas
@@ -153,6 +163,7 @@ El cleanup debe remover, cuando existan:
 ## Acceptance Criteria
 
 - El equipo puede crear un batch process nuevo sin que se genere una carpeta Bruno específica.
+- El equipo puede sembrar una versión secuencial y otra fanout del mismo proceso de negocio.
 - El equipo puede probar cualquier batch process ajustando variables en `test-batch-process`.
 - El equipo puede eliminar un proceso scaffold con un único comando `make delete-process`.
 - El modo `dry_run` permite inspeccionar el alcance del cleanup antes de ejecutarlo.

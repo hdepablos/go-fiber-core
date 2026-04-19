@@ -82,8 +82,93 @@ Uso:
 Notas:
 
 - `create-batch-process` ya no genera carpeta Bruno específica por proceso.
+- `create-batch-process` genera dos seeders: base `sequential` y companion `_fanout`.
+- `create-batch-process force=true` permite regenerar un scaffold existente sobrescribiendo los archivos generados.
+- El Makefile debe pasar booleanos en formato `-flag=false` para que `go run` no corte el parseo de argumentos antes de flags posteriores como `-force`.
+- `create-external-api-config` agrega una entrada `apis.xxx` en `internal/appconfig/config.yml`.
+- `create-external-adapter` genera un adapter HTTP reutilizable basado en `apis.xxx` de `config.yml`.
+- `create-external-integration` ejecuta ambos pasos en una sola corrida.
 - Para pruebas batch se usa la carpeta genérica `bruno/legacy/process-lifecycle/test-batch-process/`.
 - `delete-process` soporta `dry_run=true` para revisar el alcance antes de borrar archivos.
+
+## `create-external-api-config`
+
+Uso:
+
+```bash
+make create-external-api-config api_key=customer_api
+```
+
+Efectos:
+
+- agrega `apis.customer_api` en `internal/appconfig/config.yml`,
+- crea placeholders de entorno para `url` y `token`,
+- deja `timeout_seconds: 10` como valor inicial.
+
+Ejemplo generado:
+
+```yaml
+apis:
+  customer_api:
+    url: ${CUSTOMER_API_URL}
+    token: ${CUSTOMER_API_TOKEN}
+    timeout_seconds: 10
+```
+
+Reglas:
+
+- falla si `apis.customer_api` ya existe,
+- `force=true` permite sobrescribir el bloque,
+- el resultado queda listo para resolver con `appConfig.APIConfig("customer_api")`.
+
+## `create-external-adapter`
+
+Uso:
+
+```bash
+make create-external-api-config api_key=customer_api
+make create-external-adapter adapter_name=customer_api config_key=customer_api
+```
+
+Efectos:
+
+- crea `internal/adapters/customer_api_adapter.go`,
+- usa `config.ApiConfig`,
+- usa `externalhttp.NewClientFromAPIConfig(...)`,
+- y deja un método `Do(...)` como base.
+
+Reglas:
+
+- `config_key` debe existir bajo `apis.xxx` en `internal/appconfig/config.yml`,
+- nuevos adapters no deben usar `resty.New()` directamente,
+- la configuración debe resolverse desde `appConfig.APIConfig("xxx")`.
+
+## `create-external-integration`
+
+Uso:
+
+```bash
+make create-external-integration api_key=customer_api
+```
+
+Opcional:
+
+```bash
+make create-external-integration api_key=customer_api adapter_name=customer_gateway
+```
+
+Efectos:
+
+- ejecuta `create-external-api-config`,
+- ejecuta `create-external-adapter`,
+- deja lista la entrada `apis.xxx`,
+- y deja listo el adapter para usar `appConfig.APIConfig("xxx")`.
+
+Reglas:
+
+- si no se informa `adapter_name`, usa `api_key`,
+- `force=true` se propaga a ambos pasos,
+- conviene usar este comando como flujo por defecto para integraciones nuevas.
 
 ### 4. Dependencias, build y calidad
 

@@ -222,10 +222,51 @@ create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: mak
 		-service-slug "$(service_slug)" \
 		-batch-size "$(or $(batch_size),500)" \
 		-concurrent-batches "$(or $(concurrent_batches),1)" \
+		-parallel-shards "$(or $(parallel_shards),4)" \
 		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
-		-bulk-job-id "$(or $(bulk_job_id),0)" \
-		-with-bruno false
+		-with-bruno=false \
+		$(if $(filter true,$(force)),-force,)
 	@echo "$(SUCCESS)✨ Scaffold batchflow generado correctamente.$(RESET)"
+
+.PHONY: create-external-adapter
+create-external-adapter: ## 🌐 Genera un scaffold de adapter HTTP externo. Uso: make create-external-adapter adapter_name=customer_api config_key=customer_api
+	@if [ -z "$(adapter_name)" ]; then \
+		echo "$(ERROR)❌ Debes especificar adapter_name: make create-external-adapter adapter_name=customer_api config_key=customer_api$(RESET)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(config_key)" ]; then \
+		echo "$(ERROR)❌ Debes especificar config_key: make create-external-adapter adapter_name=customer_api config_key=customer_api$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🌐 Generando scaffold de adapter externo $(adapter_name)...$(RESET)"
+	@go run ./cmd/tools/external-api-adapter-scaffold \
+		-adapter-name "$(adapter_name)" \
+		-config-key "$(config_key)" \
+		$(if $(filter true,$(force)),-force,)
+	@echo "$(SUCCESS)✨ Scaffold de adapter externo generado correctamente.$(RESET)"
+
+.PHONY: create-external-api-config
+create-external-api-config: ## ⚙️ Agrega una entrada apis.xxx en config.yml. Uso: make create-external-api-config api_key=customer_api
+	@if [ -z "$(api_key)" ]; then \
+		echo "$(ERROR)❌ Debes especificar api_key: make create-external-api-config api_key=customer_api$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)⚙️ Generando entrada apis.$(api_key) en config.yml...$(RESET)"
+	@go run ./cmd/tools/external-api-config-scaffold \
+		-api-key "$(api_key)" \
+		$(if $(filter true,$(force)),-force,)
+	@echo "$(SUCCESS)✨ Config API externa agregada correctamente.$(RESET)"
+
+.PHONY: create-external-integration
+create-external-integration: ## 🌐⚙️ Genera config apis.xxx y adapter HTTP externo. Uso: make create-external-integration api_key=customer_api [adapter_name=customer_api]
+	@if [ -z "$(api_key)" ]; then \
+		echo "$(ERROR)❌ Debes especificar api_key: make create-external-integration api_key=customer_api [adapter_name=customer_api]$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🌐⚙️ Generando integracion externa $(or $(adapter_name),$(api_key))...$(RESET)"
+	@$(MAKE) create-external-api-config api_key="$(api_key)" force="$(force)"
+	@$(MAKE) create-external-adapter adapter_name="$(or $(adapter_name),$(api_key))" config_key="$(api_key)" force="$(force)"
+	@echo "$(SUCCESS)✨ Integracion externa generada correctamente.$(RESET)"
 
 .PHONY: delete-process
 delete-process: ## 🧹 Elimina del codigo un proceso scaffold. Uso: make delete-process kind=batch-process service_slug=punitorios

@@ -15,15 +15,16 @@ import (
 // --- 1. DEFINICIÓN DE STRUCTS ---
 
 type AppConfig struct {
-	App                 App                 `mapstructure:"app"`
-	Server              Server              `mapstructure:"server"`
-	JWTConfig           JWTConfig           `mapstructure:"jwt"`
-	MultiDatabaseConfig MultiDatabaseConfig `mapstructure:"database"`
-	Redis               Redis               `mapstructure:"redis"`
-	S3                  S3                  `mapstructure:"s3"`
-	EmailConfig         EmailConfig         `mapstructure:"email_config"`
-	ApiBackoffice       ApiConfig           `mapstructure:"apis.backoffice"`
-	ApiDiscord          ApiConfig           `mapstructure:"apis.discord"`
+	App                 App                  `mapstructure:"app"`
+	Server              Server               `mapstructure:"server"`
+	JWTConfig           JWTConfig            `mapstructure:"jwt"`
+	MultiDatabaseConfig MultiDatabaseConfig  `mapstructure:"database"`
+	Redis               Redis                `mapstructure:"redis"`
+	S3                  S3                   `mapstructure:"s3"`
+	EmailConfig         EmailConfig          `mapstructure:"email_config"`
+	Apis                map[string]ApiConfig `mapstructure:"apis"`
+	ApiBackoffice       ApiConfig            `mapstructure:"apis.backoffice"`
+	ApiDiscord          ApiConfig            `mapstructure:"apis.discord"`
 }
 
 type MultiDatabaseConfig struct {
@@ -102,8 +103,25 @@ type EmailConfig struct {
 }
 
 type ApiConfig struct {
-	Url   string `mapstructure:"url"`
-	Token string `mapstructure:"token"`
+	Url            string            `mapstructure:"url"`
+	Token          string            `mapstructure:"token"`
+	TimeoutSeconds int               `mapstructure:"timeout_seconds"`
+	Headers        map[string]string `mapstructure:"headers"`
+}
+
+func (c *AppConfig) APIConfig(key string) (ApiConfig, error) {
+	if c == nil {
+		return ApiConfig{}, fmt.Errorf("app config no disponible")
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ApiConfig{}, fmt.Errorf("api key requerida")
+	}
+	cfg, ok := c.Apis[key]
+	if !ok {
+		return ApiConfig{}, fmt.Errorf("api config no encontrada para key '%s'", key)
+	}
+	return cfg, nil
 }
 
 // --- 2. LÓGICA DE CARGA DE CONFIGURACIÓN ---

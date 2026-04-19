@@ -11,12 +11,12 @@ import (
 )
 
 type manager struct {
-	lifecycle     ParentLifecycle
-	dataProvider  DataProvider
-	processor     BatchProcessor
-	finalizer     Finalizer
-	stateStore    StateStore
-	defaultTTL    time.Duration
+	lifecycle    ParentLifecycle
+	dataProvider DataProvider
+	processor    BatchProcessor
+	finalizer    Finalizer
+	stateStore   StateStore
+	defaultTTL   time.Duration
 }
 
 func NewManager(
@@ -90,9 +90,43 @@ func (m *manager) Start(ctx context.Context, req StartRequest) (StartResult, err
 	}, nil
 }
 
+func (m *manager) DispatchShards(ctx context.Context, req DispatchRequest) (DispatchResult, error) {
+	if err := validateInput(req.Input); err != nil {
+		return DispatchResult{}, err
+	}
+	if req.TotalBatches <= 0 {
+		return DispatchResult{}, fmt.Errorf("total_batches inválido")
+	}
+	if req.ParallelShards <= 0 {
+		req.ParallelShards = 1
+	}
+	if req.ParallelShards > req.TotalBatches {
+		req.ParallelShards = req.TotalBatches
+	}
+	if err := m.stateStore.RegisterShards(ctx, req.Input, req.ParallelShards, m.defaultTTL); err != nil {
+		return DispatchResult{}, err
+	}
+
+	indexes := make([]int, 0, req.ParallelShards)
+	for shardIndex := 0; shardIndex < req.ParallelShards; shardIndex++ {
+		indexes = append(indexes, shardIndex)
+	}
+
+	return DispatchResult{
+		TotalShards:         req.ParallelShards,
+		InitialBatchIndexes: indexes,
+	}, nil
+}
+
 func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (ProcessResult, error) {
 	if err := validateInput(req.Input); err != nil {
 		return ProcessResult{}, err
+	}
+	if req.TotalShards <= 0 {
+		req.TotalShards = 1
+	}
+	if req.ShardIndex < 0 || req.ShardIndex >= req.TotalShards {
+		return ProcessResult{}, fmt.Errorf("shard_index fuera de rango: %d (total_shards=%d)", req.ShardIndex, req.TotalShards)
 	}
 	if req.BatchIndex < 0 || req.BatchIndex >= req.TotalBatches {
 		return ProcessResult{}, fmt.Errorf("batch_index fuera de rango: %d (total=%d)", req.BatchIndex, req.TotalBatches)
@@ -100,8 +134,17 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 	if req.ConcurrentBatches <= 0 {
 		req.ConcurrentBatches = 1
 	}
-	if req.ConcurrentBatches > req.TotalBatches-req.BatchIndex {
-		req.ConcurrentBatches = req.TotalBatches - req.BatchIndex
+
+	batchIndexes := make([]int, 0, req.ConcurrentBatches)
+	for offset := 0; offset < req.ConcurrentBatches; offset++ {
+		batchIndex := req.BatchIndex + (offset * req.TotalShards)
+		if batchIndex >= req.TotalBatches {
+			break
+		}
+		batchIndexes = append(batchIndexes, batchIndex)
+	}
+	if len(batchIndexes) == 0 {
+		return ProcessResult{}, fmt.Errorf("no hay batches para shard=%d desde batch_index=%d", req.ShardIndex, req.BatchIndex)
 	}
 
 	summary, err := m.stateStore.LoadSummary(ctx, req.Input)
@@ -116,24 +159,34 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 		err   error
 	}
 
-	results := make(chan batchResult, req.ConcurrentBatches)
-	var wg sync.WaitGroup
-	for offset := 0; offset < req.ConcurrentBatches; offset++ {
-		batchIndex := req.BatchIndex + offset
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			batch, loadErr := m.stateStore.LoadBatch(ctx, req.BatchesListKey, idx)
+	results := make(chan batchResult, len(batchIndexes))
+	if req.DispatchPacing.Enabled {
+		for _, batchIndex := range batchIndexes {
+			batch, loadErr := m.stateStore.LoadBatch(ctx, req.BatchesListKey, batchIndex)
 			if loadErr != nil {
-				results <- batchResult{index: idx, err: loadErr}
-				return
+				results <- batchResult{index: batchIndex, err: loadErr}
+				continue
 			}
-			res, processErr := m.processor.ProcessBatch(ctx, execCtx, batch)
-			results <- batchResult{index: idx, data: res, err: processErr}
-		}(batchIndex)
+			res, processErr := ProcessBatchWithDispatchPacing(ctx, m.processor, m.stateStore, execCtx, batch, req.DispatchPacing, m.defaultTTL)
+			results <- batchResult{index: batchIndex, data: res, err: processErr}
+		}
+	} else {
+		var wg sync.WaitGroup
+		for _, batchIndex := range batchIndexes {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				batch, loadErr := m.stateStore.LoadBatch(ctx, req.BatchesListKey, idx)
+				if loadErr != nil {
+					results <- batchResult{index: idx, err: loadErr}
+					return
+				}
+				res, processErr := m.processor.ProcessBatch(ctx, execCtx, batch)
+				results <- batchResult{index: idx, data: res, err: processErr}
+			}(batchIndex)
+		}
+		wg.Wait()
 	}
-
-	wg.Wait()
 	close(results)
 
 	totalProcessed := 0
@@ -146,15 +199,32 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 		metadata[fmt.Sprintf("batch_%d", result.index)] = result.data.Metadata
 	}
 
-	nextIndex := req.BatchIndex + req.ConcurrentBatches
-	isLast := nextIndex >= req.TotalBatches
+	nextIndex := req.BatchIndex + (req.ConcurrentBatches * req.TotalShards)
+	isShardComplete := nextIndex >= req.TotalBatches
+	isLast := isShardComplete && req.TotalShards == 1
+
+	var completedShards int64
+	shouldDispatchNextStep := false
+	if isShardComplete {
+		completion, err := m.stateStore.CompleteShard(ctx, req.Input, req.ShardIndex, req.TotalShards, m.defaultTTL)
+		if err != nil {
+			return ProcessResult{}, err
+		}
+		completedShards = completion.CompletedShards
+		shouldDispatchNextStep = completion.ShouldFinalize
+	}
 
 	return ProcessResult{
-		NextBatchIndex:  nextIndex,
-		IsLastBatch:     isLast,
-		ProcessedCount:  totalProcessed,
-		BatchesProcessed: req.ConcurrentBatches,
-		Metadata:        metadata,
+		NextBatchIndex:         nextIndex,
+		IsLastBatch:            isLast,
+		IsShardComplete:        isShardComplete,
+		ProcessedCount:         totalProcessed,
+		BatchesProcessed:       len(batchIndexes),
+		ShardIndex:             req.ShardIndex,
+		TotalShards:            req.TotalShards,
+		CompletedShards:        completedShards,
+		ShouldDispatchNextStep: shouldDispatchNextStep,
+		Metadata:               metadata,
 	}, nil
 }
 

@@ -106,6 +106,7 @@ func init() {
 		return previewable, nil
 	},
 		"bulk/process/generic/start",
+		"bulk/process/generic/dispatch_shards",
 		"bulk/process/generic/process_batch",
 		"bulk/process/generic/finalize",
 	)

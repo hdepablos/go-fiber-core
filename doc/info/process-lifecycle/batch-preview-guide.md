@@ -11,6 +11,10 @@ Documentar como usar `POST /api/v1/process-lifecycle/batch-preview` para:
 Este documento describe el uso humano y operativo.
 Las reglas verificables viven en `doc/specs/process-lifecycle/batch-preview-spec.md`.
 
+Documento complementario:
+
+- `doc/info/process-lifecycle/dispatch-pacing-guide.md`
+
 ## Contexto
 
 El motor `batchflow` expone un preview reutilizable para procesos como `procesar lote generico` y `punitorios`.
@@ -41,6 +45,7 @@ En local ahora existen dos comportamientos:
 - `batch_index`: seleccion de un batch concreto.
 - `limit` y `offset`: ventana sobre la seleccion.
 - `apply_changes`: si es `true`, aplica el procesamiento real sobre la seleccion renderizada.
+- `apply_changes_metadata`: metadata adicional del procesamiento real, incluyendo `dispatch_pacing` cuando aplique.
 
 ## Modos
 
@@ -84,6 +89,8 @@ Esto permite desarrollar una logica batch y verificar en el mismo request:
 - que mensajes generaria,
 - y como queda persistido realmente.
 
+Si el step `process_batch` tiene `dispatch_pacing`, la persistencia real del `apply_changes` tambien respeta esa configuracion.
+
 ### Alcance de `apply_changes`
 
 - actualiza solo los registros seleccionados,
@@ -91,6 +98,25 @@ Esto permite desarrollar una logica batch y verificar en el mismo request:
 - no ejecuta el lifecycle completo del padre,
 - no corre `Start` ni `Finalize`,
 - no debe usarse para cerrar el estado global de un `bulk_job`.
+
+### Metadata de `apply_changes`
+
+Cuando `dispatch_pacing` está activo, la respuesta incluye:
+
+- `apply_changes_metadata.dispatch_pacing.enabled`
+- `apply_changes_metadata.dispatch_pacing.messages_per_interval`
+- `apply_changes_metadata.dispatch_pacing.interval_seconds`
+- `apply_changes_metadata.dispatch_pacing.chunk_count`
+- `apply_changes_metadata.dispatch_pacing.chunk_sizes`
+- `apply_changes_metadata.dispatch_pacing.waits_ms`
+- `apply_changes_metadata.dispatch_pacing.slots`
+
+Esto permite validar desde Bruno:
+
+- cuántas tandas se ejecutaron,
+- qué tamaño tuvo cada tanda,
+- cuánto esperó cada una,
+- y qué ventanas Redis se usaron.
 
 ## Casos recomendados
 
@@ -140,11 +166,13 @@ Objetivo:
 Usa:
 
 - `bruno/legacy/process-lifecycle/test-batch-process/preview - batch - item_ids - apply_changes.bru`
+- `bruno/api/v1/process-lifecycle/post-batch-preview-apply-changes-pacing.bru`
 
 Objetivo:
 
 - probar la logica real sobre una muestra controlada,
-- sin disparar el lifecycle completo del proceso.
+- sin disparar el lifecycle completo del proceso,
+- y validar `dispatch_pacing` con una seleccion chica.
 
 ### Caso 4: correr el flujo real filtrado
 
@@ -204,11 +232,20 @@ En desarrollo local:
 4. usar `apply_changes=true` sobre pocos registros,
 5. si el comportamiento ya cierra, probar `run` filtrado.
 
+Si quieres probar pacing:
+
+1. configurar `dispatch_pacing` en el step `process_batch`,
+2. usar `messages_per_interval` chico, por ejemplo `3`,
+3. usar `interval_seconds` corto, por ejemplo `5`,
+4. correr `apply_changes=true` con `10` items,
+5. inspeccionar `apply_changes_metadata.dispatch_pacing`.
+
 ## Trazabilidad
 
 - Codigo:
   - `internal/handlers/process_lifecycle_handler.go`
   - `internal/services/batchflow/preview_service.go`
+  - `internal/services/batchflow/dispatch_pacing.go`
   - `internal/utils/shared_helpers.go`
   - `internal/services/punitorios/processor.go`
 - Bruno:
