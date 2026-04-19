@@ -30,7 +30,15 @@ Aplica a:
 - Las keys de Redis deben tener un proposito explicito.
 - Los artefactos parciales y finales en S3 deben seguir una nomenclatura estable.
 
-### 4. Filtros y datos
+### 4. Cancelacion operativa y auto-cancel
+
+- Los exports batch basados en `exportmanager.Manager` deben poder participar en cancelacion operativa y auto-cancel por errores repetidos cuando el flujo se ejecute por `execution_key`.
+- Si un export batch define `ParentLifecycle.Fail`, el auto-cancel debe poder invocarlo para dejar el padre en estado consistente sin esperar otro mensaje.
+- Para eso, el provider del export debe registrar su `Manager` en un registry central resuelto por `execution_key`.
+- No debe requerirse editar el consumer por cada export batch nuevo.
+- Los pipelines legacy que no usan `exportmanager.Manager`, como `bulkexportv1`, deben quedar documentados explícitamente como excepción hasta ser migrados.
+
+### 5. Filtros y datos
 
 - Los filtros deben normalizarse antes de tocar repositorios o providers.
 - Los pipelines no deben duplicar helpers transversales que ya existan como shared utilities.
@@ -40,3 +48,4 @@ Aplica a:
 - Cada export tiene un documento humano orientado a operacion y un documento spec orientado a contrato.
 - Las implementaciones concretas pueden variar, pero respetan la misma forma general del pipeline.
 - La coordinacion entre Redis, almacenamiento y layout queda documentada en una sola fuente normativa.
+- Un export batch nuevo sobre `exportmanager` puede enchufarse al auto-cancel registrando su manager por `execution_key`.

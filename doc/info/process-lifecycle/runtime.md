@@ -14,6 +14,23 @@ Para el modo batch distribuido con fan-out sobre Lambda/EKS ver además:
 - `doc/info/process-lifecycle/batch-fanout-guide.md`
 - `doc/info/process-lifecycle/batch-fanout-risks.md`
 
+## Guardas operativas de cancelación
+
+Para corridas batch asincrónicas el runtime ahora contempla una guarda operativa distribuida:
+
+- usa `key_redis` o `run_key` como identificador de la corrida;
+- permite cancelación manual por API o por comando;
+- soporta auto-cancel por umbral de errores repetidos del mismo fingerprint;
+- cuando el auto-cancel aplica sobre un proceso batch conocido, ejecuta `lifecycle.Fail(...)` para que el padre quede en el status correcto;
+- evita seguir re-encolando `auto_invoke`, `next_step` o `finalize` cuando la corrida ya fue cancelada.
+
+Regla práctica:
+
+- si el operador conoce el `bulk_job_id`, puede cancelar usando ese identificador;
+- si conoce el `run_key`, puede cancelar la corrida de forma directa;
+- la cancelación debe comportarse igual en Lambda y EKS porque la fuente de verdad vive en Redis y no en memoria local.
+- si se agrega un proceso batch nuevo, debe registrar su `Manager` en el registry central de batchflow para que el auto-cancel pueda ejecutar `lifecycle.Fail(...)` sin tocar el consumer.
+
 ---
 
 ## 1. ServiceContext: bolsa de datos de negocio

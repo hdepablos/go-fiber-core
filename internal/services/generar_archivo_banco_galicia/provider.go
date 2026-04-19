@@ -119,4 +119,15 @@ func init() {
 		"bulk/export/generar_archivo_banco_galicia/process_batch",
 		"bulk/export/generar_archivo_banco_galicia/finalize",
 	)
+	exportmanager.RegisterManagedExportManager(func(ctx context.Context) (exportmanager.Manager, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return prov.Manager(), nil
+	},
+		"bulk/export/generar_archivo_banco_galicia/start",
+		"bulk/export/generar_archivo_banco_galicia/process_batch",
+		"bulk/export/generar_archivo_banco_galicia/finalize",
+	)
 }

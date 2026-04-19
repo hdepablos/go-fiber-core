@@ -168,6 +168,10 @@ No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedi
 - Wiring, bootstrap, runtime de servicios o registro de dependencias:
   - `doc/specs/architecture/service-runtime-bootstrap-spec.md`
   - `doc/specs/platform/platform-runtime-spec.md`
+- Infraestructura, Terraform, Helm/K8s, Docker Compose, LocalStack o variables de entorno que afecten runtime:
+  - `doc/specs/architecture/service-runtime-bootstrap-spec.md`
+  - `doc/specs/platform/platform-runtime-spec.md`
+  - `doc/specs/platform/makefile-automation-spec.md` cuando también cambie la forma de ejecutar comandos o utilidades operativas
 - Integraciones HTTP externas o cambios en `internal/services/externalhttp/` y adapters:
   - `doc/specs/architecture/external-http-client-spec.md`
   - `doc/specs/platform/logger-runtime-spec.md`
@@ -177,6 +181,9 @@ No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedi
 - Makefile, automatizaciones operativas, catálogos `list-scaffolds` o `list-tools`:
   - `doc/specs/platform/makefile-automation-spec.md`
   - `doc/specs/platform/process-scaffold-cleanup-spec.md` si también afecta scaffolds o cleanup
+- Comandos Go bajo `cmd/tools/`, utilidades operativas conectadas a DB/Redis/colas, o targets que envuelven `go run`:
+  - `doc/specs/platform/makefile-automation-spec.md`
+  - `doc/specs/architecture/service-runtime-bootstrap-spec.md` cuando también cambie el contexto de ejecución o bootstrap compartido
 - Scaffolds, cleanup de procesos, batch/export scaffolds o convenciones Bruno genéricas:
   - `doc/specs/platform/process-scaffold-cleanup-spec.md`
   - `doc/specs/platform/makefile-automation-spec.md`
@@ -188,6 +195,14 @@ No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedi
   - `doc/specs/process-lifecycle/batch-fanout-spec.md`
   - `doc/specs/process-lifecycle/batch-observability-spec.md`
   - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+- Cancelación operativa de corridas batch, kill switch distribuida, auto-cancel por errores repetidos o guards de polling:
+  - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+  - `doc/specs/process-lifecycle/batch-fanout-spec.md`
+  - `doc/specs/process-lifecycle/batch-observability-spec.md`
+  - `doc/specs/api/http-endpoints-spec.md` si también se expone endpoint operativo
+- Export batch, `exportmanager`, generación de archivos por lotes, auto-cancel de exports o registro de managers por `execution_key`:
+  - `doc/specs/exports/export-pipelines-spec.md`
+  - `doc/info/exports/exportmanager-bulkexport-v2.md`
 - Exports, exportmanager, layouts, pipelines o generación de archivos:
   - `doc/specs/exports/export-pipelines-spec.md`
 - Base de datos, modelos GORM, migraciones, relaciones, queries e integridad:
@@ -208,6 +223,19 @@ Todo servicio nuevo o refactorizado debe estructurarse con:
 - constructor injection,
 - method receivers,
 - implementacion concreta no exportada cuando no exista una razon fuerte para exportarla.
+
+### Regla adicional para procesos batch
+
+- Si se agrega un proceso batch nuevo sobre `batchflow` y ese proceso necesita participar en cancelación operativa o auto-cancel con `lifecycle.Fail(...)`, debe registrar su `Manager` en el registry central resuelto por `execution_key`.
+- No dejar esa resolución hardcodeada en consumers o handlers por proceso nuevo.
+- El scaffold oficial de batch debe generar esa estructura por defecto; si no lo hace, primero debe corregirse el scaffold antes de seguir creando procesos nuevos.
+
+### Regla adicional para export batch
+
+- Si se agrega un export batch nuevo sobre `exportmanager` y ese proceso necesita participar en cancelación operativa o auto-cancel con `ParentLifecycle.Fail(...)`, debe registrar su `Manager` en el registry central de exports resuelto por `execution_key`.
+- No dejar esa resolución hardcodeada en consumers o handlers por export nuevo.
+- Si un export legacy no usa `exportmanager.Manager`, debe documentarse explícitamente como excepción hasta migrarlo.
+- El scaffold oficial de export debe generar esa estructura por defecto; si no lo hace, primero debe corregirse el scaffold antes de seguir creando exports nuevos.
 
 ### Patron esperado
 
@@ -319,11 +347,13 @@ Cuando una solicitud pida "logger" o un ajuste de logging, debe asumirse esta co
 
 - `log_type=redis_guard` para errores relevantes de Redis en el core batch.
 - `log_type=rate_limit_guard` para rate limit interno del core y `429` externos.
+- `log_type=execution_guard` para cancelaciones manuales, auto-cancel por threshold y pausas/cortes operativos relevantes.
 
 ### Reglas de emision
 
 - Los errores Redis del motor batch no deben pasar silenciosamente.
 - Un `429` de dependencia externa no debe pasar silenciosamente.
+- Una cancelación manual o automática relevante no debe pasar silenciosamente.
 - El logging transversal debe vivir en el core compartido correspondiente, no repetirse por cada adapter o flujo.
 - Si una solicitud implica capacidad, estres, Redis o fanout, revisar y mantener alineados los documentos operativos y normativos de observabilidad batch.
 
@@ -410,6 +440,23 @@ La documentacion del `Makefile` debe dejar claro:
 - comandos destructivos o sensibles,
 - flujos principales de desarrollo, despliegue, datos y soporte.
 
+### Contexto de ejecucion de comandos
+
+- Todo comando nuevo del `Makefile` o de `cmd/tools/` que abra conexiones a Postgres, Redis, colas u otra infraestructura debe definirse con un contexto de ejecución explícito.
+- Si `internal/appconfig/config.yml` o las variables del entorno objetivo resuelven hosts por DNS interno de Docker Compose, por ejemplo `postgres` o `redis`, el target humano del `Makefile` debe ejecutarse dentro de ese contexto, preferentemente mediante `$(DC_RUN)` o un wrapper equivalente.
+- No asumir que `go run ./cmd/tools/...` desde host funcionará igual que dentro del contenedor.
+- Si un comando debe soportar host además de Docker, la documentación y el contrato operativo deben explicitar qué configuración local lo hace válido.
+- Cuando se agregue o modifique un comando DB-aware, revisar y actualizar:
+  - `doc/info/platform/makefile-guide.md`
+  - `doc/specs/platform/makefile-automation-spec.md`
+
+### Compatibilidad multi-entorno
+
+- Todo cambio de infraestructura, runtime, bootstrap, colas, endpoints de AWS, variables de entorno, Terraform, Helm/K8s, Docker Compose o LocalStack debe evaluarse pensando en los dos entornos objetivo: `lambda` y `eks`.
+- No optimizar una corrección solo para el entorno que está fallando si eso rompe o deja ambiguo el otro.
+- Si una decisión operativa cambia URLs, nombres de colas, wiring, variables de entorno o comportamiento de bootstrap, hay que verificar explícitamente cómo queda en `lambda` y cómo queda en `eks`.
+- Si por alguna razón un cambio debe comportarse distinto entre `lambda` y `eks`, esa diferencia debe quedar justificada y documentada; no dejarla implícita.
+
 ### Catalogos operativos
 
 - Debe existir `make list-scaffolds` para descubrir generadores y scaffolds reutilizables.
@@ -466,6 +513,7 @@ Todo endpoint nuevo o modificado debe evaluarse junto con su documentacion HTTP 
 - `doc/specs/architecture/external-http-client-spec.md`
 - `doc/specs/platform/logger-runtime-spec.md`
 - `doc/specs/architecture/service-runtime-bootstrap-spec.md`
+- `doc/specs/platform/makefile-automation-spec.md`
 - `doc/specs/platform/process-scaffold-cleanup-spec.md`
 - `doc/specs/process-lifecycle/batch-observability-spec.md`
 - `doc/info/api/http-endpoints-guide.md`

@@ -518,6 +518,31 @@ o bien:
 
 - auth: bearer
 
+#### `POST /api/v1/process-lifecycle/bulk-process/run`
+
+- auth: bearer
+- objetivo: ejecutar un `bulk_job` padre usando la configuración activa de `bulk_job_configs` enlazada por `ref_code`
+- body mínimo: requiere solo el identificador del padre en `bulk_jobs`
+
+```json
+{
+  "bulk_job_id": 2
+}
+```
+
+#### `POST /api/v1/process-lifecycle/cancel-run`
+
+- auth: bearer
+- objetivo: cancelar una corrida batch activa por `run_key` o por `bulk_job_id`
+- body mínimo recomendado:
+
+```json
+{
+  "bulk_job_id": 2,
+  "reason": "manual_cancel"
+}
+```
+
 #### `POST /api/v1/process-lifecycle/run`
 
 - auth: bearer

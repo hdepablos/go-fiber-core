@@ -2,6 +2,7 @@ package bulkjobconfig
 
 import (
 	"context"
+	"strconv"
 
 	"go-fiber-core/internal/models"
 
@@ -10,6 +11,7 @@ import (
 
 type BulkJobConfigReader interface {
 	GetActiveByRefCode(ctx context.Context, db *gorm.DB, operatorID uint64, refCode string) (*models.BulkJobConfig, error)
+	GetNextRefCode(ctx context.Context, db *gorm.DB, step int64) (string, error)
 }
 
 type BulkJobConfigWriter interface {
@@ -29,6 +31,35 @@ func (r *bulkJobConfigReaderRepo) GetActiveByRefCode(ctx context.Context, db *go
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+func (r *bulkJobConfigReaderRepo) GetNextRefCode(ctx context.Context, db *gorm.DB, step int64) (string, error) {
+	if step <= 0 {
+		step = 5
+	}
+
+	var maxValue int64
+	if err := db.WithContext(ctx).
+		Raw(`SELECT COALESCE(MAX(CAST(ref_code AS BIGINT)), 0) FROM bulk_job_configs WHERE ref_code ~ '^[0-9]+$'`).
+		Scan(&maxValue).Error; err != nil {
+		return "", err
+	}
+
+	return strconv.FormatInt(nextNumericRefCode(maxValue, step), 10), nil
+}
+
+func nextNumericRefCode(maxValue int64, step int64) int64 {
+	if step <= 0 {
+		step = 5
+	}
+	if maxValue <= 0 {
+		return step
+	}
+	remainder := maxValue % step
+	if remainder == 0 {
+		return maxValue + step
+	}
+	return maxValue + (step - remainder)
 }
 
 type bulkJobConfigWriterRepo struct{}

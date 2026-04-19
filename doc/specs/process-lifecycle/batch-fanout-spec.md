@@ -6,6 +6,8 @@ when_to_read:
   - cambios en shards o auto_invoke
   - cambios en finalize distribuido
   - cambios en dispatch_pacing dentro de fanout
+  - cambios en cancelacion de corridas batch
+  - cambios en auto-cancel por errores repetidos
 code_paths:
   - internal/services/batchflow/
   - internal/services/bulkprocess/steps.go
@@ -101,6 +103,8 @@ y así sucesivamente, respetando `total_batches`.
 - No debe usarse `is_last_batch` como stop condition global del fan-out.
 - Si `dispatch_pacing` está activo, el delay de la re-invocación debe salir de `dispatch_pacing.interval_seconds`.
 - `dispatch_pacing.interval_seconds` debe validarse en rango seguro para Lambda; el contrato actual admite `1..10`.
+- Antes de re-encolar un shard por `auto_invoke`, el worker debe poder verificar si la corrida fue cancelada.
+- Si la corrida fue cancelada, `auto_invoke` no debe re-encolar el mismo shard ni disparar `next_step`.
 
 ## Reglas de coordinación global
 
@@ -110,6 +114,8 @@ Redis debe mantener como mínimo:
 - cantidad de shards completados
 - marca idempotente por shard
 - lock de finalize
+- estado de cancelacion de la corrida
+- lock de stop/cancel para evitar side effects repetidos
 
 Si `dispatch_pacing` está activo:
 
@@ -123,6 +129,7 @@ Si `dispatch_pacing` está activo:
 - Solo el último shard global debe habilitar el dispatch de `finalize`.
 - `finalize` debe ejecutarse una sola vez por corrida.
 - La protección de finalize debe usar coordinación distribuida.
+- Si la corrida ya fue cancelada, `finalize` no debe consolidar ni reactivar el flujo como si fuera exitoso.
 
 ## Invariantes
 
@@ -130,6 +137,9 @@ Si `dispatch_pacing` está activo:
 - Un reintento de un shard ya marcado no debe volver a habilitar finalize.
 - `finalize` no puede limpiarse antes de que todos los shards terminen.
 - La limpieza Redis debe ocurrir después del finalize único.
+- Una corrida cancelada no debe seguir generando mensajes `auto_invoke`.
+- Un auto-cancel por threshold no debe depender del worker exacto que detectó el error.
+- Si el proceso batch define `ParentLifecycle.Fail`, el auto-cancel debe invocarlo para dejar el padre en estado consistente.
 
 ## Compatibilidad operativa
 
@@ -177,6 +187,7 @@ Debe seguir siendo compatible con:
 - La cantidad de shards debe ajustarse a la capacidad del sistema y del proveedor externo.
 - `dispatch_pacing` no multiplica el throughput por shard; limita el ritmo global de la corrida.
 - `dispatch_pacing` no debe implementarse con espera bloqueante dentro de una Lambda de producción.
+- El fan-out no reemplaza una guarda operativa de cancelacion o auto-cancel por errores repetidos.
 
 ## Acceptance Criteria
 
@@ -186,6 +197,7 @@ Debe seguir siendo compatible con:
 - El mismo contrato funciona sobre Lambda y EKS.
 - El mismo contrato puede combinarse con `dispatch_pacing` global por corrida.
 - La documentación humana debe incluir una guía de riesgos separada.
+- Una corrida fan-out cancelada deja de re-encolar shards y no dispara `finalize` adicional.
 
 ## Trazabilidad
 

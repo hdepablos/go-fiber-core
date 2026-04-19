@@ -161,6 +161,7 @@ El motor batch usa dos familias de logs estructurados para observabilidad operat
 
 - `log_type=redis_guard`
 - `log_type=rate_limit_guard`
+- `log_type=execution_guard`
 
 Filtros sugeridos en CloudWatch Logs Insights o filtros de patrones:
 
@@ -179,6 +180,16 @@ Filtros sugeridos en CloudWatch Logs Insights o filtros de patrones:
 ```text
 { $.log_type = "rate_limit_guard" && $.scope = "internal" }
 ```
+
+```text
+{ $.log_type = "execution_guard" }
+```
+
+Casos típicos de `execution_guard`:
+
+- cancelación manual de una corrida batch;
+- auto-cancel por umbral de errores repetidos del mismo fingerprint;
+- pausa automática del polling cuando un mismo error de infraestructura se repite demasiadas veces.
 
 ```text
 { $.log_type = "rate_limit_guard" && $.event_type = "external_dependency_timeout" }

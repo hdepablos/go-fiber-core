@@ -7,7 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"go-fiber-core/internal/logger"
+
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type manager struct {
@@ -17,6 +20,7 @@ type manager struct {
 	finalizer    Finalizer
 	stateStore   StateStore
 	defaultTTL   time.Duration
+	runControl   *RunControl
 }
 
 func NewManager(
@@ -26,6 +30,7 @@ func NewManager(
 	finalizer Finalizer,
 	stateStore StateStore,
 	defaultTTL time.Duration,
+	runControl *RunControl,
 ) Manager {
 	if defaultTTL <= 0 {
 		defaultTTL = 24 * time.Hour
@@ -37,6 +42,7 @@ func NewManager(
 		finalizer:    finalizer,
 		stateStore:   stateStore,
 		defaultTTL:   defaultTTL,
+		runControl:   runControl,
 	}
 }
 
@@ -69,6 +75,11 @@ func (m *manager) Start(ctx context.Context, req StartRequest) (StartResult, err
 	batchesListKey, err := m.stateStore.Initialize(ctx, req.Input, load.Batches, load.Summary, load.Metadata, req.RedisTTL)
 	if err != nil {
 		return StartResult{}, err
+	}
+	if m.runControl != nil {
+		if err := m.runControl.RegisterRun(ctx, req.Input, req.RedisTTL); err != nil {
+			return StartResult{}, err
+		}
 	}
 
 	totalBatches := len(load.Batches)
@@ -121,6 +132,14 @@ func (m *manager) DispatchShards(ctx context.Context, req DispatchRequest) (Disp
 func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (ProcessResult, error) {
 	if err := validateInput(req.Input); err != nil {
 		return ProcessResult{}, err
+	}
+	if cancelled, status, err := m.runCancellationStatus(ctx, req.Input); err != nil {
+		return ProcessResult{}, err
+	} else if cancelled {
+		if lockErr := m.handleCancelledRun(ctx, req.Input, status); lockErr != nil {
+			return ProcessResult{}, lockErr
+		}
+		return cancelledProcessResult(req, status), nil
 	}
 	if req.TotalShards <= 0 {
 		req.TotalShards = 1
@@ -264,6 +283,23 @@ func (m *manager) Finalize(ctx context.Context, req FinalizeRequest) (FinalizeRe
 	if err := validateInput(req.Input); err != nil {
 		return FinalizeResult{}, err
 	}
+	if cancelled, status, err := m.runCancellationStatus(ctx, req.Input); err != nil {
+		return FinalizeResult{}, err
+	} else if cancelled {
+		logger.LogExecutionGuard(
+			"run_finalize_skipped_cancelled",
+			zap.String("run_key", req.Input.RedisKey),
+			zap.Int64("parent_id", req.Input.ParentID),
+			zap.String("reason", status.Reason),
+		)
+		return FinalizeResult{
+			Summary: Summary{},
+			Metadata: map[string]any{
+				"cancelled":     true,
+				"cancel_reason": status.Reason,
+			},
+		}, nil
+	}
 
 	summary, err := m.stateStore.LoadSummary(ctx, req.Input)
 	if err != nil {
@@ -288,10 +324,16 @@ func (m *manager) Finalize(ctx context.Context, req FinalizeRequest) (FinalizeRe
 	if err := m.stateStore.Cleanup(ctx, req.Input, req.BatchesListKey); err != nil {
 		return FinalizeResult{}, err
 	}
+	if m.runControl != nil {
+		_ = m.runControl.MarkCompleted(ctx, req.Input)
+	}
 	return result, nil
 }
 
 func (m *manager) Fail(ctx context.Context, input Input, cause error) error {
+	if m.runControl != nil {
+		_ = m.runControl.MarkFailed(ctx, input, cause)
+	}
 	if m.lifecycle == nil {
 		return nil
 	}
@@ -324,4 +366,54 @@ func (m *manager) newExecutionContext(input Input, summary Summary, ttl time.Dur
 		execCtx.Runtime = provider.RuntimeValues(input, ttl)
 	}
 	return execCtx
+}
+
+func (m *manager) runCancellationStatus(ctx context.Context, input Input) (bool, RunStatus, error) {
+	if m.runControl == nil || strings.TrimSpace(input.RedisKey) == "" {
+		return false, RunStatus{}, nil
+	}
+	return m.runControl.IsCancelled(ctx, input.RedisKey)
+}
+
+func (m *manager) handleCancelledRun(ctx context.Context, input Input, status RunStatus) error {
+	if m.runControl == nil || strings.TrimSpace(input.RedisKey) == "" {
+		return nil
+	}
+	locked, err := m.runControl.AcquireStopLock(ctx, input.RedisKey, m.defaultTTL)
+	if err != nil {
+		return err
+	}
+	if !locked {
+		return nil
+	}
+	logger.LogExecutionGuard(
+		"run_cancel_detected",
+		zap.String("run_key", input.RedisKey),
+		zap.Int64("parent_id", input.ParentID),
+		zap.String("reason", status.Reason),
+		zap.String("source", status.Source),
+	)
+	if m.lifecycle != nil {
+		return m.lifecycle.Fail(ctx, m.newExecutionContext(input, Summary{}, m.defaultTTL), ErrRunCancelled)
+	}
+	return nil
+}
+
+func cancelledProcessResult(req ProcessRequest, status RunStatus) ProcessResult {
+	return ProcessResult{
+		NextBatchIndex:         req.BatchIndex,
+		IsLastBatch:            true,
+		IsShardComplete:        true,
+		ProcessedCount:         0,
+		BatchesProcessed:       0,
+		ShardIndex:             req.ShardIndex,
+		TotalShards:            req.TotalShards,
+		CompletedShards:        0,
+		ShouldDispatchNextStep: false,
+		Metadata: map[string]any{
+			"cancelled":     true,
+			"cancel_reason": status.Reason,
+			"cancel_source": status.Source,
+		},
+	}
 }

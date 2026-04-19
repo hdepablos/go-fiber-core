@@ -80,6 +80,17 @@ El pipeline batch queda conceptualmente así:
 - actualiza el padre,
 - limpia el estado Redis.
 
+## Cancelación y auto-cancel
+
+En fan-out la cancelación debe ser distribuida.
+
+Reglas prácticas:
+
+- una corrida cancelada debe dejar de re-encolar shards por `auto_invoke`;
+- `finalize` no debe dispararse como cierre exitoso si la corrida ya fue cancelada;
+- si un worker detecta demasiados errores repetidos del mismo tipo y dispara auto-cancel, el resto de los workers debe respetar ese corte;
+- la fuente de verdad del corte debe vivir en Redis para comportarse igual en Lambda y EKS.
+
 ## Estrategia elegida
 
 La estrategia inicial es `stride`.

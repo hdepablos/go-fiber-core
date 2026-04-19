@@ -21,6 +21,9 @@ import (
 	"go-fiber-core/internal/dtos/requests"
 	"go-fiber-core/internal/logger"
 	"go-fiber-core/internal/models"
+	bulkjobrepo "go-fiber-core/internal/repositories/bulkjob"
+	bulkjobconfigrepo "go-fiber-core/internal/repositories/bulkjobconfig"
+	"go-fiber-core/internal/services/batchflow"
 	"go-fiber-core/internal/services/cache"
 	"go-fiber-core/internal/services/processlifecyclemanager"
 	"go-fiber-core/internal/services/serviceconfig"
@@ -36,6 +39,8 @@ type Service interface {
 	GetProcessVersionByID(ctx context.Context, processVersionID int64) (*models.ProcessVersionListItem, error)
 	GetProcessStepsByVersionID(ctx context.Context, processVersionID int64) ([]Step, error)
 	Run(ctx context.Context, req requests.RunProcessRequest) (int64, *contracts.ServiceContext, error)
+	RunBulkJob(ctx context.Context, bulkJobID int64, operatorID int64) (int64, requests.RunProcessRequest, *contracts.ServiceContext, error)
+	CancelRun(ctx context.Context, req requests.CancelProcessRunRequest, requestedBy string) (batchflow.RunStatus, error)
 }
 
 type Step struct {
@@ -46,21 +51,43 @@ type Step struct {
 }
 
 type service struct {
-	conn          *connect.ConnectDTO
-	replicateSvc  processlifecyclemanager.ReplicateService
-	promoteSvc    processlifecyclemanager.PromoteService
-	resolveSvc    processlifecyclemanager.ResolveService
-	moveToTestSvc processlifecyclemanager.MoveToTestService
+	conn                *connect.ConnectDTO
+	replicateSvc        processlifecyclemanager.ReplicateService
+	promoteSvc          processlifecyclemanager.PromoteService
+	resolveSvc          processlifecyclemanager.ResolveService
+	moveToTestSvc       processlifecyclemanager.MoveToTestService
+	bulkJobReader       bulkjobrepo.BulkJobReader
+	bulkJobConfigReader bulkjobconfigrepo.BulkJobConfigReader
+	runControl          *batchflow.RunControl
 }
 
 func NewService(conn *connect.ConnectDTO) Service {
+	return NewServiceWithDeps(
+		conn,
+		bulkjobrepo.NewBulkJobReaderRepo(),
+		bulkjobconfigrepo.NewBulkJobConfigReaderRepo(),
+	)
+}
+
+func NewServiceWithDeps(
+	conn *connect.ConnectDTO,
+	bulkJobReader bulkjobrepo.BulkJobReader,
+	bulkJobConfigReader bulkjobconfigrepo.BulkJobConfigReader,
+) Service {
 	resolveSvc := processlifecyclemanager.NewResolveService(conn)
+	var runControl *batchflow.RunControl
+	if conn != nil && conn.ConnectRedis != nil {
+		runControl = batchflow.NewRunControl(batchflow.NewRedisCache(conn.ConnectRedis), 24*time.Hour)
+	}
 	return &service{
-		conn:          conn,
-		replicateSvc:  processlifecyclemanager.NewReplicateService(conn),
-		promoteSvc:    processlifecyclemanager.NewPromoteService(conn),
-		resolveSvc:    resolveSvc,
-		moveToTestSvc: processlifecyclemanager.NewMoveToTestService(conn),
+		conn:                conn,
+		replicateSvc:        processlifecyclemanager.NewReplicateService(conn),
+		promoteSvc:          processlifecyclemanager.NewPromoteService(conn),
+		resolveSvc:          resolveSvc,
+		moveToTestSvc:       processlifecyclemanager.NewMoveToTestService(conn),
+		bulkJobReader:       bulkJobReader,
+		bulkJobConfigReader: bulkJobConfigReader,
+		runControl:          runControl,
 	}
 }
 
@@ -560,6 +587,87 @@ func BuildServiceRegistryFromSteps(steps []Step) ([]serviceconfig.ServiceRegistr
 	}
 
 	return rows, nil
+}
+
+func (s *service) RunBulkJob(ctx context.Context, bulkJobID int64, operatorID int64) (int64, requests.RunProcessRequest, *contracts.ServiceContext, error) {
+	req, err := s.buildRunRequestFromBulkJob(ctx, bulkJobID, operatorID)
+	if err != nil {
+		return 0, requests.RunProcessRequest{}, nil, err
+	}
+
+	processVersionID, svcCtx, err := s.Run(ctx, req)
+	return processVersionID, req, svcCtx, err
+}
+
+func (s *service) CancelRun(ctx context.Context, req requests.CancelProcessRunRequest, requestedBy string) (batchflow.RunStatus, error) {
+	if s.runControl == nil {
+		return batchflow.RunStatus{}, domain.ErrInternal
+	}
+
+	runKey := strings.TrimSpace(req.RunKey)
+	parentID := req.ResolvedBulkJobID()
+	status, err := s.runControl.Cancel(ctx, batchflow.RunCancelRequest{
+		RunKey:      runKey,
+		ParentID:    parentID,
+		Reason:      strings.TrimSpace(req.Reason),
+		RequestedBy: strings.TrimSpace(requestedBy),
+		Source:      "process_lifecycle_endpoint",
+	})
+	if err != nil {
+		return batchflow.RunStatus{}, err
+	}
+	return status, nil
+}
+
+func (s *service) buildRunRequestFromBulkJob(ctx context.Context, bulkJobID int64, operatorID int64) (requests.RunProcessRequest, error) {
+	if bulkJobID <= 0 {
+		return requests.RunProcessRequest{}, domain.ErrInvalidArgument
+	}
+	if s.conn == nil || s.conn.ConnectGormRead == nil {
+		return requests.RunProcessRequest{}, fmt.Errorf("gorm read connection is not initialized")
+	}
+
+	job, err := s.bulkJobReader.GetByID(ctx, s.conn.ConnectGormRead, bulkJobID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return requests.RunProcessRequest{}, fmt.Errorf("%w: bulk_job %d no encontrado", domain.ErrNotFound, bulkJobID)
+		}
+		return requests.RunProcessRequest{}, err
+	}
+
+	refCode := strings.TrimSpace(job.RefCode)
+	if refCode == "" {
+		return requests.RunProcessRequest{}, fmt.Errorf("%w: bulk_job %d no tiene ref_code", domain.ErrInvalidArgument, bulkJobID)
+	}
+
+	cfg, err := s.bulkJobConfigReader.GetActiveByRefCode(ctx, s.conn.ConnectGormRead, job.OperatorID, refCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return requests.RunProcessRequest{}, fmt.Errorf("%w: bulk_job_config activo no encontrado para ref_code %s", domain.ErrNotFound, refCode)
+		}
+		return requests.RunProcessRequest{}, err
+	}
+
+	var req requests.RunProcessRequest
+	if err := json.Unmarshal(cfg.Config, &req); err != nil {
+		return requests.RunProcessRequest{}, fmt.Errorf("%w: config inválido para ref_code %s: %v", domain.ErrInvalidArgument, refCode, err)
+	}
+
+	if req.Input == nil {
+		req.Input = make(map[string]any)
+	}
+
+	req.Input["id"] = job.ID
+	req.Input["bulk_job_id"] = job.ID
+	req.Input["ref_code"] = refCode
+
+	if operatorID > 0 {
+		req.OperatorID = operatorID
+	} else {
+		req.OperatorID = int64(job.OperatorID)
+	}
+
+	return req, nil
 }
 
 func (s *service) Run(ctx context.Context, req requests.RunProcessRequest) (int64, *contracts.ServiceContext, error) {

@@ -1,0 +1,25 @@
+meta {
+  name: post-run
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/bulk-process/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "bulk_job_id": 2
+}
+}

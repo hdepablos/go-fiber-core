@@ -5,6 +5,7 @@ when_to_read:
   - cambios en scaffolds de procesos
   - cambios en delete-process
   - cambios en list-scaffolds
+  - cambios en templates de provider o lifecycle generados
   - cambios en convenciones Bruno batch
 code_paths:
   - cmd/tools/export-manager-scaffold/
@@ -116,6 +117,9 @@ El scaffold de export debe generar:
 - archivos del servicio export,
 - archivo de seeder,
 - wiring de imports requerido,
+- wiring en `runtimebootstrap` cuando el proceso use runtime asincrono compartido,
+- `ParentLifecycle.Fail(...)` en el template base,
+- registro del manager por `execution_key` en el registry central de `exportmanager`,
 - request Bruno dedicado de `run`,
 - documentación humana base del export.
 
@@ -127,7 +131,9 @@ El scaffold de batch debe generar:
 - archivo de seeder base secuencial,
 - archivo de seeder fanout,
 - wiring de imports requerido,
-- wiring en `runtimebootstrap`.
+- wiring en `runtimebootstrap`,
+- `ParentLifecycle.Fail(...)` en el template base,
+- registro del manager por `execution_key` en el registry central de `batchflow`.
 
 El scaffold de batch no debe requerir una carpeta Bruno específica por proceso.
 El scaffold debe usar un único `process_type` por negocio y separar el modo técnico a nivel de `process_version`.
@@ -183,6 +189,7 @@ El cleanup debe remover, cuando existan:
 - archivo de seeder
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
+- wiring en `internal/runtimebootstrap/bootstrap.go`
 - registro del seeder en `internal/database/seeders/seed_service.go`
 - documentación humana base del export
 - request Bruno dedicado del proceso
@@ -198,6 +205,8 @@ El cleanup debe remover, cuando existan:
 - `force=true` debe permitir sobrescribir el scaffold existente.
 - El scaffold batch debe poder generar `dispatch_pacing` cuando se solicite explícitamente con parámetros del comando.
 - Si el scaffold batch genera `dispatch_pacing`, debe reflejarlo en el `config` del step `process_batch` sin requerir edición manual mínima para el caso base.
+- Los scaffolds batch y export deben dejar los procesos nuevos listos para participar en cancelación operativa y auto-cancel sin editar manualmente `sqs-consumer`.
+- Esa garantía depende de que el template incluya `Fail(...)` y el registro del manager por `execution_key`.
 - Debe existir una herramienta operativa genérica para clonar una `process_version` existente.
 - Debe existir una herramienta operativa para clonar una `process_version` existente y agregar `dispatch_pacing` sin regenerar el servicio.
 - La herramienta genérica de clonado debe poder, opcionalmente, agregar `dispatch_pacing` cuando se solicite explícitamente.

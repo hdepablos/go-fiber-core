@@ -421,6 +421,8 @@ list-tools: ## 🧰 Lista utilidades operativas agrupadas por dominio. Uso: make
 	@echo "4. CLI y base de datos"
 	@echo "   - make cli-help"
 	@echo "   - make run-cli c=\"redis-clear-keys --pattern go-fiber-core:*\""
+	@echo "   - make create-bulk-job-config process_type_id=13"
+	@echo "   - make cancel-process-run bulk_job_id=2"
 	@echo "   - make create-migration name=create_users_table"
 	@echo "   - make migrate-status"
 	@echo "   - make migrate-up"
@@ -1280,6 +1282,33 @@ create-command: ## ✨ Crea un nuevo comando Cobra. Uso: make create-command nam
         mv "./cmd/$(name).go" "./cmd/cmd-cli/cmd/"; \
         echo "✅ ¡Comando creado"; \
     '
+
+.PHONY: create-bulk-job-config
+create-bulk-job-config: ## 🧾 Crea un bulk_job_config con ref_code consecutivo de 5 en 5. Uso: make create-bulk-job-config process_type_id=13 [sede_id=0 override_process_version_id=0 roadmap=0]
+	@if [ -z "$(process_type_id)" ]; then \
+		echo "❌ Debes especificar process_type_id: make create-bulk-job-config process_type_id=13"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🧾 Creando bulk_job_config con ref_code consecutivo...$(RESET)"
+	@$(DC_RUN) go run ./cmd/tools/create-bulk-job-config \
+		-config "$(or $(config),internal/appconfig/config.yml)" \
+		-process-type-id "$(process_type_id)" \
+		-sede-id "$(or $(sede_id),0)" \
+		-override-process-version-id "$(or $(override_process_version_id),0)" \
+		-roadmap "$(or $(roadmap),0)"
+
+.PHONY: cancel-process-run
+cancel-process-run: ## 🛑 Cancela una corrida batch por run_key o bulk_job_id. Uso: make cancel-process-run bulk_job_id=2 [reason=manual_cancel]
+	@if [ -z "$(run_key)" ] && [ -z "$(bulk_job_id)" ]; then \
+		echo "❌ Debes especificar run_key o bulk_job_id: make cancel-process-run bulk_job_id=2"; \
+		exit 1; \
+	fi
+	@echo "$(INFO)🛑 Cancelando corrida batch...$(RESET)"
+	@$(DC_RUN) go run ./cmd/tools/cancel-process-run \
+		-config "$(or $(config),internal/appconfig/config.yml)" \
+		-run-key "$(run_key)" \
+		-bulk-job-id "$(or $(bulk_job_id),0)" \
+		-reason "$(or $(reason),manual_cancel)"
 
 ## --------------------------------------------------------------------------
 ## Gestión de Base de Datos

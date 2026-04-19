@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -31,6 +32,8 @@ type ProcessLifecycleHandler interface {
 	MoveToTestScenario(c *fiber.Ctx) error
 	ListProcessVersions(c *fiber.Ctx) error
 	RunLoanRiskLifecycle(c *fiber.Ctx) error
+	RunBulkProcess(c *fiber.Ctx) error
+	CancelRun(c *fiber.Ctx) error
 	PreviewExport(c *fiber.Ctx) error
 	PreviewBatch(c *fiber.Ctx) error
 }
@@ -204,29 +207,74 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		req.Input["sede_id"] = req.SedeID
 	}
 
-	// Extract OperatorID from JWT claims (if available)
-	if token := c.Locals("user"); token != nil {
-		if t, ok := token.(*jwt.Token); ok {
-			if claims, ok := t.Claims.(jwt.MapClaims); ok {
-				if id, ok := claims["id"].(float64); ok {
-					req.OperatorID = int64(id)
-				}
-			}
-		}
-	}
+	req.OperatorID = extractOperatorID(c)
 
 	// Inyectar el roadmap al input para que esté disponible en el contexto si es necesario
 	// (la nueva DTO y servicio ya lo hacen, pero mantenemos por claridad)
 	req.Input["roadmap"] = req.Roadmap
 
 	processVersionID, svcCtx, execErr := h.service.Run(ctx, req)
+	return h.respondRunResult(c, processVersionID, req, svcCtx, execErr, "Loan risk lifecycle ejecutado exitosamente", "PROCESS_VERSION_NOT_FOUND", nil)
+}
+
+func (h *processLifecycleHandler) RunBulkProcess(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.RunBulkProcessRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	bulkJobID := req.ResolvedBulkJobID()
+	processVersionID, runReq, svcCtx, execErr := h.service.RunBulkJob(ctx, bulkJobID, extractOperatorID(c))
+	return h.respondRunResult(c, processVersionID, runReq, svcCtx, execErr, "Bulk process ejecutado exitosamente", "BULK_PROCESS_SOURCE_NOT_FOUND", map[string]any{
+		"bulk_job_id": bulkJobID,
+		"source":      "bulk_job_config",
+	})
+}
+
+func (h *processLifecycleHandler) CancelRun(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+
+	var req requests.CancelProcessRunRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidArgument
+	}
+
+	status, err := h.service.CancelRun(ctx, req, resolveCancelRequestedBy(c))
+	if err != nil {
+		return err
+	}
+
+	return responses.Success(c, "Proceso cancelado exitosamente", status)
+}
+
+func (h *processLifecycleHandler) respondRunResult(
+	c *fiber.Ctx,
+	processVersionID int64,
+	req requests.RunProcessRequest,
+	svcCtx *contracts.ServiceContext,
+	execErr error,
+	successMessage string,
+	notFoundCode string,
+	extra map[string]any,
+) error {
 	output := map[string]any{
 		"process_version_id": processVersionID,
 		"input":              req.Input,
 		"details":            map[string]any{},
 	}
+	for key, value := range extra {
+		output[key] = value
+	}
 
 	if svcCtx != nil {
+		if snapshot := svcCtx.SnapshotInput(); snapshot != nil {
+			output["runtime_input"] = snapshot
+			if runKey := getStringFromMap(snapshot, "key_redis"); strings.TrimSpace(runKey) != "" {
+				output["run_key"] = runKey
+			}
+		}
 		if svcCtx.Results != nil {
 			output["details"] = svcCtx.Results
 		}
@@ -281,7 +329,7 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		switch {
 		case errors.Is(execErr, domain.ErrNotFound):
 			statusCode = fiber.StatusNotFound
-			errorPayload["code"] = "PROCESS_VERSION_NOT_FOUND"
+			errorPayload["code"] = notFoundCode
 		case errors.Is(execErr, domain.ErrSedeNotFound):
 			statusCode = fiber.StatusNotFound
 			errorPayload["code"] = "SEDE_NOT_FOUND"
@@ -316,7 +364,27 @@ func (h *processLifecycleHandler) RunLoanRiskLifecycle(c *fiber.Ctx) error {
 		return responses.Error(c, statusCode, "Error ejecutando proceso lifecycle", output)
 	}
 
-	return responses.Success(c, "Loan risk lifecycle ejecutado exitosamente", output)
+	return responses.Success(c, successMessage, output)
+}
+
+func extractOperatorID(c *fiber.Ctx) int64 {
+	if token := c.Locals("user"); token != nil {
+		if t, ok := token.(*jwt.Token); ok {
+			if claims, ok := t.Claims.(jwt.MapClaims); ok {
+				if id, ok := claims["id"].(float64); ok {
+					return int64(id)
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func resolveCancelRequestedBy(c *fiber.Ctx) string {
+	if operatorID := extractOperatorID(c); operatorID > 0 {
+		return fmt.Sprintf("operator:%d", operatorID)
+	}
+	return "operator:unknown"
 }
 
 func (h *processLifecycleHandler) PreviewExport(c *fiber.Ctx) error {

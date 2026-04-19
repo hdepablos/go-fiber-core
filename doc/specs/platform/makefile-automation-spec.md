@@ -1,16 +1,20 @@
 ---
 domain: platform
-summary: Reglas para el Makefile como interfaz operativa del repositorio, su descubribilidad, clasificación y trazabilidad documental.
+summary: Reglas para el Makefile como interfaz operativa del repositorio, su descubribilidad, clasificación, contexto de ejecución y trazabilidad documental.
 when_to_read:
   - cambios en Makefile
   - nuevos targets de uso humano
+  - nuevos comandos Go ejecutados via Makefile
+  - comandos que abren conexiones a DB, Redis u otros servicios de infraestructura
   - cambios en list-scaffolds o list-tools
 code_paths:
   - Makefile
+  - cmd/tools/
 related_info:
   - doc/info/platform/makefile-guide.md
   - doc/info/development/process-scaffold-and-cleanup.md
 related_specs:
+  - doc/specs/architecture/service-runtime-bootstrap-spec.md
   - doc/specs/platform/process-scaffold-cleanup-spec.md
 status: active
 ---
@@ -75,7 +79,15 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - resetean migraciones,
 - modifican variables o entorno efectivo.
 
-### 4. Trazabilidad documental
+### 4. Contexto de ejecucion
+
+- Todo target que ejecute binarios Go, scripts o utilidades que abren conexiones a DB, Redis, colas u otros servicios debe declarar implicitamente o explicitamente su contexto de ejecucion esperado.
+- Si la configuracion operativa del repositorio resuelve hosts de infraestructura por DNS interno de Docker Compose, por ejemplo `postgres`, `redis` o nombres equivalentes de servicio, el target debe ejecutarse dentro de ese contexto de red, por ejemplo via `$(DC_RUN)` u otro wrapper equivalente.
+- No debe asumirse que un `go run ./cmd/tools/...` ejecutado desde host puede resolver los mismos hosts que un contenedor.
+- Si un comando debe soportar ejecucion desde host, la implementacion o su documentacion deben dejar claro qué configuracion o variables locales necesita para no depender de DNS interno de Docker.
+- Antes de agregar un target nuevo para una utilidad operativa conectada a infraestructura, se debe revisar si el comando comparte contexto con otros targets DB-aware existentes y reutilizar el mismo patrón de ejecucion.
+
+### 5. Trazabilidad documental
 
 - Si el `Makefile` cambia de forma relevante, debe revisarse `doc/info/platform/makefile-guide.md`.
 - Si se agrega una nueva familia de comandos, debe actualizarse esta spec o una spec relacionada.
@@ -83,7 +95,7 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - Si se agrega un comando tipo scaffold o generador reusable, debe revisarse `make list-scaffolds` y la documentación humana de scaffolds.
 - Si se agrega una utilidad operativa de uso frecuente, debe evaluarse `make list-tools` y la documentación humana del Makefile.
 
-### 5. Scaffold y cleanup de procesos
+### 6. Scaffold y cleanup de procesos
 
 - Los comandos de scaffold y cleanup de procesos deben estar documentados en una guía humana específica.
 - Debe existir una forma simple de descubrir scaffolds vigentes, por ejemplo `make list-scaffolds`.
@@ -98,6 +110,7 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - El equipo puede descubrir scaffolds vigentes sin relevar manualmente todo el `Makefile`.
 - El equipo puede descubrir utilidades operativas frecuentes sin relevar manualmente todo el `Makefile`.
 - Los objetivos peligrosos son distinguibles antes de ejecutarse.
+- Los comandos conectados a infraestructura se ejecutan en un contexto compatible con los hosts y credenciales definidos por la configuración operativa.
 - La documentación del `Makefile` permanece sincronizada con las familias principales de targets.
 - Los comandos de scaffold y cleanup de procesos quedan trazados a documentación específica.
 
@@ -105,6 +118,8 @@ Los targets destructivos o riesgosos deben dejar claro si:
 
 - `AGENTS.md`
 - `Makefile`
+- `cmd/tools/`
 - `doc/info/platform/makefile-guide.md`
 - `doc/info/development/process-scaffold-and-cleanup.md`
+- `doc/specs/architecture/service-runtime-bootstrap-spec.md`
 - `doc/specs/platform/process-scaffold-cleanup-spec.md`

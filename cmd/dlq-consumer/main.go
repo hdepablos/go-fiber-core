@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"go-fiber-core/cmd/api/di"
+	ilogger "go-fiber-core/internal/logger"
+	"go-fiber-core/internal/services/queue"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/joho/godotenv/autoload"
+	"go.uber.org/zap"
 )
 
 var (
@@ -108,6 +112,8 @@ func main() {
 func runPollingLoop() {
 	slog.Info("🚀 Iniciando DLQ Consumer en modo POLLING (EKS/Local)...")
 	ctx := context.Background()
+	errorGuard := queue.NewPollingErrorGuard(0)
+	cooldown := queue.DefaultPollingErrorCooldown()
 
 	// Validar que tengamos QueueService
 	if appContainer.QueueService == nil {
@@ -121,8 +127,23 @@ func runPollingLoop() {
 		messages, err := appContainer.QueueService.ReceiveMessages(ctx, 10)
 		if err != nil {
 			slog.Error("❌ Error recibiendo mensajes de DLQ", "error", err)
+			event := errorGuard.Record(err)
+			if event.Triggered {
+				ilogger.LogExecutionGuard(
+					"consumer_receive_auto_pause",
+					zap.String("component", "dlq_consumer_polling"),
+					zap.String("fingerprint", event.Fingerprint),
+					zap.Int("error_count", event.Count),
+					zap.Int("threshold", event.Threshold),
+					zap.String("cooldown", cooldown.String()),
+				)
+				time.Sleep(cooldown)
+				errorGuard.Reset()
+				continue
+			}
 			continue
 		}
+		errorGuard.Reset()
 
 		if len(messages) == 0 {
 			continue

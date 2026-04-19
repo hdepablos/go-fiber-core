@@ -79,6 +79,12 @@ Y a sus artefactos asociados:
 - Los endpoints multipart deben declarar el campo archivo y las variables requeridas en Bruno.
 - Los ejemplos documentales y los requests de Bruno deben derivarse de los DTOs reales cuando existan.
 
+### 7. Endpoints operativos de control
+
+- Si un flujo asincrono o batch necesita cancelacion operativa, la API debe exponer un endpoint claro y documentado para activarla.
+- Ese endpoint debe tener request Bruno canonico y ejemplo humano alineado.
+- Si el endpoint acepta múltiples formas de resolver la corrida, por ejemplo `run_key` o `bulk_job_id`, la documentación debe dejar claro cuál es el mínimo obligatorio para operar.
+
 ## Endpoints minimos cubiertos
 
 La capa documental y Bruno deben cubrir, como minimo:
@@ -102,6 +108,7 @@ La capa documental y Bruno deben cubrir, como minimo:
 - Existe una coleccion Bruno canonica organizada por ruta y no por nombre historico de prueba.
 - Los endpoints protegidos reutilizan el token obtenido por login o variable equivalente.
 - Los requests historicos no bloquean la navegacion principal porque quedan separados en `legacy`.
+- Los endpoints operativos batch relevantes, como cancelacion de corrida, tienen request Bruno canonico alineado con sus DTOs.
 
 ## Trazabilidad
 

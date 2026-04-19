@@ -52,9 +52,13 @@ Uso típico:
 
 - genera archivos del servicio,
 - registra imports necesarios,
+- cablea `runtimebootstrap` cuando aplica,
 - registra el seeder,
 - genera request Bruno dedicado para `run`,
-- y crea documentación humana base del export.
+- crea documentación humana base del export,
+- deja `ParentLifecycle.Fail(...)` en el template base,
+- registra preview y manager por `execution_key`,
+- y deja el proceso listo para cancelación operativa y auto-cancel sin editar manualmente `sqs-consumer`.
 
 ### Crear un batch process
 
@@ -75,6 +79,8 @@ Uso típico:
 - genera el seeder base secuencial,
 - genera el seeder adicional `_fanout`,
 - cablea `runtimebootstrap`,
+- deja `ParentLifecycle.Fail(...)` en el template base,
+- registra el manager por `execution_key`,
 - y deja el proceso listo para probarse con la carpeta genérica de Bruno.
 
 ### Eliminar un proceso scaffold
@@ -139,6 +145,8 @@ El scaffold de export crea normalmente:
 - seeder del proceso
 - request Bruno `RunProc -> <service_slug>.bru`
 - documentación humana base del export
+- wiring en `runtimebootstrap` cuando el proceso corre en runtime compartido
+- registro de preview y manager por `execution_key`
 
 ### Batch process
 
@@ -151,6 +159,7 @@ El scaffold de batch crea normalmente:
 - `lifecycle.go`
 - seeder base del proceso: `batch_process_<service_slug>`
 - seeder fanout del proceso: `batch_process_<service_slug>_fanout`
+- registro del manager por `execution_key`
 
 No crea una carpeta Bruno nueva por proceso.
 
@@ -240,6 +249,7 @@ El cleanup elimina, cuando existen:
 - archivo de seeder del proceso
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
+- wiring en `internal/runtimebootstrap/bootstrap.go`
 - registro del seeder en `internal/database/seeders/seed_service.go`
 - documentación `doc/info/exportmanager_<service_slug>.md`
 - request Bruno dedicado del export

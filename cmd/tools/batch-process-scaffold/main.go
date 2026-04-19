@@ -503,6 +503,7 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 
 	cache := batchflow.NewRedisCache(redisClient)
 	stateStore := batchflow.NewRedisStateStore(cache)
+	runControl := batchflow.NewRunControl(cache, batchflowTTL(appCfg))
 	lifecycle := NewParentLifecycle(conn.ConnectGormRead, conn.ConnectGormWrite)
 	dataProvider := NewDataProvider(conn.ConnectGormRead)
 	processor := NewProcessor(conn.ConnectGormWrite)
@@ -515,6 +516,7 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 		finalizer,
 		stateStore,
 		batchflowTTL(appCfg),
+		runControl,
 	)
 
 	return &provider{
@@ -564,8 +566,20 @@ func init() {
 		%q,
 		%q,
 	)
+	batchflow.RegisterManagedBatchManager(func(ctx context.Context) (batchflow.Manager, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return prov.Manager(), nil
+	},
+		%q,
+		%q,
+		%q,
+		%q,
+	)
 }
-`, data.PackageName, data.PackageName+".provider", data.RedisTTLHours, data.ProcessName, data.StartKey, data.DispatchKey, data.ProcessBatchKey, data.FinalizeKey)
+`, data.PackageName, data.PackageName+".provider", data.RedisTTLHours, data.ProcessName, data.StartKey, data.DispatchKey, data.ProcessBatchKey, data.FinalizeKey, data.StartKey, data.DispatchKey, data.ProcessBatchKey, data.FinalizeKey)
 }
 
 func renderSteps(data scaffoldData) string {

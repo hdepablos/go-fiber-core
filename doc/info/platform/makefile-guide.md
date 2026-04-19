@@ -39,6 +39,24 @@ Comando de diagnóstico rápido:
 make show-all-variables
 ```
 
+## Contexto de ejecución
+
+Antes de agregar o usar un comando nuevo del `Makefile`, hay que distinguir dónde vive su contexto real de ejecución.
+
+Regla práctica:
+
+- si el comando abre conexiones a Postgres, Redis, colas o servicios que en la configuración aparecen como hosts tipo `postgres` o `redis`, debe ejecutarse dentro de Docker Compose y no asumir que funcionará con `go run` desde host;
+- si el comando fue diseñado para correr desde host, su configuración local debe resolver hosts accesibles desde host y esa condición debe quedar documentada explícitamente;
+- cuando exista un wrapper operativo del `Makefile`, debe preferirse ese wrapper sobre ejecutar el binario manualmente.
+
+Checklist para futuros comandos Go bajo `cmd/tools/`:
+
+- revisar qué hostnames resuelve `internal/appconfig/config.yml` en el entorno real;
+- verificar si el comando comparte contexto con otros targets DB-aware ya existentes;
+- usar `$(DC_RUN)` o un wrapper equivalente cuando dependa de la red interna de Compose;
+- documentar si el comando soporta host, Docker o ambos;
+- evitar exponer como “comando simple” un `go run` que sólo funciona dentro de la red del contenedor.
+
 ## Grupos principales de comandos
 
 ### 1. Setup y validación
@@ -63,12 +81,15 @@ Ejemplos:
 - `make redis-list-project-keys`
 - `make redis-get-key k="go-fiber-core:lifecycle-2"`
 - `make redis-del key="catalogs*"`
+- `make create-bulk-job-config process_type_id=13`
+- `make cancel-process-run bulk_job_id=2`
 
 Uso:
 
 - depuración,
 - limpieza controlada,
-- inspección de claves operativas.
+- inspección de claves operativas,
+- creación rápida de configuraciones `bulk_job_configs` listas para frontend/importación.
 
 ### 3. Generación de código y scaffolding
 
@@ -203,6 +224,76 @@ Reglas:
 - falla si `apis.customer_api` ya existe,
 - `force=true` permite sobrescribir el bloque,
 - el resultado queda listo para resolver con `appConfig.APIConfig("customer_api")`.
+
+## `create-bulk-job-config`
+
+Uso:
+
+```bash
+make create-bulk-job-config process_type_id=13
+```
+
+Opcional:
+
+```bash
+make create-bulk-job-config \
+  process_type_id=13 \
+  sede_id=0 \
+  override_process_version_id=0 \
+  roadmap=0
+```
+
+Efectos:
+
+- crea un registro en `bulk_job_configs`,
+- calcula el siguiente `ref_code` numérico global en saltos de `5`,
+- deja `is_active=true`,
+- guarda un `config` default compatible con `POST /api/v1/process-lifecycle/run`,
+- e imprime el `ref_code` generado para reutilizarlo en el Excel y en `bulk_jobs`.
+- el target `make` se ejecuta dentro de Docker Compose para reutilizar la red donde resuelve el hostname `postgres`.
+
+Config default generado:
+
+```json
+{
+  "process_type_id": 13,
+  "sede_id": 0,
+  "override_process_version_id": 0,
+  "roadmap": 0,
+  "input": {}
+}
+```
+
+Reglas:
+
+- `operator_id` queda interno con valor default `1`,
+- `process_type_id` es obligatorio,
+- `sede_id`, `override_process_version_id` y `roadmap` quedan en `0` por defecto,
+- el flag `-operator-id` sigue existiendo como override técnico opcional del comando CLI si alguna vez se necesita,
+- si ejecutas el binario directamente fuera de Docker, debes asegurarte de que tu configuración local resuelva correctamente los hosts de base de datos,
+- para uso operativo normal debe preferirse `make create-bulk-job-config`, no `go run` directo desde host,
+- el comando toma solo `ref_code` numéricos existentes para calcular el siguiente consecutivo.
+
+## `cancel-process-run`
+
+Uso por `bulk_job_id`:
+
+```bash
+make cancel-process-run bulk_job_id=2
+```
+
+Uso por `run_key`:
+
+```bash
+make cancel-process-run run_key=bulkjob:2:abc123 reason=manual_cancel
+```
+
+Efectos:
+
+- marca la corrida como cancelada en Redis,
+- deja razón y origen de cancelación para observabilidad,
+- permite que workers asincrónicos dejen de re-encolar `auto_invoke`,
+- y sirve tanto para operaciones manuales como para soporte.
 
 ## `create-external-adapter`
 

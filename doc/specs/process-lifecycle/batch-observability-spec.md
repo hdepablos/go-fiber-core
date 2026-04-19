@@ -14,10 +14,11 @@ Aplica a:
 
 ## Familias de logs requeridas
 
-El sistema debe emitir al menos dos familias de logs estructurados:
+El sistema debe emitir al menos tres familias de logs estructurados:
 
 - `log_type=redis_guard`
 - `log_type=rate_limit_guard`
+- `log_type=execution_guard`
 
 ## Contratos mínimos de `redis_guard`
 
@@ -88,10 +89,37 @@ Campos recomendados:
 - `status_code`
 - `retry_after`
 
+## Contratos mínimos de `execution_guard`
+
+Los eventos `execution_guard` deben usarse para:
+
+- cancelaciones manuales de corridas,
+- auto-cancel por umbral de errores repetidos,
+- y pausas o cortes operativos del polling cuando un mismo error de infraestructura se repite muchas veces.
+
+Campos mínimos esperados:
+
+- `log_type=execution_guard`
+- `event_type`
+- `component`
+
+Campos recomendados cuando existan:
+
+- `run_key`
+- `parent_id`
+- `reason`
+- `requested_by`
+- `source`
+- `fingerprint`
+- `error_count`
+- `threshold`
+- `cooldown`
+
 ## Invariantes
 
 - Los errores Redis del core batch no deben perderse sin un evento `redis_guard`.
 - Un `429` de dependencia externa no debe pasar silenciosamente sin un evento `rate_limit_guard`.
+- Una cancelacion manual o automatica relevante no debe pasar silenciosamente sin un evento `execution_guard`.
 - El logging de observabilidad no debe reemplazar el retorno de error original.
 - La emisión de logs no debe alterar la semántica del flujo batch.
 - La búsqueda operativa en producción debe poder hacerse filtrando por `log_type`.
@@ -111,12 +139,14 @@ No se debe promover una configuración si durante la prueba aparecen de forma so
 - errores Redis,
 - `external_http_429`,
 - o `internal_rate_limit_*`.
+- Si aparecen cancelaciones automáticas o pausas de polling, también deben poder relevarse con `execution_guard`.
 
 ## Acceptance Criteria
 
 - El core batch registra errores Redis estructurados bajo `redis_guard`.
 - El core batch registra limitación interna bajo `rate_limit_guard`.
 - Los adapters HTTP instrumentados registran `429` externos bajo `rate_limit_guard`.
+- El runtime batch registra cancelaciones y auto-cancel bajo `execution_guard`.
 - La documentación humana explica cómo filtrar estos logs en producción.
 - Existe una guía humana para checklist de capacidad y stress test.
 

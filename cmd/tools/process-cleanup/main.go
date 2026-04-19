@@ -102,6 +102,8 @@ func buildConfig(opts options) (processConfig, error) {
 	case "export":
 		cfg.SeedName = "export_manager_" + slug
 		cfg.SeederFuncName = "ExportManager" + cfg.PascalName + "Seeder"
+		cfg.RuntimeFieldName = cfg.PascalName
+		cfg.NeedsRuntimeWiring = true
 		cfg.FilesToDelete = []string{
 			filepath.Join(repoRoot, "internal/services", slug, "provider.go"),
 			filepath.Join(repoRoot, "internal/services", slug, "steps.go"),
@@ -205,13 +207,17 @@ func patchRuntimeBootstrap(cfg processConfig, dryRun bool) error {
 		}
 	}
 
+	buildCall := fmt.Sprintf("%s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis)", cfg.ServiceSlug)
+	if cfg.Kind == "export" {
+		buildCall = fmt.Sprintf("%s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client)", cfg.ServiceSlug)
+	}
 	buildBlock := fmt.Sprintf(`
-	if prov, err := %s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis); err == nil {
+	if prov, err := %s; err == nil {
 		deps.%s = prov
 	} else {
 		errs = append(errs, fmt.Sprintf(%q, err))
 	}
-`, cfg.ServiceSlug, cfg.RuntimeFieldName, cfg.ServiceSlug+": %v")
+`, buildCall, cfg.RuntimeFieldName, cfg.ServiceSlug+": %v")
 	if err := removeLiteral(filePath, buildBlock, dryRun); err != nil {
 		return err
 	}

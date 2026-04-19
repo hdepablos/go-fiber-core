@@ -1,0 +1,26 @@
+meta {
+  name: post-cancel-run
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/cancel-run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+{
+  "bulk_job_id": 2,
+  "reason": "manual_cancel"
+}
+}

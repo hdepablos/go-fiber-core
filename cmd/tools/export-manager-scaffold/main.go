@@ -105,6 +105,9 @@ func main() {
 	if err := patchSeedService(data); err != nil {
 		fatal(err)
 	}
+	if err := patchRuntimeBootstrap(data); err != nil {
+		fatal(err)
+	}
 
 	fmt.Println("Scaffold generado correctamente")
 	fmt.Printf("Process Name: %s\n", data.ProcessName)
@@ -119,9 +122,10 @@ func main() {
 	}
 	fmt.Println("Siguientes pasos:")
 	fmt.Println("1. Implementar DataProvider")
-	fmt.Println("2. Implementar ParentLifecycle")
+	fmt.Println("2. Ajustar ParentLifecycle, incluyendo Fail para auto-cancel")
 	fmt.Println("3. Implementar OutputRegistrar")
-	fmt.Printf("4. Ejecutar el seeder: make seed-one name=%s\n", data.SeedName)
+	fmt.Println("4. Verificar execution keys y registro automatico del manager")
+	fmt.Printf("5. Ejecutar el seeder: make seed-one name=%s\n", data.SeedName)
 }
 
 type generatedPaths struct {
@@ -312,6 +316,73 @@ func patchSeedService(data scaffoldData) error {
 	return os.WriteFile(filePath, []byte(fileStr), 0o644)
 }
 
+func patchRuntimeBootstrap(data scaffoldData) error {
+	filePath := "/private/var/www/go-fiber-core/internal/runtimebootstrap/bootstrap.go"
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+	fileStr := string(content)
+
+	importLine := fmt.Sprintf("%q", "go-fiber-core/internal/services/"+data.ServiceSlug)
+	if !strings.Contains(fileStr, importLine) {
+		if patchErr := patchImportBlock(filePath, importLine); patchErr != nil {
+			return patchErr
+		}
+		content, err = os.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+		fileStr = string(content)
+	}
+
+	fieldLine := fmt.Sprintf("\t%s %s.Provider", data.PascalName, data.PackageName)
+	if !strings.Contains(fileStr, fieldLine) {
+		structAnchor := "type Dependencies struct {"
+		start := strings.Index(fileStr, structAnchor)
+		if start == -1 {
+			return fmt.Errorf("no se encontro Dependencies struct en runtimebootstrap")
+		}
+		rest := fileStr[start:]
+		end := strings.Index(rest, "\n}")
+		if end == -1 {
+			return fmt.Errorf("no se encontro cierre de Dependencies struct")
+		}
+		insertPos := start + end
+		fileStr = fileStr[:insertPos] + "\n" + fieldLine + fileStr[insertPos:]
+	}
+
+	buildBlock := fmt.Sprintf(`
+	if prov, err := %s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client); err == nil {
+		deps.%s = prov
+	} else {
+		errs = append(errs, fmt.Sprintf(%q, err))
+	}
+`, data.PackageName, data.PascalName, data.ServiceSlug+": %v")
+	if !strings.Contains(fileStr, fmt.Sprintf("deps.%s = prov", data.PascalName)) {
+		anchor := "\tif len(errs) > 0 {"
+		if !strings.Contains(fileStr, anchor) {
+			return fmt.Errorf("no se encontro anchor de build en runtimebootstrap")
+		}
+		fileStr = strings.Replace(fileStr, anchor, buildBlock+"\n"+anchor, 1)
+	}
+
+	injectBlock := fmt.Sprintf(`
+	if d.%s != nil {
+		ctx = %s.WithProvider(ctx, d.%s)
+	}
+`, data.PascalName, data.PackageName, data.PascalName)
+	if !strings.Contains(fileStr, fmt.Sprintf("d.%s != nil", data.PascalName)) {
+		anchor := "\treturn ctx"
+		if !strings.Contains(fileStr, anchor) {
+			return fmt.Errorf("no se encontro anchor de inject en runtimebootstrap")
+		}
+		fileStr = strings.Replace(fileStr, anchor, injectBlock+"\n"+anchor, 1)
+	}
+
+	return os.WriteFile(filePath, []byte(fileStr), 0o644)
+}
+
 func renderProvider(data scaffoldData) string {
 	return fmt.Sprintf(`package %s
 
@@ -333,8 +404,9 @@ type Provider interface {
 }
 
 type provider struct {
-	manager exportmanager.Manager
-	conn    *connect.ConnectDTO
+	manager    exportmanager.Manager
+	conn       *connect.ConnectDTO
+	components exportmanager.PreviewComponents
 }
 
 const providerContextKey = %q
@@ -345,6 +417,10 @@ func (p *provider) Manager() exportmanager.Manager {
 
 func (p *provider) Connect() *connect.ConnectDTO {
 	return p.conn
+}
+
+func (p *provider) PreviewComponents() exportmanager.PreviewComponents {
+	return p.components
 }
 
 func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, redisClient *redis.Client, s3Client *s3.Client) (Provider, error) {
@@ -386,7 +462,17 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 		%q,
 	)
 
-	return &provider{manager: manager, conn: conn}, nil
+	return &provider{
+		manager: manager,
+		conn:    conn,
+		components: exportmanager.PreviewComponents{
+			DataProvider:  dataProvider,
+			HeaderBuilder: headerBuilder,
+			BodyBuilder:   bodyBuilder,
+			FooterBuilder: footerBuilder,
+			StateStore:    stateStore,
+		},
+	}, nil
 }
 
 func WithProvider(ctx context.Context, prov Provider) context.Context {
@@ -399,7 +485,38 @@ func ProviderFromContext(ctx context.Context) (Provider, error) {
 	}
 	return nil, fmt.Errorf("provider no disponible en contexto")
 }
-`, data.PackageName, data.PartPrefix, data.PackageName+".provider")
+
+const processTypeName = %q
+
+func init() {
+	exportmanager.RegisterPreviewProvider(processTypeName, func(ctx context.Context) (exportmanager.PreviewProvider, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		previewable, ok := prov.(exportmanager.PreviewProvider)
+		if !ok {
+			return nil, fmt.Errorf("provider de %%s no soporta preview", processTypeName)
+		}
+		return previewable, nil
+	},
+		%q,
+		%q,
+		%q,
+	)
+	exportmanager.RegisterManagedExportManager(func(ctx context.Context) (exportmanager.Manager, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return prov.Manager(), nil
+	},
+		%q,
+		%q,
+		%q,
+	)
+}
+`, data.PackageName, data.PackageName+".provider", data.PartPrefix, data.ProcessName, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.StartKey, data.ProcessBatchKey, data.FinalizeKey)
 }
 
 func renderSteps(data scaffoldData) string {

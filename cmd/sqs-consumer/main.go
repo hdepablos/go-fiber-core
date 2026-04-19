@@ -3,16 +3,21 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog" // Uso de logger estructurado (Go 1.21+
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"go-fiber-core/cmd/api/di"
 	"go-fiber-core/internal/dtos/requests"
+	ilogger "go-fiber-core/internal/logger"
 	"go-fiber-core/internal/runtimebootstrap"
+	"go-fiber-core/internal/services/batchflow"
+	"go-fiber-core/internal/services/exportmanager"
 	"go-fiber-core/internal/services/queue"
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
@@ -29,6 +34,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/joho/godotenv/autoload"
+	"go.uber.org/zap"
 
 	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
@@ -40,6 +46,7 @@ import (
 var (
 	appContainer *di.AppContainer
 	runtimeDeps  *runtimebootstrap.Dependencies
+	runControl   *batchflow.RunControl
 )
 
 func init() {
@@ -60,6 +67,9 @@ func init() {
 	if err != nil {
 		slog.Warn("Runtime bootstrap parcial", "error", err)
 	}
+	if appContainer != nil && appContainer.Connect != nil && appContainer.Connect.ConnectRedis != nil {
+		runControl = batchflow.NewRunControl(batchflow.NewRedisCache(appContainer.Connect.ConnectRedis), 24*time.Hour)
+	}
 }
 
 func main() {
@@ -75,6 +85,8 @@ func main() {
 func runPollingLoop() {
 	slog.Info("🚀 Iniciando SQS Consumer en modo POLLING (EKS/Local)...")
 	ctx := context.Background()
+	errorGuard := queue.NewPollingErrorGuard(0)
+	cooldown := queue.DefaultPollingErrorCooldown()
 
 	// Validar que tengamos QueueService
 	if appContainer.QueueService == nil {
@@ -89,10 +101,24 @@ func runPollingLoop() {
 		messages, err := appContainer.QueueService.ReceiveMessages(ctx, 10)
 		if err != nil {
 			slog.Error("❌ Error recibiendo mensajes de SQS", "error", err)
-			// Backoff simple para no saturar logs si SQS está caído
+			event := errorGuard.Record(err)
+			if event.Triggered {
+				ilogger.LogExecutionGuard(
+					"consumer_receive_auto_pause",
+					zap.String("component", "sqs_consumer_polling"),
+					zap.String("fingerprint", event.Fingerprint),
+					zap.Int("error_count", event.Count),
+					zap.Int("threshold", event.Threshold),
+					zap.String("cooldown", cooldown.String()),
+				)
+				time.Sleep(cooldown)
+				errorGuard.Reset()
+				continue
+			}
 			time.Sleep(5 * time.Second)
 			continue
 		}
+		errorGuard.Reset()
 
 		if len(messages) == 0 {
 			continue
@@ -279,7 +305,7 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 		// Ejecutar el servicio individual
 		if err := serviceconfig.ExecuteDispatchedServiceWithConfig(ctx, stepReq.ServicePath, stepReq.ServiceConfig, svcCtx); err != nil {
 			slog.Error("❌ Error executing async step", "service", stepReq.ServicePath, "error", err)
-			return err
+			return handleRunExecutionError(ctx, stepReq.Input, stepReq.ServicePath, err)
 		}
 
 		slog.Info("✅ Async Step Completed", "service", stepReq.ServicePath)
@@ -389,6 +415,10 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 				stepReq.Input["total_processed"] = totalProcessed
 
 				if !shouldStop {
+					if shouldSkipQueuedDispatch(ctx, stepReq.Input, stepReq.ServicePath) {
+						slog.Info("ℹ️ [Auto-Invoke] Re-queue omitido por corrida cancelada", "service", stepReq.ServicePath)
+						return nil
+					}
 					slog.Info("🔄 [Auto-Invoke] Async step completed. Re-queuing next batch...", "cursor_field", cursorField, "cursor", nextCursor)
 
 					stepReq.Input[cursorField] = nextCursor
@@ -433,6 +463,10 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 					}
 
 					if policy.NextStep != "" && shouldDispatchNextStep {
+						if shouldSkipQueuedDispatch(ctx, stepReq.Input, policy.NextStep) {
+							slog.Info("ℹ️ [Auto-Invoke] Finalize omitido por corrida cancelada", "service", policy.NextStep)
+							return nil
+						}
 						finalReq := DispatchStepRequest{
 							ServicePath:        policy.NextStep,
 							ProcessExecutionID: stepReq.ProcessExecutionID,
@@ -488,6 +522,147 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func handleRunExecutionError(ctx context.Context, input map[string]any, component string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, batchflow.ErrRunCancelled) {
+		slog.Info("ℹ️ Ejecución cancelada detectada; el mensaje no se reintentará", "component", component)
+		return nil
+	}
+	if runControl == nil || input == nil {
+		return err
+	}
+
+	runKey := getStringFromAny(input["key_redis"])
+	parentID := getInt64FromAny(input["id"])
+	if strings.TrimSpace(runKey) == "" {
+		return err
+	}
+
+	record, recordErr := runControl.RecordError(ctx, batchflow.RunErrorRecordRequest{
+		RunKey:    runKey,
+		ParentID:  parentID,
+		Component: component,
+		Source:    "sqs_consumer",
+		Err:       err,
+	})
+	if recordErr != nil {
+		slog.Warn("⚠️ No se pudo registrar error para control de corrida", "run_key", runKey, "error", recordErr)
+		return err
+	}
+	if record.AutoCancelled {
+		triggerLifecycleFailOnAutoCancel(ctx, input, component, err)
+		slog.Warn("🛑 Corrida auto-cancelada por umbral de errores", "run_key", runKey, "fingerprint", record.Fingerprint, "count", record.Count, "threshold", record.Threshold)
+		return nil
+	}
+
+	cancelled, status, checkErr := runControl.IsCancelled(ctx, runKey)
+	if checkErr == nil && cancelled {
+		slog.Info("ℹ️ Corrida ya cancelada; se confirma el corte del mensaje", "run_key", runKey, "reason", status.Reason)
+		return nil
+	}
+	return err
+}
+
+func shouldSkipQueuedDispatch(ctx context.Context, input map[string]any, component string) bool {
+	if runControl == nil || input == nil {
+		return false
+	}
+	runKey := getStringFromAny(input["key_redis"])
+	if strings.TrimSpace(runKey) == "" {
+		return false
+	}
+	cancelled, status, err := runControl.IsCancelled(ctx, runKey)
+	if err != nil || !cancelled {
+		return false
+	}
+	ilogger.LogExecutionGuard(
+		"run_cancel_skip_reinvoke",
+		zap.String("run_key", runKey),
+		zap.Int64("parent_id", getInt64FromAny(input["id"])),
+		zap.String("component", component),
+		zap.String("reason", status.Reason),
+	)
+	return true
+}
+
+func triggerLifecycleFailOnAutoCancel(ctx context.Context, input map[string]any, servicePath string, cause error) {
+	if runControl == nil || input == nil {
+		return
+	}
+
+	runKey := getStringFromAny(input["key_redis"])
+	parentID := getInt64FromAny(input["id"])
+	if strings.TrimSpace(runKey) == "" || parentID <= 0 {
+		return
+	}
+
+	locked, err := runControl.AcquireStopLock(ctx, runKey, 24*time.Hour)
+	if err != nil {
+		slog.Warn("⚠️ No se pudo adquirir stop lock para auto-cancel", "run_key", runKey, "error", err)
+		return
+	}
+	if !locked {
+		return
+	}
+
+	failer, err := resolveManagedFailer(ctx, servicePath)
+	if err != nil {
+		slog.Warn("⚠️ Auto-cancel sin manager registrado para ejecutar Fail", "service", servicePath, "run_key", runKey, "error", err)
+		return
+	}
+
+	if err := failer.Fail(ctx, runKey, parentID, batchflow.ErrRunCancelled); err != nil {
+		slog.Error("❌ Falló lifecycle.Fail durante auto-cancel", "service", servicePath, "run_key", runKey, "parent_id", parentID, "error", err)
+		return
+	}
+
+	ilogger.LogExecutionGuard(
+		"run_auto_cancel_fail_applied",
+		zap.String("run_key", runKey),
+		zap.Int64("parent_id", parentID),
+		zap.String("component", servicePath),
+		zap.Error(cause),
+	)
+}
+
+type managedFailer interface {
+	Fail(ctx context.Context, runKey string, parentID int64, cause error) error
+}
+
+type batchManagerFailer struct {
+	manager batchflow.Manager
+}
+
+func (f batchManagerFailer) Fail(ctx context.Context, runKey string, parentID int64, cause error) error {
+	return f.manager.Fail(ctx, batchflow.Input{
+		RedisKey: runKey,
+		ParentID: parentID,
+	}, cause)
+}
+
+type exportManagerFailer struct {
+	manager exportmanager.Manager
+}
+
+func (f exportManagerFailer) Fail(ctx context.Context, runKey string, parentID int64, cause error) error {
+	return f.manager.Fail(ctx, exportmanager.Input{
+		RedisKey: runKey,
+		ParentID: parentID,
+	}, cause)
+}
+
+func resolveManagedFailer(ctx context.Context, servicePath string) (managedFailer, error) {
+	if manager, err := batchflow.ResolveManagedBatchManager(ctx, servicePath); err == nil && manager != nil {
+		return batchManagerFailer{manager: manager}, nil
+	}
+	if manager, err := exportmanager.ResolveManagedExportManager(ctx, servicePath); err == nil && manager != nil {
+		return exportManagerFailer{manager: manager}, nil
+	}
+	return nil, fmt.Errorf("no existe manager batch/export registrado para %s", servicePath)
 }
 
 func resolveStepConfig(ctx context.Context, servicePath string, input map[string]any) map[string]any {
@@ -613,6 +788,19 @@ func getIntFromAny(v any) int {
 	}
 }
 
+func getStringFromAny(v any) string {
+	switch raw := v.(type) {
+	case string:
+		return raw
+	case []byte:
+		return string(raw)
+	case fmt.Stringer:
+		return raw.String()
+	default:
+		return ""
+	}
+}
+
 func executeRunProcessRequest(ctx context.Context, req requests.RunProcessRequest) error {
 
 	slog.Info("🔄 Executing Process Version", "process_version_id", req.OverrideProcessVersionID, "process_type_id", req.ProcessTypeID, "input", req.Input)
@@ -644,7 +832,7 @@ func executeRunProcessRequest(ctx context.Context, req requests.RunProcessReques
 	_, svcCtx, err := appContainer.ProcessLifecycleService.Run(ctx, req)
 	if err != nil {
 		slog.Error("❌ Error executing process", "error", err)
-		return err
+		return handleRunExecutionError(ctx, req.Input, "run_process_request", err)
 	}
 
 	// Check for autoInvoke recursion
@@ -699,6 +887,10 @@ func executeRunProcessRequest(ctx context.Context, req requests.RunProcessReques
 
 		if found {
 			if !isLastBatch {
+				if shouldSkipQueuedDispatch(ctx, req.Input, "run_process_request") {
+					slog.Info("ℹ️ [Auto-Invoke] Re-queue omitido por corrida cancelada", "process_type_id", req.ProcessTypeID)
+					return nil
+				}
 				slog.Info("🔄 [Auto-Invoke] Batch completed. Re-queuing for next batch...", "last_id", newLastID)
 
 				// Update input for next iteration

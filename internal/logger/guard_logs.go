@@ -5,6 +5,7 @@ import "go.uber.org/zap"
 const (
 	LogTypeRedisGuard     = "redis_guard"
 	LogTypeRateLimitGuard = "rate_limit_guard"
+	LogTypeExecutionGuard = "execution_guard"
 )
 
 func RedisGuardLogger() *zap.Logger {
@@ -13,6 +14,10 @@ func RedisGuardLogger() *zap.Logger {
 
 func RateLimitGuardLogger() *zap.Logger {
 	return GetLogger("rate-limit-guard").With(zap.String("log_type", LogTypeRateLimitGuard))
+}
+
+func ExecutionGuardLogger() *zap.Logger {
+	return GetLogger("execution-guard").With(zap.String("log_type", LogTypeExecutionGuard))
 }
 
 func LogRedisError(operation string, err error, fields ...zap.Field) {
@@ -73,4 +78,11 @@ func LogExternalDependencyTimeout(source string, err error, fields ...zap.Field)
 		zap.Error(err),
 	}
 	RateLimitGuardLogger().Warn("external dependency request timed out", append(baseFields, fields...)...)
+}
+
+func LogExecutionGuard(eventType string, fields ...zap.Field) {
+	baseFields := []zap.Field{
+		zap.String("event_type", eventType),
+	}
+	ExecutionGuardLogger().Warn("execution guard triggered", append(baseFields, fields...)...)
 }

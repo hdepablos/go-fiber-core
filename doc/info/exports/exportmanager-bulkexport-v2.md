@@ -113,6 +113,30 @@ Ejemplo:
 - el `footer` lo vuelve a leer usando el mismo `key_redis`
 - así evita consultar otra vez la base de datos
 
+## Registro para auto-cancel
+
+Si se crea un export batch nuevo sobre `exportmanager`, además de registrar preview debe registrar su `Manager` por `execution_key`.
+
+Objetivo:
+
+- permitir cancelación operativa manual,
+- permitir auto-cancel por errores repetidos,
+- y ejecutar `ParentLifecycle.Fail(...)` sin tocar el consumer por cada proceso nuevo.
+
+Regla práctica:
+
+- exports nuevos sobre `exportmanager` deben usar el registry central de managers;
+- `bulkexportv1` es legacy y no entra en este contrato hasta que migre a `exportmanager.Manager`.
+
+Checklist para crear un export batch nuevo:
+
+1. Implementar `DataProvider`, `HeaderBuilder`, `BodyBuilder`, `FooterBuilder`, `ParentLifecycle` y `OutputRegistrar`.
+2. Armar el `Provider` con `exportmanager.NewManager(...)`.
+3. Registrar preview con `exportmanager.RegisterPreviewProvider(...)`.
+4. Registrar el manager con `exportmanager.RegisterManagedExportManager(...)`.
+5. Registrar los `execution_key` reales del proceso, por ejemplo `start`, `process_batch` y `finalize`.
+6. Si el proceso debe soportar auto-cancel, asegurar que `ParentLifecycle.Fail(...)` deje el padre en el status correcto.
+
 ## Runtime Shared State
 
 El framework expone un runtime context por corrida.

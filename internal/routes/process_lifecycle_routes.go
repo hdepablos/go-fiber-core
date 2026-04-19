@@ -58,6 +58,20 @@ func RegisterProcessLifecycleRoutes(router fiber.Router, handler handlers.Proces
 	)
 
 	group.Post(
+		"/cancel-run",
+		utils.Validate(new(requests.CancelProcessRunRequest)),
+		handler.CancelRun,
+	)
+
+	bulkProcessGroup := group.Group("/bulk-process")
+
+	bulkProcessGroup.Post(
+		"/run",
+		utils.Validate(new(requests.RunBulkProcessRequest)),
+		handler.RunBulkProcess,
+	)
+
+	group.Post(
 		"/export-preview",
 		utils.Validate(new(requests.PreviewExportRequest)),
 		handler.PreviewExport,

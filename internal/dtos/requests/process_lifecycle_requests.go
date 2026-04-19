@@ -27,6 +27,32 @@ type RunProcessRequest struct {
 	OperatorID               int64          `json:"-"` // Injected by controller, secure
 }
 
+type RunBulkProcessRequest struct {
+	BulkJobID int64 `json:"bulk_job_id" validate:"omitempty,gt=0"`
+	ID        int64 `json:"id" validate:"omitempty,gt=0"`
+}
+
+func (r RunBulkProcessRequest) ResolvedBulkJobID() int64 {
+	if r.BulkJobID > 0 {
+		return r.BulkJobID
+	}
+	return r.ID
+}
+
+type CancelProcessRunRequest struct {
+	RunKey    string `json:"run_key" validate:"omitempty"`
+	BulkJobID int64  `json:"bulk_job_id" validate:"omitempty,gt=0"`
+	ID        int64  `json:"id" validate:"omitempty,gt=0"`
+	Reason    string `json:"reason" validate:"omitempty,max=255"`
+}
+
+func (r CancelProcessRunRequest) ResolvedBulkJobID() int64 {
+	if r.BulkJobID > 0 {
+		return r.BulkJobID
+	}
+	return r.ID
+}
+
 type PreviewExportRequest struct {
 	ProcessTypeID            int64          `json:"process_type_id" validate:"required,gt=0"`
 	SedeID                   int64          `json:"sede_id" validate:"gte=0"`

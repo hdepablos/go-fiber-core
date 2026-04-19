@@ -119,4 +119,15 @@ func init() {
 		"bulk/export/v2/process_batch",
 		"bulk/export/v2/finalize",
 	)
+	exportmanager.RegisterManagedExportManager(func(ctx context.Context) (exportmanager.Manager, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return prov.Manager(), nil
+	},
+		"bulk/export/v2/start",
+		"bulk/export/v2/process_batch",
+		"bulk/export/v2/finalize",
+	)
 }

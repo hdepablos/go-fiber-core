@@ -1,0 +1,21 @@
+meta {
+  name: bulk-process
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/bulk-process/run
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "bulk_job_id": 2
+  }
+}

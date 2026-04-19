@@ -48,6 +48,7 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 
 	cache := batchflow.NewRedisCache(redisClient)
 	stateStore := batchflow.NewRedisStateStore(cache)
+	runControl := batchflow.NewRunControl(cache, batchflowTTL(appCfg))
 	lifecycle := NewParentLifecycle(conn.ConnectGormRead, conn.ConnectGormWrite)
 	dataProvider := NewDataProvider(conn.ConnectGormRead)
 	processor := NewProcessor(conn.ConnectGormWrite)
@@ -60,6 +61,7 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 		finalizer,
 		stateStore,
 		batchflowTTL(appCfg),
+		runControl,
 	)
 
 	return &provider{
@@ -103,6 +105,18 @@ func init() {
 			return nil, fmt.Errorf("provider de %s no soporta preview", processTypeName)
 		}
 		return previewable, nil
+	},
+		"bulk/process/imputations/start",
+		"bulk/process/imputations/dispatch_shards",
+		"bulk/process/imputations/process_batch",
+		"bulk/process/imputations/finalize",
+	)
+	batchflow.RegisterManagedBatchManager(func(ctx context.Context) (batchflow.Manager, error) {
+		prov, err := ProviderFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return prov.Manager(), nil
 	},
 		"bulk/process/imputations/start",
 		"bulk/process/imputations/dispatch_shards",
