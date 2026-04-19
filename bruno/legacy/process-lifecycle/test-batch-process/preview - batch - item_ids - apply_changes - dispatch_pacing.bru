@@ -1,0 +1,36 @@
+meta {
+  name: preview - batch - item_ids - apply_changes - dispatch_pacing
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{urlBase}}api/v1/process-lifecycle/batch-preview
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+headers {
+  X-Client-Code: bruno
+}
+
+body:json {
+  {
+    "process_type_id": 19,
+    "sede_id": 0,
+    "override_process_version_id": 22,
+    "roadmap": 0,
+    "apply_changes": true,
+    "mode": "all",
+    "limit": 10,
+    "item_ids": [1,2,3,4,5,6,7,8,9,10],
+    "input": {
+      "id": 1,
+      "key_redis": "{{redis_key_batch_current}}"
+    }
+  }
+}

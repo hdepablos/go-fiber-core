@@ -21,6 +21,12 @@ Comando base:
 make help
 ```
 
+Catálogo específico de scaffolds:
+
+```bash
+make list-scaffolds
+```
+
 Comando de diagnóstico rápido:
 
 ```bash
@@ -65,6 +71,7 @@ Ejemplos:
 - `make create-step name=folder/service_name`
 - `make create-export-manager process_name="generar archivo x" file="exports/x/y"`
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x"`
+- `make list-scaffolds`
 - `make delete-process kind=batch-process service_slug=punitorios`
 - `make create-command name=nuevoComando`
 - `make create-migration name=create_users_table`
@@ -76,6 +83,7 @@ Uso:
 - scaffolding de servicios,
 - scaffolding de exportadores,
 - scaffolding de procesos batch,
+- descubrimiento centralizado de scaffolds y generadores relacionados,
 - limpieza de procesos scaffold,
 - generación de código de inyección.
 
@@ -84,12 +92,40 @@ Notas:
 - `create-batch-process` ya no genera carpeta Bruno específica por proceso.
 - `create-batch-process` genera dos seeders: base `sequential` y companion `_fanout`.
 - `create-batch-process force=true` permite regenerar un scaffold existente sobrescribiendo los archivos generados.
+- `list-scaffolds` funciona como catálogo humano de scaffolds disponibles y debe mantenerse sincronizado cuando se agreguen comandos nuevos de ese tipo.
 - El Makefile debe pasar booleanos en formato `-flag=false` para que `go run` no corte el parseo de argumentos antes de flags posteriores como `-force`.
 - `create-external-api-config` agrega una entrada `apis.xxx` en `internal/appconfig/config.yml`.
 - `create-external-adapter` genera un adapter HTTP reutilizable basado en `apis.xxx` de `config.yml`.
 - `create-external-integration` ejecuta ambos pasos en una sola corrida.
 - Para pruebas batch se usa la carpeta genérica `bruno/legacy/process-lifecycle/test-batch-process/`.
 - `delete-process` soporta `dry_run=true` para revisar el alcance antes de borrar archivos.
+
+## `list-scaffolds`
+
+Uso:
+
+```bash
+make list-scaffolds
+```
+
+Objetivo:
+
+- listar los scaffolds disponibles,
+- mostrar el comando exacto de creación,
+- resumir qué genera cada uno,
+- y recordar el cleanup o comandos relacionados.
+
+Cobertura actual:
+
+- `batch-process`
+- `export-manager`
+- `external-api-config`
+- `external-adapter`
+- `external-integration`
+
+Regla de mantenimiento:
+
+- si se agrega un comando nuevo orientado a scaffold o generación reutilizable, debe evaluarse su inclusión en `list-scaffolds`.
 
 ## `create-external-api-config`
 

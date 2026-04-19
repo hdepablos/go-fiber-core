@@ -20,6 +20,19 @@ Aplica a dos familias de procesos scaffold:
 
 ## Comandos principales
 
+### Listar scaffolds disponibles
+
+```bash
+make list-scaffolds
+```
+
+Uso típico:
+
+- descubrir los scaffolds vigentes del repositorio,
+- copiar el comando base correcto,
+- identificar qué genera cada scaffold,
+- y recordar el cleanup o comandos relacionados.
+
 ### Crear un export manager
 
 ```bash
@@ -132,6 +145,21 @@ El scaffold de batch crea normalmente:
 
 No crea una carpeta Bruno nueva por proceso.
 
+## Catálogo operativo recomendado
+
+Cuando no recuerdes el nombre exacto del scaffold o quieras confirmar su alcance, usar:
+
+```bash
+make list-scaffolds
+```
+
+Este comando debe resumir:
+
+- el nombre del scaffold,
+- el comando de creación,
+- los artefactos principales que genera,
+- el cleanup asociado cuando aplique.
+
 ## Modelo recomendado para versiones batch
 
 La convención actual para un batch nuevo es:
@@ -186,6 +214,7 @@ El cleanup elimina, cuando existen:
 ### Caso 1: batch process nuevo
 
 1. crear el scaffold con `make create-batch-process`
+2. si hace falta confirmar parámetros o cleanup, correr `make list-scaffolds`
 2. ejecutar el seeder base secuencial
 3. ejecutar el seeder fanout si se quiere comparar rendimiento
 3. abrir `test-batch-process`
@@ -198,6 +227,7 @@ El cleanup elimina, cuando existen:
 ### Caso 2: export nuevo
 
 1. crear el scaffold con `make create-export-manager`
+2. si hace falta confirmar el comando o el cleanup, correr `make list-scaffolds`
 2. ajustar `layout`, provider y lifecycle
 3. ejecutar el seeder
 4. usar el request Bruno dedicado del proceso
@@ -214,6 +244,7 @@ El cleanup elimina, cuando existen:
 - `delete-process` limpia código y archivos del repositorio, no borra datos ya seedados en la base.
 - Los requests de `test-batch-process` son genéricos; dependen de que el developer actualice las variables correctas.
 - Si un proceso tiene wiring manual fuera del patrón scaffold, el cleanup puede no capturarlo y requerir revisión manual.
+- `list-scaffolds` es un catálogo operativo, no una fuente dinámica; debe mantenerse sincronizado cuando aparezcan scaffolds nuevos.
 
 ## Troubleshooting
 

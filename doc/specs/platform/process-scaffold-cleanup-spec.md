@@ -10,6 +10,7 @@ Aplica a:
 
 - `make create-export-manager`
 - `make create-batch-process`
+- `make list-scaffolds`
 - `make delete-process`
 
 Aplica tanto a procesos `exportmanager` como a procesos `batch-process`.
@@ -58,7 +59,23 @@ Opcional:
 
 - `dry_run`
 
+### `list-scaffolds`
+
+No requiere parámetros.
+Debe poder ejecutarse sin contexto adicional.
+
 ## Reglas de scaffold
+
+### Catálogo de scaffolds
+
+- Debe existir un comando de descubrimiento humano para scaffolds vigentes.
+- La referencia actual es `make list-scaffolds`.
+- Ese catálogo debe incluir al menos:
+  - nombre del scaffold,
+  - comando base de creación,
+  - resumen de artefactos generados,
+  - cleanup o comandos relacionados cuando aplique.
+- Si se agrega un scaffold nuevo o un generador reusable del mismo nivel operativo, el catálogo debe actualizarse.
 
 ### Export manager
 
@@ -106,6 +123,7 @@ La colección genérica `test-batch-process` debe exponer ejemplos de:
 - `item_ids`
 - `row_numbers`
 - `item_ids + apply_changes`
+- `item_ids + apply_changes + dispatch_pacing`
 - `run` filtrado por ids
 - `run` filtrado por row_numbers
 
@@ -147,6 +165,7 @@ El cleanup debe remover, cuando existan:
 - Los seeders base y fanout deben apuntar al mismo `process_type`.
 - `force=true` debe permitir sobrescribir el scaffold existente.
 - La documentación humana y normativa debe reflejar el modelo Bruno genérico.
+- `make list-scaffolds` debe mantenerse alineado con los scaffolds vigentes del repositorio.
 
 ## Limitaciones explícitas
 
@@ -165,6 +184,7 @@ El cleanup debe remover, cuando existan:
 - El equipo puede crear un batch process nuevo sin que se genere una carpeta Bruno específica.
 - El equipo puede sembrar una versión secuencial y otra fanout del mismo proceso de negocio.
 - El equipo puede probar cualquier batch process ajustando variables en `test-batch-process`.
+- El equipo puede descubrir los scaffolds vigentes mediante un comando explícito.
 - El equipo puede eliminar un proceso scaffold con un único comando `make delete-process`.
 - El modo `dry_run` permite inspeccionar el alcance del cleanup antes de ejecutarlo.
 - La documentación del Makefile y del flujo batch refleja este comportamiento.

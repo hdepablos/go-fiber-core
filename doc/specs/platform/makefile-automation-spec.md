@@ -39,6 +39,7 @@ Todo target nuevo debe pertenecer a uno de estos dominios, salvo justificación 
 - Todo target orientado a uso humano debe aparecer en `make help` con descripción clara.
 - La descripción debe incluir intención y parámetros relevantes.
 - Los comandos sensibles deben advertir su impacto.
+- Los comandos de scaffold o generación reutilizable deben evaluarse también para aparecer en un catálogo específico como `make list-scaffolds`.
 
 ### 3. Seguridad operativa
 
@@ -55,10 +56,12 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - Si el `Makefile` cambia de forma relevante, debe revisarse `doc/info/platform/makefile-guide.md`.
 - Si se agrega una nueva familia de comandos, debe actualizarse esta spec o una spec relacionada.
 - Los comandos vinculados a otros dominios deben enlazarse con la documentación humana correspondiente cuando aplique.
+- Si se agrega un comando tipo scaffold o generador reusable, debe revisarse `make list-scaffolds` y la documentación humana de scaffolds.
 
 ### 5. Scaffold y cleanup de procesos
 
 - Los comandos de scaffold y cleanup de procesos deben estar documentados en una guía humana específica.
+- Debe existir una forma simple de descubrir scaffolds vigentes, por ejemplo `make list-scaffolds`.
 - Si existe un comando para crear un tipo de proceso, debe existir una estrategia documentada para revertir ese scaffold.
 - Los comandos destructivos de cleanup deben ofrecer una forma segura de inspección previa cuando aplique, por ejemplo `dry_run`.
 - Los cambios que afecten la convención de Bruno deben reflejarse tanto en la documentación humana como en la spec correspondiente.
@@ -66,6 +69,7 @@ Los targets destructivos o riesgosos deben dejar claro si:
 ## Acceptance Criteria
 
 - El equipo puede identificar el target correcto por dominio sin leer todo el `Makefile`.
+- El equipo puede descubrir scaffolds vigentes sin relevar manualmente todo el `Makefile`.
 - Los objetivos peligrosos son distinguibles antes de ejecutarse.
 - La documentación del `Makefile` permanece sincronizada con las familias principales de targets.
 - Los comandos de scaffold y cleanup de procesos quedan trazados a documentación específica.

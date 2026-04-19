@@ -95,6 +95,21 @@ Los procesos batch deben separar negocio de perfil tecnico.
 - Para limpiar procesos scaffold, usar `make delete-process kind=batch-process service_slug=...`.
 - El scaffold batch no debe crear carpetas Bruno especificas por proceso; debe reutilizar `bruno/legacy/process-lifecycle/test-batch-process`.
 
+### Catalogo de scaffolds
+
+- Debe existir un catálogo operativo de scaffolds accesible con `make list-scaffolds`.
+- Si se agrega un comando nuevo de scaffold o un generador reusable del mismo nivel operativo, se debe actualizar `make list-scaffolds` en la misma solicitud.
+- Esa actualización debe incluir:
+  - nombre del scaffold,
+  - comando base de creación,
+  - resumen de lo que genera,
+  - cleanup o comandos relacionados cuando aplique.
+- Cuando cambie ese catálogo, también deben revisarse:
+  - `doc/info/platform/makefile-guide.md`
+  - `doc/info/development/process-scaffold-and-cleanup.md`
+  - `doc/specs/platform/makefile-automation-spec.md`
+  - `doc/specs/platform/process-scaffold-cleanup-spec.md`
+
 ## Observabilidad operativa de batch e integraciones
 
 Cuando se modifique el core batch o integraciones HTTP externas, debe preservarse la observabilidad estructurada existente.
