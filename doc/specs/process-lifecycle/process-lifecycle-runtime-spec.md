@@ -1,3 +1,27 @@
+---
+domain: process-lifecycle
+summary: Contrato del runtime del motor process lifecycle, su contexto compartido, resolución de versiones y ejecución general.
+when_to_read:
+  - cambios en el runtime del motor
+  - cambios en execution keys o resolucion de versiones
+  - cambios en service context o manager
+  - cambios estructurales en process lifecycle
+code_paths:
+  - internal/services/processlifecycle/
+  - internal/services/serviceconfig/
+  - internal/handlers/process_lifecycle_handler.go
+  - internal/services/batchflow/
+related_info:
+  - doc/info/process-lifecycle/motor-overview.md
+  - doc/info/process-lifecycle/runtime.md
+  - doc/info/process-lifecycle/manager-flow.md
+related_specs:
+  - doc/specs/process-lifecycle/batch-preview-spec.md
+  - doc/specs/process-lifecycle/batch-fanout-spec.md
+  - doc/specs/process-lifecycle/batch-observability-spec.md
+status: active
+---
+
 # Process Lifecycle Runtime Spec
 
 ## Objetivo

@@ -18,13 +18,14 @@ Ejemplo:
 
 - hay `1000` items para despachar a SQS,
 - se quiere procesar `100`,
-- esperar `10` segundos,
-- y recién después procesar los siguientes `100`.
+- dejar que el motor re-invoque el siguiente tramo `10` segundos después,
+- y recién entonces procesar los siguientes `100`.
 
 `dispatch_pacing` resuelve exactamente ese patrón.
 
 No es un throttle defensivo por request.
-Es una estrategia explícita de dosificación por tandas.
+No usa `sleep` dentro de la Lambda para el `run` real.
+Es una estrategia explícita de dosificación por tandas entre invocaciones.
 
 ## Dónde se configura
 
@@ -71,8 +72,21 @@ Ejemplo completo:
 ## Significado de los campos
 
 - `enabled`: activa o desactiva el pacing.
-- `messages_per_interval`: cantidad de items que se procesan por tanda.
-- `interval_seconds`: segundos de espera entre tandas sucesivas.
+- `messages_per_interval`: cantidad máxima de items que una invocación puede procesar antes de re-encolarse.
+- `interval_seconds`: delay entre una invocación y la siguiente.
+
+## Reglas del contrato
+
+Si `dispatch_pacing.enabled=true`, el step debe cumplir:
+
+- `execution_policy.mode = ASYNC`
+- `execution_policy.auto_invoke.enabled = true`
+- `interval_seconds` entre `1` y `10`
+
+No hace falta duplicar `delay_seconds` en `auto_invoke`.
+Cuando `dispatch_pacing` está activo, el delay efectivo de la re-invocación sale de `dispatch_pacing.interval_seconds`.
+
+Si alguien configura `execution_policy.auto_invoke.delay_seconds`, debe coincidir con `dispatch_pacing.interval_seconds`.
 
 ## Comportamiento por default
 
@@ -100,18 +114,29 @@ Si un `Batch.Items` trae `10` items y la configuración es:
 
 el procesamiento queda conceptualmente así:
 
-1. procesa `3`
-2. espera hasta la próxima ventana
-3. procesa `3`
-4. espera hasta la próxima ventana
-5. procesa `3`
-6. espera hasta la próxima ventana
-7. procesa `1`
+1. invocación 1 procesa `3`
+2. el consumer re-encola el mismo step con delay de `5` segundos
+3. invocación 2 procesa `3`
+4. se vuelve a re-encolar con delay
+5. invocación 3 procesa `3`
+6. se vuelve a re-encolar con delay
+7. invocación 4 procesa `1`
 
 Resultado esperado:
 
 - `chunk_count = 4`
 - `chunk_sizes = [3, 3, 3, 1]`
+
+## Comportamiento en Lambda
+
+En `run` real:
+
+- no se duerme la Lambda,
+- no se bloquea la invocación esperando la siguiente ventana,
+- cada invocación procesa una sola tanda,
+- y `auto_invoke` agenda la siguiente con delay.
+
+Esto evita agotar el timeout de invocación cuando el lote total es grande.
 
 ## Sequential vs Fanout
 
@@ -120,8 +145,8 @@ Resultado esperado:
 En `sequential`, el comportamiento es el más intuitivo:
 
 - la misma corrida procesa una tanda,
-- espera la siguiente ventana,
-- continúa con la siguiente tanda.
+- termina esa invocación,
+- y la siguiente tanda se dispara por `auto_invoke` con delay.
 
 ### Fanout
 
@@ -140,7 +165,7 @@ Ejemplo:
 
 Interpretación correcta:
 
-- entre todos los shards juntos se habilitan `100` items por ventana de `10` segundos.
+- entre todos los shards juntos se habilitan `100` items por re-invocación de `10` segundos.
 
 Interpretación incorrecta:
 
@@ -150,24 +175,21 @@ Interpretación incorrecta:
 
 `concurrent_batches` y `dispatch_pacing` controlan cosas distintas.
 
-- `concurrent_batches`: cuántos batches se intentan procesar en la misma invocación.
-- `dispatch_pacing`: cuántos items se dejan pasar por ventana temporal.
+- `concurrent_batches`: batches que el proceso intentaría procesar en una invocación normal.
+- `dispatch_pacing`: items máximos permitidos por invocación.
 
-Cuando `dispatch_pacing` está activo:
-
-- el manager prioriza respetar la ventana,
-- y procesa las tandas en orden,
-- aunque el proceso tenga capacidad de paralelismo mayor.
+Cuando `dispatch_pacing` está activo, el pacing tiene prioridad operativa.
+En la práctica, el avance queda reducido a una sola tanda por invocación.
 
 ## Coordinación en Redis
 
-La ventana se coordina usando Redis con claves derivadas de `input.RedisKey`.
+El avance parcial del batch se coordina usando runtime Redis derivado de `input.RedisKey`.
 
 Consecuencias:
 
 - dos corridas distintas con distinta `key_redis` no comparten pacing,
 - los shards de una misma corrida sí comparten pacing,
-- `preview apply_changes` también usa ese mismo criterio.
+- el `run` real conserva el offset parcial del batch entre invocaciones.
 
 ## Preview y `apply_changes`
 
@@ -179,7 +201,7 @@ Consecuencias:
 En ese caso:
 
 - el preview sigue renderizando los items normalmente,
-- y la fase de persistencia real respeta el pacing del step.
+- y `apply_changes` simula el pacing del step sin hacer esperas reales.
 
 La respuesta ahora expone:
 
@@ -194,10 +216,11 @@ Ejemplo de metadata esperada:
     "enabled": true,
     "messages_per_interval": 3,
     "interval_seconds": 5,
+    "mode": "preview_simulated",
+    "simulated": true,
     "chunk_count": 4,
     "chunk_sizes": [3, 3, 3, 1],
-    "waits_ms": [0, 5000, 5000, 5000],
-    "slots": [170000000, 170000001, 170000002, 170000003]
+    "waits_ms": [0, 5000, 5000, 5000]
   }
 }
 ```
@@ -223,15 +246,16 @@ Configuración sugerida para test rápido:
 
 Con `10` items, se espera:
 
-- que el request tarde más que un preview sin pacing,
+- que el request responda rápido, porque el preview no duerme,
 - que la metadata muestre `4` tandas,
-- que `waits_ms` refleje las pausas entre ventanas.
+- que `waits_ms` refleje las pausas simuladas entre invocaciones.
 
 ## Recomendaciones de uso
 
 - arrancar con valores chicos para verificar el comportamiento,
 - usar `preview apply_changes` en local antes de probar `run`,
 - en `fanout`, pensar el pacing como límite global de la corrida,
+- no usar `interval_seconds` altos; el contrato actual permite hasta `10`,
 - no mezclar este concepto con throttle HTTP o cooldown.
 
 ## Cuándo conviene usarlo

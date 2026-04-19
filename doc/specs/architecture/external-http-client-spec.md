@@ -1,3 +1,24 @@
+---
+domain: architecture
+summary: Estandar compartido para integraciones HTTP externas, resolución desde apis.xxx, observabilidad transversal y adapters reutilizables sobre externalhttp.
+when_to_read:
+  - nuevas integraciones HTTP
+  - cambios en externalhttp
+  - cambios en adapters externos
+  - cambios en observabilidad de 429 o timeouts
+code_paths:
+  - internal/services/externalhttp/
+  - internal/adapters/
+  - internal/appconfig/config.yml
+  - cmd/tools/external-api-config-scaffold/
+  - cmd/tools/external-api-adapter-scaffold/
+related_info:
+  - doc/info/development/external-http-service-standard.md
+related_specs:
+  - doc/specs/platform/logger-runtime-spec.md
+status: active
+---
+
 # External HTTP Client Spec
 
 ## Objetivo

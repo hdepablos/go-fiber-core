@@ -159,18 +159,50 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 		err   error
 	}
 
-	results := make(chan batchResult, len(batchIndexes))
 	if req.DispatchPacing.Enabled {
-		for _, batchIndex := range batchIndexes {
-			batch, loadErr := m.stateStore.LoadBatch(ctx, req.BatchesListKey, batchIndex)
-			if loadErr != nil {
-				results <- batchResult{index: batchIndex, err: loadErr}
-				continue
-			}
-			res, processErr := ProcessBatchWithDispatchPacing(ctx, m.processor, m.stateStore, execCtx, batch, req.DispatchPacing, m.defaultTTL)
-			results <- batchResult{index: batchIndex, data: res, err: processErr}
+		batch, loadErr := m.stateStore.LoadBatch(ctx, req.BatchesListKey, req.BatchIndex)
+		if loadErr != nil {
+			return ProcessResult{}, loadErr
 		}
-	} else {
+		pacingRes, processErr := ProcessBatchWithDispatchPacing(ctx, m.processor, execCtx, batch, req.BatchIndex, req.DispatchPacing, req.TotalShards)
+		if processErr != nil {
+			return ProcessResult{}, processErr
+		}
+		totalProcessed := pacingRes.ProcessResult.ProcessedCount
+		metadata := map[string]any{
+			fmt.Sprintf("batch_%d", req.BatchIndex): pacingRes.ProcessResult.Metadata,
+		}
+		nextIndex := pacingRes.NextBatchIndex
+		isShardComplete := pacingRes.BatchComplete && nextIndex >= req.TotalBatches
+		isLast := isShardComplete && req.TotalShards == 1
+
+		var completedShards int64
+		shouldDispatchNextStep := false
+		if isShardComplete {
+			completion, err := m.stateStore.CompleteShard(ctx, req.Input, req.ShardIndex, req.TotalShards, m.defaultTTL)
+			if err != nil {
+				return ProcessResult{}, err
+			}
+			completedShards = completion.CompletedShards
+			shouldDispatchNextStep = completion.ShouldFinalize
+		}
+
+		return ProcessResult{
+			NextBatchIndex:         nextIndex,
+			IsLastBatch:            isLast,
+			IsShardComplete:        isShardComplete,
+			ProcessedCount:         totalProcessed,
+			BatchesProcessed:       1,
+			ShardIndex:             req.ShardIndex,
+			TotalShards:            req.TotalShards,
+			CompletedShards:        completedShards,
+			ShouldDispatchNextStep: shouldDispatchNextStep,
+			Metadata:               metadata,
+		}, nil
+	}
+
+	results := make(chan batchResult, len(batchIndexes))
+	{
 		var wg sync.WaitGroup
 		for _, batchIndex := range batchIndexes {
 			wg.Add(1)

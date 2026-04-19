@@ -406,6 +406,9 @@ func handleBusinessLogic(ctx context.Context, rawData string) error {
 						Source:  "auto-invoke-step",
 						Created: time.Now().Format(time.RFC3339),
 					}
+					if delaySeconds := resolveAutoInvokeDelaySeconds(policy, stepReq.ServiceConfig); delaySeconds > 0 {
+						newMessage.DelaySeconds = int32(delaySeconds)
+					}
 
 					if err := appContainer.QueueService.SendMessage(ctx, newMessage); err != nil {
 						slog.Error("❌ Failed to re-queue auto-invoke step message", "error", err)
@@ -544,6 +547,34 @@ func extractExecutionPolicy(cfg map[string]any) *contracts.ExecutionPolicy {
 		return nil
 	}
 	return &policy
+}
+
+func resolveAutoInvokeDelaySeconds(policy contracts.ExecutionPolicy, cfg map[string]any) int {
+	if policy.AutoInvoke.DelaySeconds > 0 {
+		return policy.AutoInvoke.DelaySeconds
+	}
+	if cfg == nil {
+		return 0
+	}
+	raw, ok := cfg["dispatch_pacing"]
+	if !ok || raw == nil {
+		return 0
+	}
+	bytes, err := json.Marshal(raw)
+	if err != nil {
+		return 0
+	}
+	var pacing struct {
+		Enabled         bool `json:"enabled"`
+		IntervalSeconds int  `json:"interval_seconds"`
+	}
+	if err := json.Unmarshal(bytes, &pacing); err != nil {
+		return 0
+	}
+	if pacing.Enabled && pacing.IntervalSeconds > 0 {
+		return pacing.IntervalSeconds
+	}
+	return 0
 }
 
 func getInt64FromAny(v any) int64 {

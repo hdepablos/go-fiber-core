@@ -107,7 +107,7 @@ func (s *previewService) Preview(ctx context.Context, req PreviewRequest) (Previ
 		return PreviewResponse{}, err
 	}
 	if req.ApplyChanges {
-		processResult, err := ProcessBatchWithDispatchPacing(ctx, components.BatchProcessor, components.StateStore, execCtx, Batch{Items: items}, req.DispatchPacing, s.sessionTTL)
+		processResult, err := SimulateDispatchPacingPreview(ctx, components.BatchProcessor, execCtx, Batch{Items: items}, req.DispatchPacing)
 		if err != nil {
 			return PreviewResponse{}, err
 		}

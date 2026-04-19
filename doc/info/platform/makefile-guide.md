@@ -27,6 +27,12 @@ Catálogo específico de scaffolds:
 make list-scaffolds
 ```
 
+Catálogo amplio de utilidades:
+
+```bash
+make list-tools
+```
+
 Comando de diagnóstico rápido:
 
 ```bash
@@ -71,9 +77,10 @@ Ejemplos:
 - `make create-step name=folder/service_name`
 - `make create-export-manager process_name="generar archivo x" file="exports/x/y"`
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x"`
-- `make list-scaffolds`
-- `make delete-process kind=batch-process service_slug=punitorios`
 - `make create-command name=nuevoComando`
+- `make list-scaffolds`
+- `make list-tools`
+- `make delete-process kind=batch-process service_slug=punitorios`
 - `make create-migration name=create_users_table`
 - `make wire`
 - `make wire-sync`
@@ -84,6 +91,7 @@ Uso:
 - scaffolding de exportadores,
 - scaffolding de procesos batch,
 - descubrimiento centralizado de scaffolds y generadores relacionados,
+- descubrimiento de utilidades operativas agrupadas por dominio,
 - limpieza de procesos scaffold,
 - generación de código de inyección.
 
@@ -92,6 +100,12 @@ Notas:
 - `create-batch-process` ya no genera carpeta Bruno específica por proceso.
 - `create-batch-process` genera dos seeders: base `sequential` y companion `_fanout`.
 - `create-batch-process force=true` permite regenerar un scaffold existente sobrescribiendo los archivos generados.
+- `create-batch-process` soporta además la variante técnica `dispatch_pacing` con `pacing=true`.
+- `create-batch-process pacing=true` acepta `pacing_messages` y `pacing_interval` para generar el config del `process_batch`.
+- `clone-process-version` y `add-process-pacing` se presentan en `list-scaffolds` como operaciones hijas del dominio `batch-process`, no como familias independientes.
+- `clone-process-version` es el comando genérico para obtener variantes nuevas como `fanout + pacing` o `sequential + pacing`.
+- `add-process-pacing` funciona como wrapper conveniente de `clone-process-version` con `with_pacing=true`.
+- `create-export-manager force=true` permite regenerar archivos existentes porque el `Makefile` ya propaga ese flag al scaffold.
 - `list-scaffolds` funciona como catálogo humano de scaffolds disponibles y debe mantenerse sincronizado cuando se agreguen comandos nuevos de ese tipo.
 - El Makefile debe pasar booleanos en formato `-flag=false` para que `go run` no corte el parseo de argumentos antes de flags posteriores como `-force`.
 - `create-external-api-config` agrega una entrada `apis.xxx` en `internal/appconfig/config.yml`.
@@ -112,20 +126,53 @@ Objetivo:
 
 - listar los scaffolds disponibles,
 - mostrar el comando exacto de creación,
+- mostrar variantes técnicas y capacidades relevantes como `force=true`,
 - resumir qué genera cada uno,
 - y recordar el cleanup o comandos relacionados.
 
 Cobertura actual:
 
+- `service-step`
 - `batch-process`
 - `export-manager`
 - `external-api-config`
 - `external-adapter`
 - `external-integration`
+- `cli-command`
 
 Regla de mantenimiento:
 
 - si se agrega un comando nuevo orientado a scaffold o generación reutilizable, debe evaluarse su inclusión en `list-scaffolds`.
+- si un scaffold agrega una capacidad importante como `force=true` o una variante técnica relevante como `dispatch_pacing`, `list-scaffolds` y esta guía deben reflejarlo.
+
+## `list-tools`
+
+Uso:
+
+```bash
+make list-tools
+```
+
+Objetivo:
+
+- ofrecer un mapa corto de utilidades operativas,
+- agrupar comandos por dominio,
+- y derivar a `list-scaffolds` cuando la necesidad sea generar código base.
+
+Cobertura esperada:
+
+- scaffolds y generadores
+- procesos, seeds y cleanup
+- redis y estado
+- CLI y base de datos
+- entorno y diagnóstico
+- logs y observabilidad
+- Bruno y entorno local
+
+Regla de mantenimiento:
+
+- si se agrega una utilidad operativa de uso humano frecuente, debe evaluarse su inclusión en `list-tools`.
+- `list-tools` no reemplaza `make help`; funciona como catálogo resumido y curado.
 
 ## `create-external-api-config`
 

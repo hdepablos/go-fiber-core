@@ -179,7 +179,7 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 		if v, ok := s.ctx.CurrentStepConfig["concurrent_batches"]; ok {
 			s.concurrentBatches = utils.ToInt(v)
 		}
-		s.dispatchPacing, s.initErr = batchflow.ResolveDispatchPacingConfig(s.ctx.CurrentStepConfig)
+		s.dispatchPacing, s.initErr = batchflow.ValidateDispatchPacingStepConfig(s.ctx.CurrentStepConfig)
 	}
 	if s.concurrentBatches <= 0 {
 		s.concurrentBatches = 1

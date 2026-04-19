@@ -139,7 +139,7 @@ Ejemplo:
 Esto permite probar escenarios como:
 
 - procesar `3` items,
-- esperar `5` segundos,
+- re-encolar la siguiente tanda `5` segundos después,
 - continuar con los siguientes `3`.
 
 ### Qué probar en local
@@ -151,7 +151,8 @@ Esto permite probar escenarios como:
    - `chunk_count`
    - `chunk_sizes`
    - `waits_ms`
-   - `slots`
+   - `mode`
+   - `simulated`
 
 Requests recomendados:
 
@@ -163,10 +164,12 @@ Requests recomendados:
 - `preview apply_changes`:
   - sirve para validar el pacing con una muestra controlada,
   - devuelve metadata detallada del pacing,
+  - simula el delay sin dormir el request HTTP,
   - no ejecuta el lifecycle completo del padre.
 - `run`:
   - ejecuta el lifecycle completo,
   - respeta el mismo `dispatch_pacing` del step,
+  - usa `auto_invoke` con delay entre invocaciones,
   - pero ya no está acotado a la muestra del preview.
 
 ## Fan-out Batch para Lambda/EKS

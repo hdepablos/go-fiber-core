@@ -1,3 +1,27 @@
+---
+domain: process-lifecycle
+summary: Contrato del modo fan-out distribuido de batchflow, su coordinación por shards, finalize único y compatibilidad con dispatch_pacing basado en auto_invoke con delay.
+when_to_read:
+  - cambios en fanout batch
+  - cambios en shards o auto_invoke
+  - cambios en finalize distribuido
+  - cambios en dispatch_pacing dentro de fanout
+code_paths:
+  - internal/services/batchflow/
+  - internal/services/bulkprocess/steps.go
+  - internal/services/punitorios/steps.go
+  - internal/services/imputations/steps.go
+  - cmd/sqs-consumer/main.go
+related_info:
+  - doc/info/process-lifecycle/batch-fanout-guide.md
+  - doc/info/process-lifecycle/batch-fanout-risks.md
+  - doc/info/process-lifecycle/dispatch-pacing-guide.md
+related_specs:
+  - doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md
+  - doc/specs/process-lifecycle/batch-observability-spec.md
+status: active
+---
+
 # Batch Fanout Spec
 
 ## Objetivo
@@ -68,12 +92,15 @@ y así sucesivamente, respetando `total_batches`.
 - Debe poder respetar `dispatch_pacing` cuando esa configuración exista en el step.
 - En fan-out, el próximo cursor del shard debe avanzar por stride:
   - `next_batch_index = current_batch_index + concurrent_batches * total_shards`
+- Si `dispatch_pacing` está activo y un batch queda parcial, el shard debe poder re-invocar el mismo `batch_index` hasta agotar la tanda completa.
 
 ## Reglas de `auto_invoke`
 
 - En fan-out, `auto_invoke.stop_condition` debe basarse en fin de shard.
 - La condición recomendada es `is_shard_complete`.
 - No debe usarse `is_last_batch` como stop condition global del fan-out.
+- Si `dispatch_pacing` está activo, el delay de la re-invocación debe salir de `dispatch_pacing.interval_seconds`.
+- `dispatch_pacing.interval_seconds` debe validarse en rango seguro para Lambda; el contrato actual admite `1..10`.
 
 ## Reglas de coordinación global
 
@@ -86,8 +113,8 @@ Redis debe mantener como mínimo:
 
 Si `dispatch_pacing` está activo:
 
-- la coordinación de la ventana debe ser global por corrida,
-- usando una clave derivada de `input.RedisKey`,
+- el avance parcial del batch debe persistirse usando estado derivado de `input.RedisKey`,
+- la coordinación del ritmo debe ser global por corrida,
 - y no debe interpretarse como cupo independiente por shard.
 
 ## Reglas de finalización
@@ -128,6 +155,7 @@ El step `process_batch` debe soportar:
 - `execution_policy.mode`
 - `execution_policy.auto_invoke.cursor_field`
 - `execution_policy.auto_invoke.stop_condition`
+- `execution_policy.auto_invoke.delay_seconds` opcional, pero si existe y `dispatch_pacing` está activo debe coincidir con `dispatch_pacing.interval_seconds`
 - `execution_policy.next_step`
 
 ## Reglas de body HTTP
@@ -148,6 +176,7 @@ Debe seguir siendo compatible con:
 - El fan-out no garantiza mejora lineal de performance.
 - La cantidad de shards debe ajustarse a la capacidad del sistema y del proveedor externo.
 - `dispatch_pacing` no multiplica el throughput por shard; limita el ritmo global de la corrida.
+- `dispatch_pacing` no debe implementarse con espera bloqueante dentro de una Lambda de producción.
 
 ## Acceptance Criteria
 

@@ -26,6 +26,7 @@ type AutoInvokeConfig struct {
 	Enabled       bool   `json:"enabled"`
 	CursorField   string `json:"cursor_field"`   // Campo del output que actualiza el input
 	StopCondition string `json:"stop_condition"` // Campo booleano del output que detiene el loop
+	DelaySeconds  int    `json:"delay_seconds,omitempty"`
 }
 
 type ServiceContext struct {

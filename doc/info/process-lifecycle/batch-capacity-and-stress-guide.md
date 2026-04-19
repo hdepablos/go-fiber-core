@@ -108,7 +108,8 @@ Antes de subir `parallel_shards` o mover el proceso a Lambda/EKS, revisar:
    - comportamiento documentado ante `429`,
    - retry/backoff definido,
    - timeout explícito,
-   - necesidad de dosificación por tandas usando `dispatch_pacing`.
+   - necesidad de dosificación por tandas usando `dispatch_pacing`,
+   - y límite máximo aceptable de delay entre re-invocaciones.
 4. Entorno
    - cantidad esperada de workers/pods/Lambdas concurrentes,
    - pool de conexiones a Redis,
@@ -127,6 +128,8 @@ Para la primera salida controlada:
 - `dispatch_pacing` activo si el destino no tolera bursts
 - `batch_size` moderado
 - TTL Redis suficiente para la corrida completa
+
+Si corre sobre Lambda, asumir que `dispatch_pacing` debe usar re-invocación con delay y no espera bloqueante dentro de la misma invocación.
 
 No conviene arrancar con:
 

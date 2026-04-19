@@ -1,3 +1,25 @@
+---
+domain: platform
+summary: Contrato de scaffold y cleanup para procesos exportmanager y batch-process, incluyendo convenciones Bruno y catálogos de scaffolds.
+when_to_read:
+  - cambios en scaffolds de procesos
+  - cambios en delete-process
+  - cambios en list-scaffolds
+  - cambios en convenciones Bruno batch
+code_paths:
+  - cmd/tools/export-manager-scaffold/
+  - cmd/tools/batch-process-scaffold/
+  - cmd/tools/process-cleanup/
+  - Makefile
+  - bruno/legacy/process-lifecycle/test-batch-process/
+related_info:
+  - doc/info/development/process-scaffold-and-cleanup.md
+  - doc/info/platform/makefile-guide.md
+related_specs:
+  - doc/specs/platform/makefile-automation-spec.md
+status: active
+---
+
 # Process Scaffold Cleanup Spec
 
 ## Objetivo
@@ -73,9 +95,19 @@ Debe poder ejecutarse sin contexto adicional.
 - Ese catálogo debe incluir al menos:
   - nombre del scaffold,
   - comando base de creación,
+  - opciones importantes como `force=true` cuando existan,
+  - variantes técnicas relevantes del scaffold cuando existan,
   - resumen de artefactos generados,
   - cleanup o comandos relacionados cuando aplique.
 - Si se agrega un scaffold nuevo o un generador reusable del mismo nivel operativo, el catálogo debe actualizarse.
+- La cobertura actual del catálogo debe contemplar al menos:
+  - `service-step`
+  - `batch-process`
+  - `export-manager`
+  - `external-api-config`
+  - `external-adapter`
+  - `external-integration`
+  - `cli-command`
 
 ### Export manager
 
@@ -164,6 +196,13 @@ El cleanup debe remover, cuando existan:
 - El scaffold batch debe producir un seeder base `sequential` y un seeder adicional `_fanout`.
 - Los seeders base y fanout deben apuntar al mismo `process_type`.
 - `force=true` debe permitir sobrescribir el scaffold existente.
+- El scaffold batch debe poder generar `dispatch_pacing` cuando se solicite explícitamente con parámetros del comando.
+- Si el scaffold batch genera `dispatch_pacing`, debe reflejarlo en el `config` del step `process_batch` sin requerir edición manual mínima para el caso base.
+- Debe existir una herramienta operativa genérica para clonar una `process_version` existente.
+- Debe existir una herramienta operativa para clonar una `process_version` existente y agregar `dispatch_pacing` sin regenerar el servicio.
+- La herramienta genérica de clonado debe poder, opcionalmente, agregar `dispatch_pacing` cuando se solicite explícitamente.
+- Esa herramienta debe preservar la semántica técnica de la versión origen, por ejemplo `sequential` o `fanout`, y modificar solo el `process_batch`.
+- En el catálogo humano, esas operaciones de versionado deben poder aparecer como hijas del dominio `batch-process`.
 - La documentación humana y normativa debe reflejar el modelo Bruno genérico.
 - `make list-scaffolds` debe mantenerse alineado con los scaffolds vigentes del repositorio.
 

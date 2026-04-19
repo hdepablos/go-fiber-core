@@ -29,6 +29,177 @@ Toda nueva documentacion debe:
 - respetar la clasificacion por dominio,
 - dejar claro si el archivo pertenece a humanos (`info`) o IA/SDD (`specs`).
 
+### Regla adicional para `doc/specs`
+
+Cada vez que se cree, mueva, renombre o amplie documentacion en `doc/specs/`, tambien se debe actualizar `AGENTS.md`.
+
+Esa actualizacion debe reflejar la spec en ambos lugares:
+
+- `Indice operativo de specs`
+- `Referencias`
+
+Si la nueva spec cambia la clasificacion por dominio o agrega un dominio nuevo, `AGENTS.md` debe reflejar ese cambio en la misma solicitud.
+
+### Metadata minima obligatoria para specs nuevas
+
+Toda spec nueva en `doc/specs/` debe incluir una metadata breve y estructurada al inicio del archivo.
+
+Objetivo de esa metadata:
+
+- permitir indices mas utiles,
+- mejorar la trazabilidad por dominio,
+- ayudar a decidir que spec revisar segun el tipo de cambio,
+- y facilitar futuras automatizaciones del indice de `AGENTS.md` y `doc/specs/README.md`.
+
+Formato recomendado:
+
+```md
+---
+domain: process-lifecycle
+summary: Contrato del preview batch, apply_changes y seleccion de items.
+when_to_read:
+  - cambios en preview batch
+  - cambios en apply_changes
+code_paths:
+  - internal/services/batchflow/
+  - internal/handlers/process_lifecycle_handler.go
+related_info:
+  - doc/info/process-lifecycle/batch-preview-guide.md
+related_specs:
+  - doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md
+status: active
+---
+```
+
+Campos minimos obligatorios:
+
+- `domain`
+- `summary`
+- `when_to_read`
+- `code_paths`
+- `related_info`
+
+Campos recomendados:
+
+- `related_specs`
+- `status`
+
+Reglas de uso:
+
+- `domain` debe coincidir con la clasificacion real del documento en `doc/specs/`.
+- `summary` debe explicar en una o dos lineas que contrato o comportamiento norma la spec.
+- `when_to_read` debe listar disparadores funcionales concretos, no frases genericas.
+- `code_paths` debe apuntar a archivos o directorios del repositorio que normalmente obligan a revisar esa spec.
+- `related_info` debe enlazar las guias humanas del mismo dominio cuando existan.
+- `related_specs` debe usarse cuando la spec dependa de otras specs del mismo dominio o de dominios cercanos.
+
+Regla de mantenimiento:
+
+- Si una spec nueva no incluye esta metadata minima, la documentacion debe considerarse incompleta.
+- Si una spec cambia de alcance, dominio o paths relevantes, su metadata tambien debe actualizarse.
+- Cuando una spec nueva agregue metadata nueva relevante para navegacion, se debe evaluar si `AGENTS.md` y `doc/specs/README.md` necesitan ajustarse.
+
+## Indice operativo de specs
+
+Antes de diseñar, refactorizar o documentar cambios importantes, revisar `doc/specs/README.md` y luego las specs del dominio afectado.
+
+### Gobierno documental
+
+- `doc/specs/documentation-governance-spec.md`
+- `doc/specs/documentation-defaults-spec.md`
+
+### Shared
+
+- `doc/specs/shared/shared-utils-spec.md`
+
+### Arquitectura
+
+- `doc/specs/architecture/core-architecture-spec.md`
+- `doc/specs/architecture/service-design-spec.md`
+- `doc/specs/architecture/service-runtime-bootstrap-spec.md`
+- `doc/specs/architecture/external-http-client-spec.md`
+
+### API
+
+- `doc/specs/api/http-endpoints-spec.md`
+
+### Platform
+
+- `doc/specs/platform/platform-runtime-spec.md`
+- `doc/specs/platform/logger-runtime-spec.md`
+- `doc/specs/platform/makefile-automation-spec.md`
+- `doc/specs/platform/process-scaffold-cleanup-spec.md`
+
+### Process Lifecycle
+
+- `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+- `doc/specs/process-lifecycle/batch-preview-spec.md`
+- `doc/specs/process-lifecycle/batch-fanout-spec.md`
+- `doc/specs/process-lifecycle/batch-observability-spec.md`
+
+### Exports
+
+- `doc/specs/exports/export-pipelines-spec.md`
+
+### Data
+
+- `doc/specs/data/database-schema-query-spec.md`
+
+## Regla de revision obligatoria de specs
+
+Antes de implementar o modificar código, se deben revisar las specs relevantes al tipo de cambio.
+No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedicada.
+
+### Reglas generales
+
+- Si el cambio toca más de un dominio, revisar las specs de todos los dominios involucrados.
+- Si el cambio modifica contratos, invariantes, aceptación o comportamiento operable, revisar también la spec específica aunque el cambio parezca pequeño.
+- Si una spec relevante no existe, documentar el vacío y proponer o crear la spec correspondiente cuando tenga sentido.
+- Si una spec existe pero queda desalineada con el cambio solicitado, actualizarla en la misma solicitud.
+
+### Matriz por tipo de cambio
+
+- Documentación o mapa documental:
+  - `doc/specs/documentation-governance-spec.md`
+  - `doc/specs/documentation-defaults-spec.md`
+- Servicios, casos de uso, diseño de interfaces o refactors estructurales:
+  - `doc/specs/architecture/service-design-spec.md`
+  - `doc/specs/architecture/core-architecture-spec.md`
+- Wiring, bootstrap, runtime de servicios o registro de dependencias:
+  - `doc/specs/architecture/service-runtime-bootstrap-spec.md`
+  - `doc/specs/platform/platform-runtime-spec.md`
+- Integraciones HTTP externas o cambios en `internal/services/externalhttp/` y adapters:
+  - `doc/specs/architecture/external-http-client-spec.md`
+  - `doc/specs/platform/logger-runtime-spec.md`
+  - `doc/specs/process-lifecycle/batch-observability-spec.md` cuando también impacte batch, rate limit, Redis o fanout
+- Endpoints HTTP, DTOs, handlers, auth de endpoints o requests Bruno:
+  - `doc/specs/api/http-endpoints-spec.md`
+- Makefile, automatizaciones operativas, catálogos `list-scaffolds` o `list-tools`:
+  - `doc/specs/platform/makefile-automation-spec.md`
+  - `doc/specs/platform/process-scaffold-cleanup-spec.md` si también afecta scaffolds o cleanup
+- Scaffolds, cleanup de procesos, batch/export scaffolds o convenciones Bruno genéricas:
+  - `doc/specs/platform/process-scaffold-cleanup-spec.md`
+  - `doc/specs/platform/makefile-automation-spec.md`
+- Process lifecycle, manager, runtime del motor, resolución de versiones o execution keys:
+  - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+- Batch preview, `apply_changes`, selección por `item_ids`, `row_numbers` o preview batch:
+  - `doc/specs/process-lifecycle/batch-preview-spec.md`
+- Fanout, shards, capacidad, Redis batch, observabilidad batch, `auto_invoke` con delay o throttling/pacing del motor:
+  - `doc/specs/process-lifecycle/batch-fanout-spec.md`
+  - `doc/specs/process-lifecycle/batch-observability-spec.md`
+  - `doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`
+- Exports, exportmanager, layouts, pipelines o generación de archivos:
+  - `doc/specs/exports/export-pipelines-spec.md`
+- Base de datos, modelos GORM, migraciones, relaciones, queries e integridad:
+  - `doc/specs/data/database-schema-query-spec.md`
+- Helpers o utilidades compartidas:
+  - `doc/specs/shared/shared-utils-spec.md`
+
+### Regla de cierre
+
+- Antes de cerrar una tarea, verificar explícitamente si las specs revisadas siguen alineadas con el cambio.
+- Si el cambio toca un área listada arriba y no se revisó su spec, el trabajo debe considerarse incompleto.
+
 ## Convenciones tecnicas de servicios
 
 Todo servicio nuevo o refactorizado debe estructurarse con:
@@ -92,6 +263,10 @@ Los procesos batch deben separar negocio de perfil tecnico.
   - servicio del proceso,
   - seeder base secuencial,
   - seeder companion `_fanout`.
+- El scaffold batch puede además generar `dispatch_pacing` en `process_batch` cuando se use `pacing=true` con `pacing_messages` y `pacing_interval`.
+- Para clonar una `process_version` existente, usar `make clone-process-version source_version_id=... operator_id=... [with_pacing=true pacing_messages=... pacing_interval=...]`.
+- Para una versión ya existente donde solo se quiera agregar pacing, usar `make add-process-pacing source_version_id=... operator_id=... pacing_messages=... pacing_interval=...`.
+- En `make list-scaffolds`, `clone-process-version` y `add-process-pacing` deben presentarse como operaciones hijas del dominio `batch-process`.
 - Para limpiar procesos scaffold, usar `make delete-process kind=batch-process service_slug=...`.
 - El scaffold batch no debe crear carpetas Bruno especificas por proceso; debe reutilizar `bruno/legacy/process-lifecycle/test-batch-process`.
 
@@ -102,6 +277,9 @@ Los procesos batch deben separar negocio de perfil tecnico.
 - Esa actualización debe incluir:
   - nombre del scaffold,
   - comando base de creación,
+  - opciones importantes como `force=true` cuando existan,
+  - variantes técnicas relevantes del scaffold cuando existan,
+  - parámetros relevantes de variantes técnicas cuando formen parte del uso recomendado,
   - resumen de lo que genera,
   - cleanup o comandos relacionados cuando aplique.
 - Cuando cambie ese catálogo, también deben revisarse:
@@ -193,6 +371,33 @@ Cuando cambien tablas, relaciones, indices, enums o reglas de integridad, deben 
 - la documentacion normativa de base de datos en `doc/specs/`,
 - y sus enlaces en los indices documentales si corresponde.
 
+### Regla obligatoria para migraciones y reportes futuros
+
+- Cada vez que se agregue o modifique una migracion SQL o una migracion que impacte tablas, columnas, relaciones, indices, enums, constraints o reglas de integridad, se debe actualizar `doc/specs/data/database-schema-query-spec.md`.
+- Si el cambio tambien altera el entendimiento humano del modelo, se debe actualizar ademas la documentacion correspondiente en `doc/info/data/`.
+- El objetivo es que futuras solicitudes de reportes, consultas SQL, joins o sentencias de mantenimiento puedan resolverse desde la documentacion base sin relevar todo desde cero.
+- Si una migracion cambia el modelo y no se actualizan las specs de `data`, el trabajo debe considerarse incompleto.
+
+## Documentacion de shared y utilidades reutilizables
+
+Las funciones compartidas, helpers reutilizables y utilidades transversales deben mantener documentacion suficiente para:
+
+- entender su contrato,
+- saber cuándo usarlas,
+- evitar duplicacion de logica,
+- y permitir que futuras solicitudes reutilicen correctamente esas capacidades.
+
+Cuando se agreguen o cambien funciones compartidas, helpers o utilidades reutilizables, deben actualizarse:
+
+- la documentacion normativa en `doc/specs/shared/shared-utils-spec.md`,
+- y la documentacion humana correspondiente en `doc/info/` cuando el cambio necesite contexto operativo o de uso.
+
+### Regla obligatoria para funciones compartidas
+
+- Cada vez que se cree o modifique una funcion compartida relevante para uso transversal, se debe revisar y actualizar `doc/specs/shared/shared-utils-spec.md`.
+- Si el cambio introduce una utilidad reusable nueva, hay que documentar su contrato esperado, limites y casos de uso.
+- Si una funcion compartida cambia de semantica y la spec no se actualiza, el trabajo debe considerarse incompleto.
+
 ## Documentacion del Makefile
 
 El `Makefile` debe tener documentacion `info + specs` cuando no exista una cobertura canonica suficiente.
@@ -204,6 +409,16 @@ La documentacion del `Makefile` debe dejar claro:
 - efectos colaterales,
 - comandos destructivos o sensibles,
 - flujos principales de desarrollo, despliegue, datos y soporte.
+
+### Catalogos operativos
+
+- Debe existir `make list-scaffolds` para descubrir generadores y scaffolds reutilizables.
+- Debe existir `make list-tools` para descubrir utilidades operativas frecuentes agrupadas por dominio.
+- Si se agrega un scaffold o generador reusable, se debe evaluar y actualizar `make list-scaffolds`.
+- Si se agrega una utilidad operativa frecuente para uso humano, se debe evaluar y actualizar `make list-tools`.
+- Cuando cambie cualquiera de esos catálogos, también deben revisarse:
+  - `doc/info/platform/makefile-guide.md`
+  - `doc/specs/platform/makefile-automation-spec.md`
 
 ## Convenciones de endpoints y Bruno
 

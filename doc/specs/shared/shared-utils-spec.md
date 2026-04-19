@@ -1,3 +1,22 @@
+---
+domain: shared
+summary: Contrato funcional de helpers reutilizables en internal/utils para conversiones, lectura compartida, CSV, fechas, JSON y filtros comunes.
+when_to_read:
+  - cambios en helpers compartidos
+  - extraccion o consolidacion de utilidades reutilizables
+  - refactors que mueven logica comun a internal/utils
+code_paths:
+  - internal/utils/
+  - internal/utils/shared_helpers.go
+  - internal/utils/shared_helpers_test.go
+related_info:
+  - doc/info/development/service-design-conventions.md
+  - doc/info/development/create-services-steps.md
+related_specs:
+  - doc/specs/architecture/service-design-spec.md
+status: active
+---
+
 # Shared Utils Spec
 
 ## Objetivo

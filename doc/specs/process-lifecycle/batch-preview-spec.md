@@ -1,3 +1,27 @@
+---
+domain: process-lifecycle
+summary: Contrato del endpoint batch-preview, sus modos de selección, apply_changes local y simulación de dispatch_pacing visible en preview.
+when_to_read:
+  - cambios en batch preview
+  - cambios en apply_changes
+  - cambios en item_ids o row_numbers
+  - cambios en dispatch_pacing visible en preview
+code_paths:
+  - internal/handlers/process_lifecycle_handler.go
+  - internal/services/batchflow/preview_service.go
+  - internal/services/batchflow/contracts.go
+  - bruno/api/v1/process-lifecycle/
+  - bruno/legacy/process-lifecycle/test-batch-process/
+related_info:
+  - doc/info/process-lifecycle/batch-preview-guide.md
+  - doc/info/process-lifecycle/testing-guide.md
+  - doc/info/process-lifecycle/dispatch-pacing-guide.md
+related_specs:
+  - doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md
+  - doc/specs/process-lifecycle/batch-fanout-spec.md
+status: active
+---
+
 # Batch Preview Spec
 
 ## Objetivo
@@ -86,7 +110,7 @@ Reglas adicionales:
   1. resolver la misma seleccion del preview,
   2. ejecutar `BatchPreviewer.PreviewBatch`,
   3. ejecutar `BatchProcessor.ProcessBatch` sobre exactamente los mismos items.
-- Si el step `process_batch` resuelto tiene `dispatch_pacing`, `apply_changes` debe respetar esa configuración.
+- Si el step `process_batch` resuelto tiene `dispatch_pacing`, `apply_changes` debe simular esa configuración sobre exactamente los mismos items, sin dormir el request HTTP.
 
 ## Invariantes de persistencia
 
@@ -100,10 +124,11 @@ Reglas adicionales:
   - `enabled`
   - `messages_per_interval`
   - `interval_seconds`
+  - `mode`
   - `chunk_count`
   - `chunk_sizes`
   - `waits_ms`
-  - `slots`
+  - `simulated`
 
 ## Errores esperados
 
@@ -122,6 +147,7 @@ Reglas adicionales:
 - El mismo conjunto de items renderizado por preview puede persistirse con `apply_changes=true`.
 - En local, un request con `item_ids` y `apply_changes=true` modifica solo esos registros.
 - En local, un request con `item_ids` y `apply_changes=true` refleja `dispatch_pacing` en `apply_changes_metadata` cuando el step lo define.
+- En local, `apply_changes` con `dispatch_pacing` no debe depender del tiempo real transcurrido para completar la respuesta.
 - En entornos no locales, el mismo request se rechaza.
 - La colección Bruno debe exponer ejemplos de:
   - `prepare`

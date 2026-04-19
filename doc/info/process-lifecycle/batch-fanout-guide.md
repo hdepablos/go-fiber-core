@@ -131,7 +131,7 @@ El step `process_batch` debe quedar con una configuración de este estilo:
 ## Significado de los campos
 
 - `concurrent_batches`: batches procesados en paralelo dentro de una misma invocación.
-- `dispatch_pacing`: dosificación temporal del procesamiento por tandas.
+- `dispatch_pacing`: límite de items por invocación y delay entre re-invocaciones.
 - `parallel_shards`: cantidad de ramas distribuidas.
 - `execution_mode.type`: modo del proceso; para este caso `fanout`.
 - `execution_mode.strategy`: estrategia de reparto; actualmente `stride`.
@@ -156,7 +156,7 @@ Ejemplo:
 
 Interpretación correcta:
 
-- entre todos los shards juntos se habilitan `100` items por ventana de `10` segundos.
+- entre todos los shards juntos se habilitan `100` items por re-invocación de `10` segundos.
 
 Interpretación incorrecta:
 
@@ -171,6 +171,16 @@ Conviene cuando:
 - y se quiere controlar el ritmo global de salida.
 
 No conviene asumir que fanout con pacing implica throughput lineal por shard.
+
+## Relación con Lambda
+
+Cuando el proceso corre sobre Lambda:
+
+- `dispatch_pacing` no debe implementarse con `sleep`,
+- el shard procesa una sola tanda por invocación,
+- y `auto_invoke` agenda la siguiente invocación con delay.
+
+Esto evita consumir el presupuesto de tiempo de una sola Lambda esperando la ventana siguiente.
 
 ## Cuerpo del `run`
 

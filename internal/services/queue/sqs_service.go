@@ -29,11 +29,12 @@ type sqsService struct {
 
 // Message representa un mensaje de SQS
 type Message struct {
-	ID      string                 `json:"id"`
-	Body    string                 `json:"body"`
-	Data    map[string]interface{} `json:"data,omitempty"`
-	Source  string                 `json:"source"`
-	Created string                 `json:"created"`
+	ID           string                 `json:"id"`
+	Body         string                 `json:"body"`
+	Data         map[string]interface{} `json:"data,omitempty"`
+	Source       string                 `json:"source"`
+	Created      string                 `json:"created"`
+	DelaySeconds int32                  `json:"-"`
 }
 
 // NewSQSService crea una nueva instancia del servicio SQS.
@@ -67,6 +68,9 @@ func (s *sqsService) SendMessageToUrl(ctx context.Context, queueURL string, mess
 				StringValue: aws.String(message.Source),
 			},
 		},
+	}
+	if message.DelaySeconds > 0 {
+		input.DelaySeconds = int32(message.DelaySeconds)
 	}
 
 	result, err := s.client.SendMessage(ctx, input)

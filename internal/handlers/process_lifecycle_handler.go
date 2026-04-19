@@ -492,7 +492,7 @@ func resolveDispatchPacingFromSteps(steps []processlifecycle.Step) (batchflow.Di
 		if err := json.Unmarshal(step.Config, &cfg); err != nil {
 			return batchflow.DispatchPacingConfig{}, err
 		}
-		return batchflow.ResolveDispatchPacingConfig(cfg)
+		return batchflow.ValidateDispatchPacingStepConfig(cfg)
 	}
 	return batchflow.DispatchPacingConfig{}, nil
 }

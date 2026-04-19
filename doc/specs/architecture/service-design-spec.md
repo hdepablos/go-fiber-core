@@ -1,3 +1,21 @@
+---
+domain: architecture
+summary: Convención de diseño para servicios, casos de uso y componentes equivalentes con interfaces pequeñas, constructor injection y receivers sobre implementación concreta.
+when_to_read:
+  - servicios nuevos
+  - refactors estructurales de servicios
+  - cambios en interfaces o constructor injection
+code_paths:
+  - internal/services/
+  - internal/adapters/
+related_info:
+  - doc/info/development/service-design-conventions.md
+  - doc/info/development/create-services-steps.md
+related_specs:
+  - doc/specs/architecture/core-architecture-spec.md
+status: active
+---
+
 # Service Design Spec
 
 ## Objetivo

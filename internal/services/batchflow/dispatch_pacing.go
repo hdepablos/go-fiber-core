@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
+	"strings"
+
+	servicecontracts "go-fiber-core/internal/services/serviceconfig/contracts"
 )
 
 type DispatchPacingConfig struct {
@@ -13,9 +15,9 @@ type DispatchPacingConfig struct {
 	IntervalSeconds     int64 `json:"interval_seconds"`
 }
 
-var (
-	dispatchPacingNowFn   = time.Now
-	dispatchPacingSleepFn = sleepWithContext
+const (
+	minDispatchPacingIntervalSeconds = 1
+	maxDispatchPacingIntervalSeconds = 10
 )
 
 func ResolveDispatchPacingConfig(stepConfig map[string]any) (DispatchPacingConfig, error) {
@@ -49,20 +51,123 @@ func ParseDispatchPacingConfig(raw any) (DispatchPacingConfig, error) {
 	if cfg.MessagesPerInterval <= 0 {
 		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing.messages_per_interval debe ser mayor a 0")
 	}
-	if cfg.IntervalSeconds <= 0 {
-		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing.interval_seconds debe ser mayor a 0")
+	if cfg.IntervalSeconds < minDispatchPacingIntervalSeconds || cfg.IntervalSeconds > maxDispatchPacingIntervalSeconds {
+		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing.interval_seconds debe estar entre %d y %d", minDispatchPacingIntervalSeconds, maxDispatchPacingIntervalSeconds)
 	}
 	return cfg, nil
+}
+
+func ValidateDispatchPacingStepConfig(stepConfig map[string]any) (DispatchPacingConfig, error) {
+	cfg, err := ResolveDispatchPacingConfig(stepConfig)
+	if err != nil || !cfg.Enabled {
+		return cfg, err
+	}
+
+	rawPolicy, ok := stepConfig["execution_policy"]
+	if !ok || rawPolicy == nil {
+		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing requiere execution_policy configurado")
+	}
+
+	policyBytes, err := json.Marshal(rawPolicy)
+	if err != nil {
+		return DispatchPacingConfig{}, fmt.Errorf("execution_policy inválido para dispatch_pacing: %w", err)
+	}
+
+	var policy servicecontracts.ExecutionPolicy
+	if err := json.Unmarshal(policyBytes, &policy); err != nil {
+		return DispatchPacingConfig{}, fmt.Errorf("execution_policy inválido para dispatch_pacing: %w", err)
+	}
+
+	if !strings.EqualFold(policy.Mode, "ASYNC") {
+		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing requiere execution_policy.mode=ASYNC")
+	}
+	if !policy.AutoInvoke.Enabled {
+		return DispatchPacingConfig{}, fmt.Errorf("dispatch_pacing requiere execution_policy.auto_invoke.enabled=true")
+	}
+	if policy.AutoInvoke.DelaySeconds > 0 && int64(policy.AutoInvoke.DelaySeconds) != cfg.IntervalSeconds {
+		return DispatchPacingConfig{}, fmt.Errorf("execution_policy.auto_invoke.delay_seconds debe coincidir con dispatch_pacing.interval_seconds")
+	}
+
+	return cfg, nil
+}
+
+type DispatchPacingInvocationResult struct {
+	ProcessResult  ProcessBatchResult
+	NextBatchIndex int
+	BatchComplete  bool
 }
 
 func ProcessBatchWithDispatchPacing(
 	ctx context.Context,
 	processor BatchProcessor,
-	stateStore StateStore,
+	execCtx ExecutionContext,
+	batch Batch,
+	batchIndex int,
+	cfg DispatchPacingConfig,
+	totalShards int,
+) (DispatchPacingInvocationResult, error) {
+	if processor == nil {
+		return DispatchPacingInvocationResult{}, fmt.Errorf("batch processor inválido")
+	}
+	if !cfg.Enabled || len(batch.Items) == 0 {
+		res, err := processor.ProcessBatch(ctx, execCtx, batch)
+		if err != nil {
+			return DispatchPacingInvocationResult{}, err
+		}
+		return DispatchPacingInvocationResult{
+			ProcessResult:  res,
+			NextBatchIndex: batchIndex + max(totalShards, 1),
+			BatchComplete:  true,
+		}, nil
+	}
+
+	offset, err := loadDispatchPacingOffset(ctx, execCtx.Runtime, batchIndex)
+	if err != nil {
+		return DispatchPacingInvocationResult{}, err
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(batch.Items) {
+		offset = 0
+	}
+
+	end := offset + cfg.MessagesPerInterval
+	if end > len(batch.Items) {
+		end = len(batch.Items)
+	}
+	res, err := processor.ProcessBatch(ctx, execCtx, Batch{Items: batch.Items[offset:end]})
+	if err != nil {
+		return DispatchPacingInvocationResult{}, err
+	}
+
+	batchComplete := end >= len(batch.Items)
+	nextBatchIndex := batchIndex
+	if batchComplete {
+		if err := clearDispatchPacingOffset(ctx, execCtx.Runtime, batchIndex); err != nil {
+			return DispatchPacingInvocationResult{}, err
+		}
+		nextBatchIndex = batchIndex + max(totalShards, 1)
+	} else {
+		if err := saveDispatchPacingOffset(ctx, execCtx.Runtime, batchIndex, end); err != nil {
+			return DispatchPacingInvocationResult{}, err
+		}
+	}
+
+	res.Metadata = appendDispatchPacingInvocationMetadata(res.Metadata, cfg, batchIndex, offset, end, len(batch.Items), batchComplete)
+	return DispatchPacingInvocationResult{
+		ProcessResult:  res,
+		NextBatchIndex: nextBatchIndex,
+		BatchComplete:  batchComplete,
+	}, nil
+}
+
+func SimulateDispatchPacingPreview(
+	ctx context.Context,
+	processor BatchProcessor,
 	execCtx ExecutionContext,
 	batch Batch,
 	cfg DispatchPacingConfig,
-	ttl time.Duration,
 ) (ProcessBatchResult, error) {
 	if processor == nil {
 		return ProcessBatchResult{}, fmt.Errorf("batch processor inválido")
@@ -71,35 +176,16 @@ func ProcessBatchWithDispatchPacing(
 		return processor.ProcessBatch(ctx, execCtx, batch)
 	}
 
-	chunkSize := cfg.MessagesPerInterval
-	if chunkSize <= 0 || chunkSize >= len(batch.Items) {
-		waited, slot, err := acquireDispatchPacingSlot(ctx, stateStore, execCtx.Input, cfg, ttl)
-		if err != nil {
-			return ProcessBatchResult{}, err
-		}
-		res, err := processor.ProcessBatch(ctx, execCtx, batch)
-		if err != nil {
-			return ProcessBatchResult{}, err
-		}
-		res.Metadata = appendDispatchPacingMetadata(res.Metadata, cfg, []int{len(batch.Items)}, []int64{waited.Milliseconds()}, []int64{slot})
-		return res, nil
-	}
-
 	totalProcessed := 0
-	var (
-		aggregateMetadata map[string]any
-		chunkSizes        []int
-		waitsMs           []int64
-		slots             []int64
-	)
+	chunkSize := cfg.MessagesPerInterval
+	chunkSizes := make([]int, 0, (len(batch.Items)+chunkSize-1)/chunkSize)
+	waitsMs := make([]int64, 0, len(chunkSizes))
+	aggregateMetadata := make(map[string]any)
+
 	for start := 0; start < len(batch.Items); start += chunkSize {
 		end := start + chunkSize
 		if end > len(batch.Items) {
 			end = len(batch.Items)
-		}
-		waited, slot, err := acquireDispatchPacingSlot(ctx, stateStore, execCtx.Input, cfg, ttl)
-		if err != nil {
-			return ProcessBatchResult{}, err
 		}
 		res, err := processor.ProcessBatch(ctx, execCtx, Batch{Items: batch.Items[start:end]})
 		if err != nil {
@@ -107,65 +193,24 @@ func ProcessBatchWithDispatchPacing(
 		}
 		totalProcessed += res.ProcessedCount
 		if len(res.Metadata) > 0 {
-			if aggregateMetadata == nil {
-				aggregateMetadata = make(map[string]any)
-			}
 			aggregateMetadata[fmt.Sprintf("chunk_%d", len(chunkSizes)+1)] = res.Metadata
 		}
 		chunkSizes = append(chunkSizes, end-start)
-		waitsMs = append(waitsMs, waited.Milliseconds())
-		slots = append(slots, slot)
+		if len(chunkSizes) == 1 {
+			waitsMs = append(waitsMs, 0)
+		} else {
+			waitsMs = append(waitsMs, cfg.IntervalSeconds*1000)
+		}
 	}
 
-	aggregateMetadata = appendDispatchPacingMetadata(aggregateMetadata, cfg, chunkSizes, waitsMs, slots)
+	aggregateMetadata = appendDispatchPacingPreviewMetadata(aggregateMetadata, cfg, chunkSizes, waitsMs)
 	return ProcessBatchResult{
 		ProcessedCount: totalProcessed,
 		Metadata:       aggregateMetadata,
 	}, nil
 }
 
-func acquireDispatchPacingSlot(ctx context.Context, stateStore StateStore, input Input, cfg DispatchPacingConfig, ttl time.Duration) (time.Duration, int64, error) {
-	if !cfg.Enabled {
-		return 0, 0, nil
-	}
-	if stateStore == nil {
-		return 0, 0, fmt.Errorf("state store inválido para dispatch_pacing")
-	}
-	intervalSeconds := cfg.IntervalSeconds
-	if intervalSeconds <= 0 {
-		return 0, 0, fmt.Errorf("dispatch_pacing.interval_seconds inválido")
-	}
-
-	totalWait := time.Duration(0)
-	for {
-		now := dispatchPacingNowFn()
-		slot := now.Unix() / intervalSeconds
-		counterKey := fmt.Sprintf("%s:dispatch_pacing:%d", input.RedisKey, slot)
-		ttlForCounter := ttl
-		if ttlForCounter <= 0 {
-			ttlForCounter = time.Duration(intervalSeconds*2) * time.Second
-		}
-		current, err := stateStore.IncrCounter(ctx, counterKey, 1, ttlForCounter)
-		if err != nil {
-			return totalWait, slot, err
-		}
-		if current == 1 {
-			return totalWait, slot, nil
-		}
-
-		nextSlot := time.Unix((slot+1)*intervalSeconds, 0)
-		waitFor := nextSlot.Sub(now)
-		if waitFor <= 0 {
-			waitFor = time.Second
-		}
-		if err := dispatchPacingSleepFn(ctx, waitFor); err != nil {
-			return totalWait, slot, err
-		}
-		totalWait += waitFor
-	}
-}
-
-func appendDispatchPacingMetadata(metadata map[string]any, cfg DispatchPacingConfig, chunkSizes []int, waitsMs []int64, slots []int64) map[string]any {
+func appendDispatchPacingInvocationMetadata(metadata map[string]any, cfg DispatchPacingConfig, batchIndex, offsetStart, offsetEnd, totalItems int, batchComplete bool) map[string]any {
 	if metadata == nil {
 		metadata = make(map[string]any)
 	}
@@ -173,25 +218,66 @@ func appendDispatchPacingMetadata(metadata map[string]any, cfg DispatchPacingCon
 		"enabled":               cfg.Enabled,
 		"messages_per_interval": cfg.MessagesPerInterval,
 		"interval_seconds":      cfg.IntervalSeconds,
-		"chunk_count":           len(chunkSizes),
-		"chunk_sizes":           chunkSizes,
-		"waits_ms":              waitsMs,
-		"slots":                 slots,
+		"mode":                  "auto_invoke_delay",
+		"batch_index":           batchIndex,
+		"offset_start":          offsetStart,
+		"offset_end":            offsetEnd,
+		"remaining_items":       max(totalItems-offsetEnd, 0),
+		"batch_complete":        batchComplete,
+		"requeue_delay_seconds": cfg.IntervalSeconds,
 	}
 	return metadata
 }
 
-func sleepWithContext(ctx context.Context, waitFor time.Duration) error {
-	if waitFor <= 0 {
-		return nil
+func appendDispatchPacingPreviewMetadata(metadata map[string]any, cfg DispatchPacingConfig, chunkSizes []int, waitsMs []int64) map[string]any {
+	if metadata == nil {
+		metadata = make(map[string]any)
 	}
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
+	metadata["dispatch_pacing"] = map[string]any{
+		"enabled":               cfg.Enabled,
+		"messages_per_interval": cfg.MessagesPerInterval,
+		"interval_seconds":      cfg.IntervalSeconds,
+		"mode":                  "preview_simulated",
+		"simulated":             true,
+		"chunk_count":           len(chunkSizes),
+		"chunk_sizes":           chunkSizes,
+		"waits_ms":              waitsMs,
+	}
+	return metadata
+}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
+func loadDispatchPacingOffset(ctx context.Context, runtime RuntimeValues, batchIndex int) (int, error) {
+	if runtime == nil {
+		return 0, nil
+	}
+	var offset int
+	if err := runtime.Get(ctx, dispatchPacingOffsetKey(batchIndex), &offset); err != nil {
+		return 0, nil
+	}
+	return offset, nil
+}
+
+func saveDispatchPacingOffset(ctx context.Context, runtime RuntimeValues, batchIndex, offset int) error {
+	if runtime == nil {
 		return nil
 	}
+	return runtime.Set(ctx, dispatchPacingOffsetKey(batchIndex), offset)
+}
+
+func clearDispatchPacingOffset(ctx context.Context, runtime RuntimeValues, batchIndex int) error {
+	if runtime == nil {
+		return nil
+	}
+	return runtime.Delete(ctx, dispatchPacingOffsetKey(batchIndex))
+}
+
+func dispatchPacingOffsetKey(batchIndex int) string {
+	return fmt.Sprintf("dispatch_pacing:batch:%06d:offset", batchIndex)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

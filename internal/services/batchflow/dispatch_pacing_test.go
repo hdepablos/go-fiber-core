@@ -58,17 +58,15 @@ func (p *fakeBatchProcessor) ProcessBatch(_ context.Context, _ ExecutionContext,
 }
 
 type fakeStateStore struct {
-	summary  Summary
-	batches  []Batch
-	counters map[string]int64
-	runtime  *fakeRuntimeValues
-	ready    bool
+	summary Summary
+	batches []Batch
+	runtime *fakeRuntimeValues
+	ready   bool
 }
 
 func newFakeStateStore() *fakeStateStore {
 	return &fakeStateStore{
-		counters: make(map[string]int64),
-		runtime:  &fakeRuntimeValues{values: make(map[string]any)},
+		runtime: &fakeRuntimeValues{values: make(map[string]any)},
 	}
 }
 
@@ -99,17 +97,15 @@ func (s *fakeStateStore) Cleanup(context.Context, Input, string) error {
 }
 
 func (s *fakeStateStore) SetCounter(_ context.Context, key string, value int64, _ time.Duration) error {
-	s.counters[key] = value
 	return nil
 }
 
 func (s *fakeStateStore) IncrCounter(_ context.Context, key string, delta int64, _ time.Duration) (int64, error) {
-	s.counters[key] += delta
-	return s.counters[key], nil
+	return delta, nil
 }
 
 func (s *fakeStateStore) GetCounter(_ context.Context, key string) (int64, error) {
-	return s.counters[key], nil
+	return 0, nil
 }
 
 func (s *fakeStateStore) RegisterShards(context.Context, Input, int, time.Duration) error {
@@ -150,7 +146,106 @@ func TestResolveDispatchPacingConfig_DefaultDisabledWhenMissing(t *testing.T) {
 	assert.Zero(t, cfg.IntervalSeconds)
 }
 
-func TestPreviewApplyChanges_UsesDispatchPacing(t *testing.T) {
+func TestValidateDispatchPacingStepConfig_RequiresAsyncAutoInvoke(t *testing.T) {
+	_, err := ValidateDispatchPacingStepConfig(map[string]any{
+		"dispatch_pacing": map[string]any{
+			"enabled":               true,
+			"messages_per_interval": 100,
+			"interval_seconds":      2,
+		},
+		"execution_policy": map[string]any{
+			"mode": "SYNC",
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "execution_policy.mode=ASYNC")
+}
+
+func TestParseDispatchPacingConfig_RejectsLongDelay(t *testing.T) {
+	_, err := ParseDispatchPacingConfig(map[string]any{
+		"enabled":               true,
+		"messages_per_interval": 100,
+		"interval_seconds":      50,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "entre 1 y 10")
+}
+
+func TestValidateDispatchPacingStepConfig_AllowsDerivedDelay(t *testing.T) {
+	cfg, err := ValidateDispatchPacingStepConfig(map[string]any{
+		"dispatch_pacing": map[string]any{
+			"enabled":               true,
+			"messages_per_interval": 100,
+			"interval_seconds":      2,
+		},
+		"execution_policy": map[string]any{
+			"mode": "ASYNC",
+			"auto_invoke": map[string]any{
+				"enabled":        true,
+				"cursor_field":   "batch_index",
+				"stop_condition": "is_last_batch",
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, 2, int(cfg.IntervalSeconds))
+}
+
+func TestProcessBatchWithDispatchPacing_ProcessesSingleChunkPerInvocation(t *testing.T) {
+	processor := &fakeBatchProcessor{}
+	runtime := &fakeRuntimeValues{values: make(map[string]any)}
+	execCtx := ExecutionContext{
+		Input: Input{
+			ParentID: 1,
+			RedisKey: "run-1",
+		},
+		Runtime: runtime,
+	}
+
+	first, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+		Enabled:             true,
+		MessagesPerInterval: 3,
+		IntervalSeconds:     2,
+	}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 3, first.ProcessResult.ProcessedCount)
+	assert.Equal(t, 0, first.NextBatchIndex)
+	assert.False(t, first.BatchComplete)
+
+	second, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+		Enabled:             true,
+		MessagesPerInterval: 3,
+		IntervalSeconds:     2,
+	}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 3, second.ProcessResult.ProcessedCount)
+	assert.Equal(t, 0, second.NextBatchIndex)
+	assert.False(t, second.BatchComplete)
+
+	third, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+		Enabled:             true,
+		MessagesPerInterval: 3,
+		IntervalSeconds:     2,
+	}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 3, third.ProcessResult.ProcessedCount)
+	assert.Equal(t, 0, third.NextBatchIndex)
+	assert.False(t, third.BatchComplete)
+
+	fourth, err := ProcessBatchWithDispatchPacing(context.Background(), processor, execCtx, Batch{Items: buildTestItems(10)}, 0, DispatchPacingConfig{
+		Enabled:             true,
+		MessagesPerInterval: 3,
+		IntervalSeconds:     2,
+	}, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fourth.ProcessResult.ProcessedCount)
+	assert.Equal(t, 1, fourth.NextBatchIndex)
+	assert.True(t, fourth.BatchComplete)
+	assert.Equal(t, []int{3, 3, 3, 1}, processor.sizes)
+}
+
+func TestPreviewApplyChanges_UsesDispatchPacingSimulation(t *testing.T) {
 	processor := &fakeBatchProcessor{}
 	stateStore := newFakeStateStore()
 	registry := NewPreviewRegistry()
@@ -169,19 +264,6 @@ func TestPreviewApplyChanges_UsesDispatchPacing(t *testing.T) {
 			},
 		}, nil
 	})
-
-	originalNow := dispatchPacingNowFn
-	originalSleep := dispatchPacingSleepFn
-	currentTime := time.Unix(1_700_000_000, 0)
-	dispatchPacingNowFn = func() time.Time { return currentTime }
-	dispatchPacingSleepFn = func(_ context.Context, d time.Duration) error {
-		currentTime = currentTime.Add(d)
-		return nil
-	}
-	defer func() {
-		dispatchPacingNowFn = originalNow
-		dispatchPacingSleepFn = originalSleep
-	}()
 
 	svc := NewPreviewService(registry, time.Minute)
 	res, err := svc.Preview(context.Background(), PreviewRequest{
@@ -209,6 +291,8 @@ func TestPreviewApplyChanges_UsesDispatchPacing(t *testing.T) {
 	assert.Equal(t, 4, meta["chunk_count"])
 	assert.Equal(t, 3, meta["messages_per_interval"])
 	assert.Equal(t, int64(5), meta["interval_seconds"])
+	assert.Equal(t, "preview_simulated", meta["mode"])
+	assert.Equal(t, true, meta["simulated"])
 }
 
 func buildTestItems(total int) []json.RawMessage {

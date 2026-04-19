@@ -207,11 +207,12 @@ create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make cr
 		-batch-size "$(or $(batch_size),5000)" \
 		-part-prefix "$(or $(part_prefix),)" \
 		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
-		-bulk-job-id "$(or $(bulk_job_id),0)"
+		-bulk-job-id "$(or $(bulk_job_id),0)" \
+		$(if $(filter true,$(force)),-force,)
 	@echo "$(SUCCESS)✨ Scaffold exportmanager generado correctamente.$(RESET)"
 
 .PHONY: create-batch-process
-create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x]
+create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x] [pacing=true pacing_messages=100 pacing_interval=2]
 	@if [ -z "$(process_name)" ]; then \
 		echo "$(ERROR)❌ Debes especificar process_name: make create-batch-process process_name=\"procesar x\" [service_slug=procesar_x]$(RESET)"; \
 		exit 1; \
@@ -224,17 +225,66 @@ create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: mak
 		-concurrent-batches "$(or $(concurrent_batches),1)" \
 		-parallel-shards "$(or $(parallel_shards),4)" \
 		-redis-ttl-hours "$(or $(redis_ttl_hours),24)" \
+		-with-pacing=$(if $(filter true,$(pacing)),true,false) \
+		-pacing-messages "$(or $(pacing_messages),100)" \
+		-pacing-interval "$(or $(pacing_interval),2)" \
 		-with-bruno=false \
 		$(if $(filter true,$(force)),-force,)
 	@echo "$(SUCCESS)✨ Scaffold batchflow generado correctamente.$(RESET)"
+
+.PHONY: add-process-pacing
+add-process-pacing: ## ⏱️ Clona una process_version existente y agrega dispatch_pacing al step process_batch. Uso: make add-process-pacing source_version_id=2 operator_id=1 pacing_messages=100 pacing_interval=2
+	@echo "$(INFO)⏱️ Clonando version $(source_version_id) y agregando dispatch_pacing...$(RESET)"
+	@go run ./cmd/tools/clone-process-version \
+		-config "$(or $(config),internal/appconfig/config.yml)" \
+		-source-version-id "$(source_version_id)" \
+		-operator-id "$(operator_id)" \
+		-with-pacing=true \
+		-pacing-messages "$(or $(pacing_messages),100)" \
+		-pacing-interval "$(or $(pacing_interval),2)" \
+		$(if $(process_batch_step),-process-batch-step "$(process_batch_step)",)
+	@echo "$(SUCCESS)✨ Nueva version clonada con dispatch_pacing.$(RESET)"
+
+.PHONY: clone-process-version
+clone-process-version: ## 🧬 Clona una process_version existente, con opcion de aplicar dispatch_pacing. Uso: make clone-process-version source_version_id=19 operator_id=1 [with_pacing=true pacing_messages=100 pacing_interval=2]
+	@echo "$(INFO)🧬 Clonando version $(source_version_id)...$(RESET)"
+	@go run ./cmd/tools/clone-process-version \
+		-config "$(or $(config),internal/appconfig/config.yml)" \
+		-source-version-id "$(source_version_id)" \
+		-operator-id "$(operator_id)" \
+		-with-pacing=$(if $(filter true,$(with_pacing)),true,false) \
+		-pacing-messages "$(or $(pacing_messages),100)" \
+		-pacing-interval "$(or $(pacing_interval),2)" \
+		$(if $(process_batch_step),-process-batch-step "$(process_batch_step)",)
+	@echo "$(SUCCESS)✨ Process version clonada correctamente.$(RESET)"
 
 .PHONY: list-scaffolds
 list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relacionados. Uso: make list-scaffolds
 	@echo "$(INFO)Scaffolds disponibles$(RESET)"
 	@echo ""
-	@echo "1. batch-process"
+	@echo "1. service-step"
+	@echo "   Comando:"
+	@echo "   make create-step name=carpeta/servicio"
+	@echo ""
+	@echo "   Genera:"
+	@echo "   - servicio step en internal/services/<ruta>"
+	@echo "   - registro automatico en serviceconfig.Register"
+	@echo "   - auto-wiring de imports en cmd/api/main.go"
+	@echo "   - auto-wiring de imports en cmd/cmd-cli/main.go"
+	@echo ""
+	@echo "   Opciones importantes:"
+	@echo "   - no soporta force=true; si el archivo existe, falla para evitar sobrescritura"
+	@echo ""
+	@echo "2. batch-process"
 	@echo "   Comando:"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\""
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" force=true"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" pacing=true pacing_messages=100 pacing_interval=2"
+	@echo ""
+	@echo "   Variantes:"
+	@echo "   - sequential: version base generada automaticamente"
+	@echo "   - fanout: version companion _fanout generada automaticamente"
+	@echo "   - dispatch_pacing: variante opcional generable via pacing=true"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - provider.go"
@@ -245,12 +295,28 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo "   - seeder base sequential"
 	@echo "   - seeder companion _fanout"
 	@echo ""
+	@echo "   Opciones importantes:"
+	@echo "   - force=true: regenera y sobrescribe archivos scaffold existentes"
+	@echo "   - pacing=true: agrega dispatch_pacing al step process_batch"
+	@echo "   - pacing_messages=<n>: items por invocacion cuando pacing=true"
+	@echo "   - pacing_interval=<1..10>: delay entre auto_invoke cuando pacing=true"
+	@echo ""
+	@echo "   Operaciones hijas sobre versiones existentes:"
+	@echo "   - make clone-process-version source_version_id=19 operator_id=1"
+	@echo "   - make clone-process-version source_version_id=19 operator_id=1 with_pacing=true pacing_messages=100 pacing_interval=2"
+	@echo "   - make add-process-pacing source_version_id=19 operator_id=1 pacing_messages=100 pacing_interval=2"
+	@echo ""
+	@echo "   Batch versioning:"
+	@echo "   - clone-process-version: clona una process_version existente"
+	@echo "   - add-process-pacing: wrapper de clone-process-version con with_pacing=true"
+	@echo ""
 	@echo "   Cleanup:"
 	@echo "   make delete-process kind=batch-process service_slug=procesar_x"
 	@echo ""
-	@echo "2. export-manager"
+	@echo "3. export-manager"
 	@echo "   Comando:"
 	@echo "   make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\""
+	@echo "   make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\" force=true"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - provider.go"
@@ -262,42 +328,124 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo "   - request Bruno dedicado"
 	@echo "   - documentacion base"
 	@echo ""
+	@echo "   Opciones importantes:"
+	@echo "   - force=true: regenera y sobrescribe archivos generados si existen"
+	@echo ""
 	@echo "   Cleanup:"
 	@echo "   make delete-process kind=export service_slug=generar_archivo_x"
 	@echo ""
-	@echo "3. external-api-config"
+	@echo "4. external-api-config"
 	@echo "   Comando:"
 	@echo "   make create-external-api-config api_key=customer_api"
+	@echo "   make create-external-api-config api_key=customer_api force=true"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - entrada apis.xxx en internal/appconfig/config.yml"
 	@echo "   - placeholders de entorno base"
 	@echo ""
-	@echo "4. external-adapter"
+	@echo "   Opciones importantes:"
+	@echo "   - force=true: sobrescribe la entrada apis.xxx si ya existe"
+	@echo ""
+	@echo "5. external-adapter"
 	@echo "   Comando:"
 	@echo "   make create-external-adapter adapter_name=customer_api config_key=customer_api"
+	@echo "   make create-external-adapter adapter_name=customer_api config_key=customer_api force=true"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - adapter HTTP externo reusable"
 	@echo "   - base alineada con externalhttp y config.ApiConfig"
 	@echo ""
-	@echo "5. external-integration"
+	@echo "   Opciones importantes:"
+	@echo "   - force=true: sobrescribe el archivo generado si ya existe"
+	@echo ""
+	@echo "6. external-integration"
 	@echo "   Comando:"
 	@echo "   make create-external-integration api_key=customer_api [adapter_name=customer_api]"
+	@echo "   make create-external-integration api_key=customer_api force=true"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - config apis.xxx"
 	@echo "   - adapter HTTP externo"
 	@echo ""
+	@echo "   Opciones importantes:"
+	@echo "   - force=true: se propaga a config y adapter"
+	@echo ""
+	@echo "7. cli-command"
+	@echo "   Comando:"
+	@echo "   make create-command name=nuevoComando"
+	@echo ""
+	@echo "   Genera:"
+	@echo "   - comando Cobra bajo cmd/cmd-cli/cmd/"
+	@echo "   - alta inicial via cobra-cli add"
+	@echo ""
+	@echo "   Opciones importantes:"
+	@echo "   - no soporta force=true"
+	@echo "   - pensado para ampliar la CLI interna, no para servicios batch"
+	@echo ""
 	@echo "Comandos relacionados"
 	@echo "   - make delete-process kind=batch-process service_slug=..."
 	@echo "   - make delete-process kind=export service_slug=..."
 	@echo "   - make seed-one name=..."
+	@echo "   - make cli-help"
 	@echo "   - make help"
 	@echo ""
 	@echo "Documentacion:"
 	@echo "   - doc/info/development/process-scaffold-and-cleanup.md"
 	@echo "   - doc/info/platform/makefile-guide.md"
+
+.PHONY: list-tools
+list-tools: ## 🧰 Lista utilidades operativas agrupadas por dominio. Uso: make list-tools
+	@echo "$(INFO)Herramientas operativas$(RESET)"
+	@echo ""
+	@echo "1. Scaffolds y generadores"
+	@echo "   - make list-scaffolds"
+	@echo "   - make create-step name=carpeta/servicio"
+	@echo "   - make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\""
+	@echo "   - make clone-process-version source_version_id=19 operator_id=1 with_pacing=true pacing_messages=100 pacing_interval=2"
+	@echo "   - make add-process-pacing source_version_id=2 operator_id=1 pacing_messages=100 pacing_interval=2"
+	@echo "   - make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\""
+	@echo "   - make create-external-integration api_key=customer_api"
+	@echo "   - make create-command name=nuevoComando"
+	@echo ""
+	@echo "2. Procesos, seeds y cleanup"
+	@echo "   - make seed-list"
+	@echo "   - make seed-one name=..."
+	@echo "   - make delete-process kind=batch-process service_slug=..."
+	@echo "   - make delete-process kind=export service_slug=... dry_run=true"
+	@echo ""
+	@echo "3. Redis y estado"
+	@echo "   - make redis-list-project-keys"
+	@echo "   - make redis-get-key k=\"go-fiber-core:lifecycle-2\""
+	@echo "   - make redis-del key=\"catalogs*\""
+	@echo ""
+	@echo "4. CLI y base de datos"
+	@echo "   - make cli-help"
+	@echo "   - make run-cli c=\"redis-clear-keys --pattern go-fiber-core:*\""
+	@echo "   - make create-migration name=create_users_table"
+	@echo "   - make migrate-status"
+	@echo "   - make migrate-up"
+	@echo ""
+	@echo "5. Entorno y diagnostico"
+	@echo "   - make help"
+	@echo "   - make show-all-variables"
+	@echo "   - make check-env"
+	@echo "   - make color-messages"
+	@echo ""
+	@echo "6. Logs y observabilidad"
+	@echo "   - make logs-tail service=api since=1h"
+	@echo "   - make logs-tail-slow-sql"
+	@echo "   - make logs-tail-slow-sql-cloudwatch service=api since=1h"
+	@echo "   - make logs-all"
+	@echo ""
+	@echo "7. Bruno y entorno local"
+	@echo "   - make update-bruno-url-base"
+	@echo "   - make update-bruno-lambda"
+	@echo "   - make update-bruno-eks"
+	@echo "   - make update-bruno"
+	@echo ""
+	@echo "Documentacion:"
+	@echo "   - doc/info/platform/makefile-guide.md"
+	@echo "   - doc/info/development/process-scaffold-and-cleanup.md"
 
 .PHONY: create-external-adapter
 create-external-adapter: ## 🌐 Genera un scaffold de adapter HTTP externo. Uso: make create-external-adapter adapter_name=customer_api config_key=customer_api

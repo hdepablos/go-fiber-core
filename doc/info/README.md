@@ -53,6 +53,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [testing-guide.md](process-lifecycle/testing-guide.md): pruebas funcionales y requests.
 - [batch-preview-guide.md](process-lifecycle/batch-preview-guide.md): uso de batch preview, apply_changes local y run filtrado.
 - [batch-fanout-guide.md](process-lifecycle/batch-fanout-guide.md): fan-out batch para Lambda/EKS y configuración de steps.
+- [dispatch-pacing-guide.md](process-lifecycle/dispatch-pacing-guide.md): dosificación por tandas usando `process_batch` + `auto_invoke` con delay.
 - [batch-capacity-and-stress-guide.md](process-lifecycle/batch-capacity-and-stress-guide.md): checklist de capacidad, stress test y filtros de logs para Redis/rate limit.
 - [batch-fanout-risks.md](process-lifecycle/batch-fanout-risks.md): riesgos, anti-patrones y alertas del fan-out.
 - [sql-cheatsheet.md](process-lifecycle/sql-cheatsheet.md): apoyo SQL para analisis y operacion.

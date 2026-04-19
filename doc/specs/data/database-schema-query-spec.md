@@ -1,3 +1,22 @@
+---
+domain: data
+summary: Contrato documental mínimo del esquema relacional para generar SQL, joins y reportes confiables a partir de migraciones, modelos y documentación base.
+when_to_read:
+  - cambios en migraciones SQL
+  - cambios en tablas o columnas
+  - cambios en relaciones o integridad
+  - solicitudes de reportes o consultas SQL
+code_paths:
+  - internal/database/migrations/postgres/
+  - internal/models/
+related_info:
+  - doc/info/data/database-model-relations.md
+  - doc/info/data/create-migrations.md
+related_specs:
+  - doc/specs/documentation-governance-spec.md
+status: active
+---
+
 # Database Schema Query Spec
 
 ## Objetivo

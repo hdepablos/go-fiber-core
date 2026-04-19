@@ -18,6 +18,9 @@ type options struct {
 	ConcurrentBatches int
 	ParallelShards    int
 	RedisTTLHours     int
+	WithPacing        bool
+	PacingMessages    int
+	PacingInterval    int
 	WithBruno         bool
 	Force             bool
 }
@@ -41,6 +44,9 @@ type scaffoldData struct {
 	ConcurrentBatches    int
 	ParallelShards       int
 	RedisTTLHours        int
+	WithPacing           bool
+	PacingMessages       int
+	PacingInterval       int
 	ImportPath           string
 }
 
@@ -136,6 +142,9 @@ func parseOptions() options {
 	flag.IntVar(&opts.ConcurrentBatches, "concurrent-batches", 1, "Cantidad de lotes por invocacion")
 	flag.IntVar(&opts.ParallelShards, "parallel-shards", 4, "Cantidad de shards distribuidos para la version fanout")
 	flag.IntVar(&opts.RedisTTLHours, "redis-ttl-hours", 24, "TTL de Redis en horas")
+	flag.BoolVar(&opts.WithPacing, "with-pacing", false, "Genera process_batch con dispatch_pacing")
+	flag.IntVar(&opts.PacingMessages, "pacing-messages", 100, "Cantidad de items por invocacion cuando dispatch_pacing esta activo")
+	flag.IntVar(&opts.PacingInterval, "pacing-interval", 2, "Delay entre re-invocaciones cuando dispatch_pacing esta activo")
 	flag.BoolVar(&opts.WithBruno, "with-bruno", false, "Genera requests Bruno base (deshabilitado por defecto: usar test-batch-process parametrizado)")
 	flag.BoolVar(&opts.Force, "force", false, "Sobrescribe archivos generados si existen")
 	flag.Parse()
@@ -176,6 +185,17 @@ func enrichOptions(opts *options) error {
 	if opts.RedisTTLHours <= 0 {
 		opts.RedisTTLHours = 24
 	}
+	if !opts.WithPacing {
+		opts.PacingMessages = 0
+		opts.PacingInterval = 0
+		return nil
+	}
+	if opts.PacingMessages <= 0 {
+		return fmt.Errorf("pacing_messages debe ser mayor a 0 cuando with_pacing=true")
+	}
+	if opts.PacingInterval < 1 || opts.PacingInterval > 10 {
+		return fmt.Errorf("pacing_interval debe estar entre 1 y 10 cuando with_pacing=true")
+	}
 	return nil
 }
 
@@ -201,6 +221,9 @@ func buildScaffoldData(opts options) scaffoldData {
 		ConcurrentBatches:    opts.ConcurrentBatches,
 		ParallelShards:       opts.ParallelShards,
 		RedisTTLHours:        opts.RedisTTLHours,
+		WithPacing:           opts.WithPacing,
+		PacingMessages:       opts.PacingMessages,
+		PacingInterval:       opts.PacingInterval,
 		ImportPath:           "go-fiber-core/internal/services/" + opts.ServiceSlug,
 	}
 }
@@ -727,7 +750,7 @@ func (s *processBatchStep) Init(ctx *contracts.ServiceContext, servicePath strin
 		if v, ok := s.ctx.CurrentStepConfig["concurrent_batches"]; ok {
 			s.concurrentBatches = utils.ToInt(v)
 		}
-		s.dispatchPacing, s.initErr = batchflow.ResolveDispatchPacingConfig(s.ctx.CurrentStepConfig)
+		s.dispatchPacing, s.initErr = batchflow.ValidateDispatchPacingStepConfig(s.ctx.CurrentStepConfig)
 	}
 	if s.concurrentBatches <= 0 {
 		s.concurrentBatches = 1
@@ -1325,8 +1348,10 @@ func renderSeederVariant(data scaffoldData, fanout bool) string {
 	step2Config := `{
 					"parallel_shards": 1
 				}`
+	step3Pacing := renderDispatchPacingConfig(data, false)
 	step3Config := fmt.Sprintf(`{
 					"concurrent_batches": %d,
+%s
 					"execution_mode": {
 						"type": "sequential"
 					},
@@ -1336,11 +1361,11 @@ func renderSeederVariant(data scaffoldData, fanout bool) string {
 						"auto_invoke": {
 							"enabled": true,
 							"cursor_field": "batch_index",
-							"stop_condition": "is_last_batch"
+							"stop_condition": "is_last_batch"%s
 						},
 						"next_step": %q
 					}
-				}`, data.ConcurrentBatches, data.ProcessName, data.FinalizeKey)
+				}`, data.ConcurrentBatches, step3Pacing, data.ProcessName, renderAutoInvokeDelay(data), data.FinalizeKey)
 	if fanout {
 		seederName = data.FanoutSeedName
 		seederFuncName = data.FanoutSeederFuncName
@@ -1349,9 +1374,11 @@ func renderSeederVariant(data scaffoldData, fanout bool) string {
 		step2Config = fmt.Sprintf(`{
 					"parallel_shards": %d
 				}`, data.ParallelShards)
+		step3Pacing = renderDispatchPacingConfig(data, true)
 		step3Config = fmt.Sprintf(`{
 					"concurrent_batches": %d,
 					"parallel_shards": %d,
+%s
 					"execution_mode": {
 						"type": "fanout",
 						"parallel_shards": %d,
@@ -1363,11 +1390,11 @@ func renderSeederVariant(data scaffoldData, fanout bool) string {
 						"auto_invoke": {
 							"enabled": true,
 							"cursor_field": "batch_index",
-							"stop_condition": "is_shard_complete"
+							"stop_condition": "is_shard_complete"%s
 						},
 						"next_step": %q
 					}
-				}`, data.ConcurrentBatches, data.ParallelShards, data.ParallelShards, data.ProcessName+" fanout", data.FinalizeKey)
+				}`, data.ConcurrentBatches, data.ParallelShards, step3Pacing, data.ParallelShards, data.ProcessName+" fanout", renderAutoInvokeDelay(data), data.FinalizeKey)
 	}
 
 	return fmt.Sprintf(`package seeders
@@ -1495,6 +1522,28 @@ func %s(pool *pgxpool.Pool) error {
 	})
 }
 `, seederFuncName, seederName, data.ProcessName, versionNumber, versionNumber, data.StartKey, data.BatchSize, data.RedisTTLHours, step2Name, data.DispatchKey, step2Config, data.ProcessBatchKey, step3Config, data.FinalizeKey)
+}
+
+func renderDispatchPacingConfig(data scaffoldData, fanout bool) string {
+	if !data.WithPacing {
+		return ""
+	}
+	indent := "\t\t\t\t\t"
+	_ = fanout
+	return fmt.Sprintf(`%s"dispatch_pacing": {
+%s	"enabled": true,
+%s	"messages_per_interval": %d,
+%s	"interval_seconds": %d
+%s},
+`, indent, indent, indent, data.PacingMessages, indent, data.PacingInterval, indent)
+}
+
+func renderAutoInvokeDelay(data scaffoldData) string {
+	if !data.WithPacing {
+		return ""
+	}
+	return fmt.Sprintf(`,
+							"delay_seconds": %d`, data.PacingInterval)
 }
 
 func ask(reader *bufio.Reader, label string) string {

@@ -29,7 +29,10 @@ make list-scaffolds
 Uso típico:
 
 - descubrir los scaffolds vigentes del repositorio,
+- detectar generadores reusables cercanos como `create-step` y `create-command`,
 - copiar el comando base correcto,
+- identificar opciones importantes como `force=true`,
+- identificar variantes técnicas relevantes del scaffold,
 - identificar qué genera cada scaffold,
 - y recordar el cleanup o comandos relacionados.
 
@@ -37,6 +40,12 @@ Uso típico:
 
 ```bash
 make create-export-manager process_name="generar archivo x" file="exports/x/y"
+```
+
+Si el scaffold ya existe y se quiere regenerar sobrescribiendo archivos generados:
+
+```bash
+make create-export-manager process_name="generar archivo x" file="exports/x/y" force=true
 ```
 
 Uso típico:
@@ -145,6 +154,14 @@ El scaffold de batch crea normalmente:
 
 No crea una carpeta Bruno nueva por proceso.
 
+Variantes operativas relevantes:
+
+- `sequential`: base generada automáticamente.
+- `fanout`: companion `_fanout` generado automáticamente.
+- `dispatch_pacing`: variante técnica opcional generable desde el scaffold con `pacing=true`.
+- `clone-process-version`: operación hija de `batch-process` para clonar una `process_version` existente y opcionalmente agregar `dispatch_pacing`.
+- `add-process-pacing`: operación hija de `batch-process`, atajo de `clone-process-version` con pacing activado.
+
 ## Catálogo operativo recomendado
 
 Cuando no recuerdes el nombre exacto del scaffold o quieras confirmar su alcance, usar:
@@ -153,12 +170,30 @@ Cuando no recuerdes el nombre exacto del scaffold o quieras confirmar su alcance
 make list-scaffolds
 ```
 
+Si la necesidad es encontrar utilidades operativas más amplias del repositorio y no solo scaffolds, usar:
+
+```bash
+make list-tools
+```
+
 Este comando debe resumir:
 
 - el nombre del scaffold,
 - el comando de creación,
+- las opciones importantes como `force=true`,
+- las variantes técnicas relevantes del scaffold,
 - los artefactos principales que genera,
 - el cleanup asociado cuando aplique.
+
+Cobertura mínima esperada hoy:
+
+- `service-step`
+- `batch-process`
+- `export-manager`
+- `external-api-config`
+- `external-adapter`
+- `external-integration`
+- `cli-command`
 
 ## Modelo recomendado para versiones batch
 
@@ -214,6 +249,9 @@ El cleanup elimina, cuando existen:
 ### Caso 1: batch process nuevo
 
 1. crear el scaffold con `make create-batch-process`
+   Ejemplos:
+   - `make create-batch-process process_name="imputations" service_slug="imputations"`
+   - `make create-batch-process process_name="imputations" service_slug="imputations" pacing=true pacing_messages=100 pacing_interval=2`
 2. si hace falta confirmar parámetros o cleanup, correr `make list-scaffolds`
 2. ejecutar el seeder base secuencial
 3. ejecutar el seeder fanout si se quiere comparar rendimiento
@@ -245,6 +283,7 @@ El cleanup elimina, cuando existen:
 - Los requests de `test-batch-process` son genéricos; dependen de que el developer actualice las variables correctas.
 - Si un proceso tiene wiring manual fuera del patrón scaffold, el cleanup puede no capturarlo y requerir revisión manual.
 - `list-scaffolds` es un catálogo operativo, no una fuente dinámica; debe mantenerse sincronizado cuando aparezcan scaffolds nuevos.
+- `list-scaffolds` también debe mantenerse sincronizado cuando cambien opciones críticas como `force=true` o aparezcan variantes técnicas relevantes como `dispatch_pacing`, `pacing_messages` o `pacing_interval`.
 
 ## Troubleshooting
 

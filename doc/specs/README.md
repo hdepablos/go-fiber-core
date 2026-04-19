@@ -10,6 +10,49 @@ Estas specs no reemplazan la documentacion humana: la complementan.
 - Cada spec debe apuntar a codigo, pruebas o documentos humanos relacionados.
 - Ninguna spec debe duplicar una guia operativa completa; debe formalizar reglas verificables.
 
+## Metadata recomendada
+
+Las specs nuevas y las specs que se migren deben incluir metadata breve al inicio del archivo para mejorar:
+
+- la navegacion por dominio,
+- la trazabilidad con codigo y guias humanas,
+- la decision de que spec revisar segun el tipo de cambio,
+- y futuras automatizaciones de indices en `AGENTS.md` y este `README`.
+
+Campos minimos esperados:
+
+- `domain`
+- `summary`
+- `when_to_read`
+- `code_paths`
+- `related_info`
+
+Campos recomendados:
+
+- `related_specs`
+- `status`
+
+Ejemplo:
+
+```md
+---
+domain: api
+summary: Contrato documental minimo para endpoints HTTP, handlers, DTOs y requests Bruno.
+when_to_read:
+  - cambios en endpoints HTTP
+  - cambios en DTOs
+code_paths:
+  - internal/routes/
+  - internal/handlers/
+  - bruno/api/
+related_info:
+  - doc/info/api/http-endpoints-guide.md
+related_specs:
+  - doc/specs/documentation-governance-spec.md
+status: active
+---
+```
+
 ## Specs Disponibles
 
 ### Gobierno documental

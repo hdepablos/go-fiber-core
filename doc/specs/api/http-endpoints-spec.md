@@ -1,3 +1,24 @@
+---
+domain: api
+summary: Contrato documental mínimo para endpoints HTTP, handlers, DTOs y requests Bruno canónicos organizados por URL real.
+when_to_read:
+  - cambios en endpoints HTTP
+  - cambios en handlers o DTOs
+  - cambios en rutas o auth
+  - cambios en requests Bruno canónicos
+code_paths:
+  - internal/server/register_routes.go
+  - internal/routes/
+  - internal/handlers/
+  - internal/dtos/
+  - bruno/api/
+related_info:
+  - doc/info/api/http-endpoints-guide.md
+related_specs:
+  - doc/specs/documentation-governance-spec.md
+status: active
+---
+
 # HTTP Endpoints Spec
 
 ## Objetivo

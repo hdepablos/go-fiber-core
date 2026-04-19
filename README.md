@@ -45,6 +45,7 @@ La documentacion se divide en dos capas complementarias:
 - [Testing](doc/info/process-lifecycle/testing-guide.md)
 - [Batch Preview](doc/info/process-lifecycle/batch-preview-guide.md)
 - [Batch Fanout](doc/info/process-lifecycle/batch-fanout-guide.md)
+- [Dispatch Pacing](doc/info/process-lifecycle/dispatch-pacing-guide.md)
 - [Capacidad y Stress Batch](doc/info/process-lifecycle/batch-capacity-and-stress-guide.md)
 - [Riesgos Fanout](doc/info/process-lifecycle/batch-fanout-risks.md)
 

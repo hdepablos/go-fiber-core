@@ -89,7 +89,7 @@ Esto permite desarrollar una logica batch y verificar en el mismo request:
 - que mensajes generaria,
 - y como queda persistido realmente.
 
-Si el step `process_batch` tiene `dispatch_pacing`, la persistencia real del `apply_changes` tambien respeta esa configuracion.
+Si el step `process_batch` tiene `dispatch_pacing`, `apply_changes` simula esa configuración en la misma respuesta, sin esperar entre tandas.
 
 ### Alcance de `apply_changes`
 
@@ -106,17 +106,18 @@ Cuando `dispatch_pacing` está activo, la respuesta incluye:
 - `apply_changes_metadata.dispatch_pacing.enabled`
 - `apply_changes_metadata.dispatch_pacing.messages_per_interval`
 - `apply_changes_metadata.dispatch_pacing.interval_seconds`
+- `apply_changes_metadata.dispatch_pacing.mode`
 - `apply_changes_metadata.dispatch_pacing.chunk_count`
 - `apply_changes_metadata.dispatch_pacing.chunk_sizes`
 - `apply_changes_metadata.dispatch_pacing.waits_ms`
-- `apply_changes_metadata.dispatch_pacing.slots`
+- `apply_changes_metadata.dispatch_pacing.simulated`
 
 Esto permite validar desde Bruno:
 
 - cuántas tandas se ejecutaron,
 - qué tamaño tuvo cada tanda,
-- cuánto esperó cada una,
-- y qué ventanas Redis se usaron.
+- cuánto delay habría entre invocaciones,
+- y cómo quedaría particionado el trabajo real.
 
 ## Casos recomendados
 
@@ -239,6 +240,12 @@ Si quieres probar pacing:
 3. usar `interval_seconds` corto, por ejemplo `5`,
 4. correr `apply_changes=true` con `10` items,
 5. inspeccionar `apply_changes_metadata.dispatch_pacing`.
+
+Importante:
+
+- el preview no re-encola mensajes,
+- el preview no duerme entre tandas,
+- la metadata representa una simulación del `run` real.
 
 ## Trazabilidad
 
