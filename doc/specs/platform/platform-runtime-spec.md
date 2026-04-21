@@ -1,3 +1,27 @@
+---
+domain: platform
+summary: Contrato operativo mínimo para desarrollo, configuración y despliegue en modos local, Lambda y EKS, variables de entorno y cambio de modo.
+when_to_read:
+  - cambios en infraestructura o entornos de despliegue
+  - cambios en variables de entorno o configuración runtime
+  - cambios en modos de ejecución lambda o eks
+  - onboarding de DevOps o cambios en terraform o helm
+code_paths:
+  - terraform/
+  - k8s/
+  - docker-compose.yml
+  - .env
+related_info:
+  - doc/info/development/development-workflow.md
+  - doc/info/platform/devops-guide.md
+  - doc/info/platform/manage-env-vars.md
+  - doc/info/platform/eks-prerequisites.md
+  - doc/info/platform/hybrid-deployment.md
+related_specs:
+  - doc/specs/architecture/service-runtime-bootstrap-spec.md
+status: active
+---
+
 # Platform Runtime Spec
 
 ## Objetivo

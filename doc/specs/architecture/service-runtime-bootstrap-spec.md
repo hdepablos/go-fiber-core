@@ -1,3 +1,27 @@
+---
+domain: architecture
+summary: Reglas del runtime de servicios y scaffold de export managers para evitar globals, mantener dispatcher y providers resolubles por contexto.
+when_to_read:
+  - cambios en bootstrap HTTP o SQS
+  - cambios en dispatcher o providers de exportación
+  - cambios en runtimebootstrap
+  - scaffold de export managers o batch processes
+code_paths:
+  - internal/runtimebootstrap/bootstrap.go
+  - internal/services/runtimectx/
+  - internal/services/serviceconfig/executor.go
+  - cmd/api/main.go
+  - cmd/sqs-consumer/main.go
+  - cmd/tools/export-manager-scaffold/
+related_info:
+  - doc/info/development/service-runtime-and-scaffold.md
+  - doc/info/development/service-design-conventions.md
+related_specs:
+  - doc/specs/architecture/service-design-spec.md
+  - doc/specs/platform/platform-runtime-spec.md
+status: active
+---
+
 # Service Runtime Bootstrap Spec
 
 ## Objetivo

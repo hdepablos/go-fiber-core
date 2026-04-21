@@ -1,3 +1,22 @@
+---
+domain: documentation
+summary: Estructura documental oficial del repositorio, reglas de ubicación, clasificación, no duplicación y vinculación entre doc/info/ y doc/specs/.
+when_to_read:
+  - cambios en estructura de carpetas documentales
+  - creación de nuevos dominios documentales
+  - reorganización de índices o mapa documental
+  - cuando haya duda sobre dónde ubicar un documento nuevo
+code_paths:
+  - doc/info/
+  - doc/specs/
+  - README.md
+related_info:
+  - doc/info/README.md
+related_specs:
+  - doc/specs/documentation-defaults-spec.md
+status: active
+---
+
 # Documentation Governance Spec
 
 ## Objetivo

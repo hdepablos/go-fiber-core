@@ -1,3 +1,23 @@
+---
+domain: platform
+summary: Convención de runtime del logger por entorno, granularidad por proceso, tipos de log obligatorios y reglas de destino para producción y local.
+when_to_read:
+  - cambios en logger o logging estructurado
+  - nuevas implementaciones que necesiten logging
+  - cambios en tipos de log guard redis_guard rate_limit_guard execution_guard
+  - observabilidad de batch o integraciones HTTP
+code_paths:
+  - internal/logger/
+  - internal/logger/logger.go
+  - internal/logger/guard_logs.go
+related_info:
+  - doc/info/operations/logs.md
+related_specs:
+  - doc/specs/process-lifecycle/batch-observability-spec.md
+  - doc/specs/architecture/external-http-client-spec.md
+status: active
+---
+
 # Logger Runtime Spec
 
 ## Objetivo

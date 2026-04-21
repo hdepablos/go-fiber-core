@@ -1,3 +1,25 @@
+---
+domain: exports
+summary: Contratos y acceptance criteria para pipelines de exportación por lotes con exportmanager, redis, S3, cancelación operativa y auto-cancel.
+when_to_read:
+  - exports batch nuevos sobre exportmanager
+  - cambios en exportmanager.Manager
+  - cambios en registro de exports por execution_key
+  - cambios en auto-cancel de exports
+  - cambios en generación de archivos por lote
+code_paths:
+  - internal/services/exportmanager/
+  - internal/services/generar_archivo_banco_galicia/
+  - internal/services/test/bulkexportV2/
+related_info:
+  - doc/info/exports/exportmanager-bulkexport-v2.md
+  - doc/info/exports/exportmanager-generar-archivo-banco-galicia.md
+  - doc/info/exports/bulk-export-generate-file-v1-async.md
+related_specs:
+  - doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md
+status: active
+---
+
 # Export Pipelines Spec
 
 ## Objetivo

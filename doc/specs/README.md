@@ -55,6 +55,11 @@ status: active
 
 ## Specs Disponibles
 
+### Agents
+
+- [change-matrix.md](agents/change-matrix.md)
+- [conventions-index.md](agents/conventions-index.md)
+
 ### Gobierno documental
 
 - [documentation-governance-spec.md](documentation-governance-spec.md)

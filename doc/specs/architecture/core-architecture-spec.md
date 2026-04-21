@@ -1,3 +1,24 @@
+---
+domain: architecture
+summary: Reglas base de arquitectura transversal para autenticación por provider, resolución de secretos y consistencia con Redis locking.
+when_to_read:
+  - cambios en providers de autenticación
+  - cambios en estrategia de secretos o configuración
+  - cambios en estrategia de caché o locking Redis
+  - refactors transversales de arquitectura
+code_paths:
+  - internal/services/auth/
+  - internal/appconfig/
+related_info:
+  - doc/info/architecture/authentication-providers.md
+  - doc/info/architecture/configuration-secrets.md
+  - doc/info/architecture/redis-locking-strategy.md
+  - doc/info/architecture/process-architecture-evolution.md
+related_specs:
+  - doc/specs/architecture/service-design-spec.md
+status: active
+---
+
 # Core Architecture Spec
 
 ## Objetivo

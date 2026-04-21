@@ -1,3 +1,21 @@
+---
+domain: documentation
+summary: Comportamiento por defecto para documentar en el repositorio, separación info/specs, convenciones de clasificación por dominio y reglas de vinculación.
+when_to_read:
+  - ante cualquier solicitud de documentar, redocumentar o reorganizar
+  - cuando haya duda sobre si crear info, spec o ambos
+  - onboarding de nuevos colaboradores o agentes
+code_paths:
+  - doc/info/
+  - doc/specs/
+  - AGENTS.md
+related_info:
+  - doc/info/README.md
+related_specs:
+  - doc/specs/documentation-governance-spec.md
+status: active
+---
+
 # Documentation Defaults Spec
 
 ## Objetivo

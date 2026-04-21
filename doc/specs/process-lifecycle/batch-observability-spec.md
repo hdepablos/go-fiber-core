@@ -1,3 +1,26 @@
+---
+domain: process-lifecycle
+summary: Requisitos mínimos de observabilidad para batch con Redis, fanout y dependencias HTTP mediante log_type redis_guard, rate_limit_guard y execution_guard.
+when_to_read:
+  - cambios en observabilidad batch
+  - cambios en log_type redis_guard o rate_limit_guard
+  - cambios en auto-cancel o execution_guard
+  - stress test o análisis de capacidad batch
+  - cambios en adapters HTTP que participan en batch
+code_paths:
+  - internal/logger/guard_logs.go
+  - internal/services/batchflow/state_store.go
+  - internal/services/batchflow/throttle.go
+  - internal/adapters/
+related_info:
+  - doc/info/process-lifecycle/batch-capacity-and-stress-guide.md
+  - doc/info/operations/logs.md
+related_specs:
+  - doc/specs/process-lifecycle/batch-fanout-spec.md
+  - doc/specs/architecture/external-http-client-spec.md
+status: active
+---
+
 # Batch Observability Spec
 
 ## Objetivo
