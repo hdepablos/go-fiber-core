@@ -64,11 +64,12 @@ Debe aceptar al menos:
 Opcionales típicos:
 
 - `service_slug`
+- `mode`
+- `type_process`
 - `batch_size`
 - `concurrent_batches`
 - `parallel_shards`
 - `redis_ttl_hours`
-- `bulk_job_id`
 - `force`
 
 ### `delete-process`
@@ -97,6 +98,7 @@ Debe poder ejecutarse sin contexto adicional.
   - nombre del scaffold,
   - comando base de creación,
   - opciones importantes como `force=true` cuando existan,
+  - modos operativos relevantes como `bulk_jobs` cuando estén contemplados,
   - variantes técnicas relevantes del scaffold cuando existan,
   - resumen de artefactos generados,
   - cleanup o comandos relacionados cuando aplique.
@@ -114,6 +116,7 @@ Debe poder ejecutarse sin contexto adicional.
 
 El scaffold de export debe generar:
 
+- carpeta del servicio bajo `internal/services/exports/<service_slug>/`,
 - archivos del servicio export,
 - archivo de seeder,
 - wiring de imports requerido,
@@ -123,11 +126,31 @@ El scaffold de export debe generar:
 - request Bruno dedicado de `run`,
 - documentación humana base del export.
 
+Si el comando recibe `bulk_job_id > 0`, `make list-scaffolds` y la documentación humana deben explicar explícitamente la semántica del modo `bulk_jobs`:
+
+- `input.id = bulk_job_id`
+- `DataProvider` consulta `bulk_job_items`
+- `ParentLifecycle` opera sobre `bulk_jobs`
+- `OutputRegistrar` registra en `bulk_job_outputs`
+
 ### Batch process
 
 El scaffold de batch debe generar:
 
-- archivos del servicio batch,
+- carpeta del servicio bajo `internal/services/batchprocess/<service_slug>/`,
+- `provider.go`,
+- `runtime/provider_context.go`,
+- `data/provider.go`,
+- `processor/processor.go`,
+- `lifecycle/parent.go`,
+- `lifecycle/finalizer.go`,
+- `steps/start.go`,
+- `steps/dispatch_shards.go`,
+- `steps/process_batch.go`,
+- `steps/finalize.go`,
+- `steps/input.go`,
+- `steps/failure.go`,
+- `steps/helpers.go`,
 - archivo de seeder base secuencial,
 - archivo de seeder fanout,
 - wiring de imports requerido,
@@ -139,6 +162,21 @@ El scaffold de batch no debe requerir una carpeta Bruno específica por proceso.
 El scaffold debe usar un único `process_type` por negocio y separar el modo técnico a nivel de `process_version`.
 - La versión base debe usar como `execution_policy.label` el nombre del proceso de negocio sin sufijo técnico.
 - La versión fanout puede usar un label técnico explícito, por ejemplo `<process_name> fanout`.
+
+Cuando el scaffold base contemple semántica `bulk_jobs`, `make list-scaffolds` y la documentación humana deben explicarla explícitamente aunque el comando de creación no exponga un flag `bulk_job_id` propio:
+
+- `mode=generic` debe ser el comportamiento por defecto.
+- `mode=generic` debe generar templates compilables y comentados para adaptar otra tabla padre/hija sin asumir `bulk_jobs`.
+- `mode=bulk_jobs` debe generar el scaffold funcional base sobre `bulk_jobs` y `bulk_job_items` con la misma lógica operativa inicial que `punitorios`.
+- `type_process=item-oriented` debe ser el comportamiento por defecto del processor.
+- `type_process=item-oriented` debe exponer `processItemOriented(...)` como punto de extension.
+- `type_process=batch-oriented` debe exponer `processBatchOriented(...)` como punto de extension para trabajar el lote completo.
+
+- `input.id = bulk_job_id`
+- `DataProvider` consulta `bulk_job_items`
+- `ParentLifecycle` opera sobre `bulk_jobs`
+- `Finalize` calcula progreso y pendientes desde `bulk_job_items`
+- `ProcessBatch` actualiza `status_code`, `last_detail_message` y mensajes operativos de `bulk_job_items`
 
 ## Reglas de Bruno para batch
 
@@ -171,7 +209,8 @@ La colección genérica `test-batch-process` debe exponer ejemplos de:
 
 El cleanup debe remover, cuando existan:
 
-- carpeta del servicio
+- carpeta del servicio bajo `internal/services/batchprocess/<service_slug>/`
+- carpeta legacy `internal/services/<service_slug>/`
 - archivo de seeder
 - archivo de seeder fanout
 - import en `cmd/api/main.go`
@@ -185,7 +224,7 @@ El cleanup debe remover, cuando existan:
 
 El cleanup debe remover, cuando existan:
 
-- carpeta del servicio
+- carpeta del servicio bajo `internal/services/exports/<service_slug>/`
 - archivo de seeder
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`

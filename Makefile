@@ -190,13 +190,13 @@ create-step: ## 👣 Crea un nuevo servicio (Step) con boilerplate y auto-wiring
 	@echo "$(INFO)📝 Ahora edita el archivo generado para implementar tu lógica.$(RESET)"
 
 .PHONY: create-export-manager
-create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make create-export-manager process_name="generar archivo x" file="exports/x/y"
+create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make create-export-manager process_name="generar archivo x" [service_slug=generar_archivo_x] file="exports/x/y"
 	@if [ -z "$(process_name)" ]; then \
-		echo "$(ERROR)❌ Debes especificar process_name: make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\"$(RESET)"; \
+		echo "$(ERROR)❌ Debes especificar process_name: make create-export-manager process_name=\"generar archivo x\" [service_slug=generar_archivo_x] file=\"exports/x/y\"$(RESET)"; \
 		exit 1; \
 	fi
 	@if [ -z "$(file)" ]; then \
-		echo "$(ERROR)❌ Debes especificar file: make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\"$(RESET)"; \
+		echo "$(ERROR)❌ Debes especificar file: make create-export-manager process_name=\"generar archivo x\" [service_slug=generar_archivo_x] file=\"exports/x/y\"$(RESET)"; \
 		exit 1; \
 	fi
 	@echo "$(INFO)🚀 Generando scaffold exportmanager para $(process_name)...$(RESET)"
@@ -212,7 +212,7 @@ create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make cr
 	@echo "$(SUCCESS)✨ Scaffold exportmanager generado correctamente.$(RESET)"
 
 .PHONY: create-batch-process
-create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x] [pacing=true pacing_messages=100 pacing_interval=2]
+create-batch-process: ## 🧩 Genera un scaffold de batchflow. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x] [mode=generic|bulk_jobs] [type_process=item-oriented|batch-oriented] [pacing=true pacing_messages=100 pacing_interval=2]
 	@if [ -z "$(process_name)" ]; then \
 		echo "$(ERROR)❌ Debes especificar process_name: make create-batch-process process_name=\"procesar x\" [service_slug=procesar_x]$(RESET)"; \
 		exit 1; \
@@ -221,6 +221,8 @@ create-batch-process: ## 🧩 Genera un scaffold de batchflow generico. Uso: mak
 	@go run ./cmd/tools/batch-process-scaffold \
 		-process-name "$(process_name)" \
 		-service-slug "$(service_slug)" \
+		-mode "$(or $(mode),generic)" \
+		-type-process "$(or $(type_process),item-oriented)" \
 		-batch-size "$(or $(batch_size),500)" \
 		-concurrent-batches "$(or $(concurrent_batches),1)" \
 		-parallel-shards "$(or $(parallel_shards),4)" \
@@ -279,27 +281,52 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo "   Comando:"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\""
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" force=true"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" mode=bulk_jobs"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" type_process=batch-oriented"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" mode=bulk_jobs type_process=item-oriented"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" pacing=true pacing_messages=100 pacing_interval=2"
 	@echo ""
 	@echo "   Variantes:"
+	@echo "   - generic: modo por defecto; deja provider/processor/lifecycle comentados para adaptar otra tabla padre/hija"
+	@echo "   - type_process=item-oriented: default; el developer implementa processItemOriented(...)"
+	@echo "   - type_process=batch-oriented: el developer implementa processBatchOriented(...)"
 	@echo "   - sequential: version base generada automaticamente"
 	@echo "   - fanout: version companion _fanout generada automaticamente"
 	@echo "   - dispatch_pacing: variante opcional generable via pacing=true"
+	@echo "   - bulk_jobs: genera el scaffold funcional tipo punitorios sobre bulk_jobs/bulk_job_items"
+	@echo "     Implementacion esperada del modo bulk_jobs:"
+	@echo "     - input.id = bulk_job_id"
+	@echo "     - DataProvider consulta bulk_job_items por bulk_job_id"
+	@echo "     - ParentLifecycle opera sobre bulk_jobs"
+	@echo "     - Finalize calcula progreso y pendientes desde bulk_job_items"
+	@echo "     - ProcessBatch actualiza status y mensajes de bulk_job_items"
 	@echo ""
 	@echo "   Genera:"
 	@echo "   - provider.go"
-	@echo "   - steps.go"
-	@echo "   - data_provider.go"
-	@echo "   - processor.go"
-	@echo "   - lifecycle.go"
+	@echo "   - carpeta del servicio en internal/services/batchprocess/<service_slug>/"
+	@echo "   - runtime/provider_context.go"
+	@echo "   - data/provider.go"
+	@echo "   - processor/processor.go"
+	@echo "   - lifecycle/parent.go"
+	@echo "   - lifecycle/finalizer.go"
+	@echo "   - steps/start.go"
+	@echo "   - steps/dispatch_shards.go"
+	@echo "   - steps/process_batch.go"
+	@echo "   - steps/finalize.go"
+	@echo "   - steps/input.go"
+	@echo "   - steps/failure.go"
+	@echo "   - steps/helpers.go"
 	@echo "   - seeder base sequential"
 	@echo "   - seeder companion _fanout"
 	@echo ""
 	@echo "   Opciones importantes:"
+	@echo "   - mode=generic|bulk_jobs: generic es el default; bulk_jobs genera la base funcional tipo punitorios"
+	@echo "   - type_process=item-oriented|batch-oriented: define la estrategia del processor; item-oriented es el default"
 	@echo "   - force=true: regenera y sobrescribe archivos scaffold existentes"
 	@echo "   - pacing=true: agrega dispatch_pacing al step process_batch"
 	@echo "   - pacing_messages=<n>: items por invocacion cuando pacing=true"
 	@echo "   - pacing_interval=<1..10>: delay entre auto_invoke cuando pacing=true"
+	@echo "   - modo bulk_jobs: usar input.id como bulk_job_id al ejecutar preview/run y resolver la data desde bulk_job_items"
 	@echo ""
 	@echo "   Operaciones hijas sobre versiones existentes:"
 	@echo "   - make clone-process-version source_version_id=19 operator_id=1"
@@ -315,21 +342,46 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo ""
 	@echo "3. export-manager"
 	@echo "   Comando:"
-	@echo "   make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\""
-	@echo "   make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\" force=true"
+	@echo "   make create-export-manager process_name=\"generar archivo x\" service_slug=\"generar_archivo_x\" file=\"exports/x/y\""
+	@echo "   make create-export-manager process_name=\"generar archivo x\" service_slug=\"generar_archivo_x\" file=\"exports/x/y\" force=true"
+	@echo "   make create-export-manager process_name=\"generar archivo x\" service_slug=\"generar_archivo_x\" file=\"exports/x/y\" bulk_job_id=2"
+	@echo ""
+	@echo "   Variantes:"
+	@echo "   - service_slug: opcional; si no se envia, se deriva desde process_name"
+	@echo "   - item-oriented por contrato: el BodyBuilder delega la logica del registro en renderItem(...)"
+	@echo "   - preview y run reutilizan la misma ruta de render desde BodyBuilder.renderItem(...)"
+	@echo "   - layout default funcional: header/body/footer CSV con ';', columnas historicas y helper layout_helpers.go"
+	@echo "   - generico: deja provider/lifecycle/output para personalizar"
+	@echo "   - bulk_jobs: se activa con bulk_job_id=<id> y deja el scaffold funcional sobre bulk_jobs"
+	@echo "     Implementacion esperada del modo bulk_jobs:"
+	@echo "     - input.id = bulk_job_id"
+	@echo "     - DataProvider consulta bulk_job_items por bulk_job_id"
+	@echo "     - ParentLifecycle opera sobre bulk_jobs"
+	@echo "     - OutputRegistrar registra en bulk_job_outputs"
 	@echo ""
 	@echo "   Genera:"
+	@echo "   - carpeta del servicio en internal/services/exports/<service_slug>/"
 	@echo "   - provider.go"
-	@echo "   - steps.go"
-	@echo "   - data_provider.go"
-	@echo "   - layout.go"
-	@echo "   - lifecycle.go"
+	@echo "   - runtime/provider_context.go"
+	@echo "   - data/provider.go"
+	@echo "   - layout/header_builder.go"
+	@echo "   - layout/body_builder.go"
+	@echo "   - layout/footer_builder.go"
+	@echo "   - layout/layout_helpers.go"
+	@echo "   - lifecycle/parent.go"
+	@echo "   - lifecycle/output_registrar.go"
+	@echo "   - steps/start.go"
+	@echo "   - steps/process_batch.go"
+	@echo "   - steps/finalize.go"
+	@echo "   - steps/input.go"
+	@echo "   - steps/failure.go"
 	@echo "   - seeder"
 	@echo "   - request Bruno dedicado"
 	@echo "   - documentacion base"
 	@echo ""
 	@echo "   Opciones importantes:"
 	@echo "   - force=true: regenera y sobrescribe archivos generados si existen"
+	@echo "   - bulk_job_id=<id>: activa el modo bulk_jobs y genera el scaffold funcional sobre bulk_jobs/bulk_job_items"
 	@echo ""
 	@echo "   Cleanup:"
 	@echo "   make delete-process kind=export service_slug=generar_archivo_x"
@@ -403,7 +455,7 @@ list-tools: ## 🧰 Lista utilidades operativas agrupadas por dominio. Uso: make
 	@echo "   - make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\""
 	@echo "   - make clone-process-version source_version_id=19 operator_id=1 with_pacing=true pacing_messages=100 pacing_interval=2"
 	@echo "   - make add-process-pacing source_version_id=2 operator_id=1 pacing_messages=100 pacing_interval=2"
-	@echo "   - make create-export-manager process_name=\"generar archivo x\" file=\"exports/x/y\""
+	@echo "   - make create-export-manager process_name=\"generar archivo x\" service_slug=\"generar_archivo_x\" file=\"exports/x/y\""
 	@echo "   - make create-external-integration api_key=customer_api"
 	@echo "   - make create-command name=nuevoComando"
 	@echo ""

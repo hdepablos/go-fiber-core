@@ -35,11 +35,11 @@ Para un proceso batch nuevo, la convención recomendada es:
 
 Ejemplo:
 
-- `process_type`: `imputations`
-- seeder base: `batch_process_imputations`
-- seeder fanout: `batch_process_imputations_fanout`
-- label base recomendado: `imputations`
-- label fanout recomendado: `imputations fanout`
+- `process_type`: `mi_proceso`
+- seeder base: `batch_process_mi_proceso`
+- seeder fanout: `batch_process_mi_proceso_fanout`
+- label base recomendado: `mi_proceso`
+- label fanout recomendado: `mi_proceso fanout`
 
 Esto evita crear procesos de negocio distintos solo para representar una diferencia técnica de ejecución.
 
@@ -128,7 +128,7 @@ El step `process_batch` debe quedar con una configuración de este estilo:
   },
   "execution_policy": {
     "mode": "ASYNC",
-    "label": "imputations fanout",
+    "label": "mi_proceso fanout",
     "auto_invoke": {
       "enabled": true,
       "cursor_field": "batch_index",
@@ -327,7 +327,7 @@ Guía operativa:
 - `internal/services/batchflow/manager.go`
 - `internal/services/batchflow/state_store.go`
 - `internal/services/bulkprocess/steps.go`
-- `internal/services/punitorios/steps.go`
+- `internal/services/batchprocess/punitorios/steps/`
 - `cmd/sqs-consumer/main.go`
 - `doc/info/process-lifecycle/batch-fanout-risks.md`
 - `doc/specs/process-lifecycle/batch-fanout-spec.md`

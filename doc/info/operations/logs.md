@@ -77,7 +77,7 @@ log := logger.GetLogger("process-lifecycle")
 ```
 
 ```go
-log := logger.GetLoggerToFile("imputations", "pkg/logs/imputations-debug.log")
+log := logger.GetLoggerToFile("mi_proceso", "pkg/logs/mi_proceso-debug.log")
 ```
 
 Objetivo:

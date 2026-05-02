@@ -1,7 +1,7 @@
 meta {
-  name: run process
+  name: ProcessBatch
   type: http
-  seq: 3
+  seq: 24
 }
 
 post {
@@ -16,10 +16,12 @@ auth:bearer {
 
 body:json {
   {
-    "process_type_id": 20,
+    "process_type_id": 22,
     "sede_id": 0,
-    "override_process_version_id": 24,
+    "override_process_version_id": 26,
     "roadmap": 0,
-    "input": {}
+    "input": {
+      "id": 6
+    }
   }
 }

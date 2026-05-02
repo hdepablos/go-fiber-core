@@ -168,7 +168,7 @@ Reglas adicionales:
   - `internal/handlers/process_lifecycle_handler.go`
   - `internal/services/batchflow/contracts.go`
   - `internal/services/batchflow/preview_service.go`
-  - `internal/services/punitorios/provider.go`
+  - `internal/services/batchprocess/punitorios/provider.go`
 - Bruno:
   - `bruno/legacy/process-lifecycle/test-batch-process/`
 - Documentacion humana:

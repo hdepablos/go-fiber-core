@@ -281,8 +281,7 @@ No es el mecanismo principal cuando el problema real es:
   - `internal/services/batchflow/preview_service.go`
   - `internal/handlers/process_lifecycle_handler.go`
   - `internal/services/bulkprocess/steps.go`
-  - `internal/services/punitorios/steps.go`
-  - `internal/services/imputations/steps.go`
+  - `internal/services/batchprocess/punitorios/steps/`
 - Bruno:
   - `bruno/api/v1/process-lifecycle/post-batch-preview-apply-changes-pacing.bru`
   - `bruno/legacy/process-lifecycle/test-batch-process/preview - batch - item_ids - apply_changes.bru`

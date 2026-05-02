@@ -9,8 +9,7 @@ when_to_read:
   - cambios en generación de archivos por lote
 code_paths:
   - internal/services/exportmanager/
-  - internal/services/generar_archivo_banco_galicia/
-  - internal/services/test/bulkexportV2/
+  - internal/services/exports/bcra/
 related_info:
   - doc/info/exports/exportmanager-bulkexport-v2.md
   - doc/info/exports/exportmanager-generar-archivo-banco-galicia.md
@@ -58,7 +57,7 @@ Aplica a:
 - Si un export batch define `ParentLifecycle.Fail`, el auto-cancel debe poder invocarlo para dejar el padre en estado consistente sin esperar otro mensaje.
 - Para eso, el provider del export debe registrar su `Manager` en un registry central resuelto por `execution_key`.
 - No debe requerirse editar el consumer por cada export batch nuevo.
-- Los pipelines legacy que no usan `exportmanager.Manager`, como `bulkexportv1`, deben quedar documentados explícitamente como excepción hasta ser migrados.
+- Los pipelines legacy que no usan `exportmanager.Manager` deben quedar documentados explícitamente como excepción hasta ser migrados.
 
 ### 5. Filtros y datos
 

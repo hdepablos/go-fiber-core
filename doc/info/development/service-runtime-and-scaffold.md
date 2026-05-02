@@ -64,9 +64,7 @@ Ahora cada provider expone:
 
 Eso aplica a:
 
-- [provider.go](file:///private/var/www/go-fiber-core/internal/services/test/bulkexportv1/provider.go)
-- [provider.go](file:///private/var/www/go-fiber-core/internal/services/test/bulkexportV2/provider.go)
-- [provider.go](file:///private/var/www/go-fiber-core/internal/services/generar_archivo_banco_galicia/provider.go)
+- [provider.go](file:///private/var/www/go-fiber-core/internal/services/exports/bcra/provider.go)
 
 ### 5. Step services consumen dependencias del contexto
 
@@ -119,6 +117,7 @@ Ahora el scaffold genera:
 - `headerBuilder`, `bodyBuilder`, `footerBuilder` no exportados
 - `parentLifecycle` y `outputRegistrar` no exportados
 - constructores que devuelven interfaces del framework `exportmanager`
+- wiring runtime de export autocontenido, resolviendo AWS/S3 dentro del bloque del provider cuando aplica
 
 Para `batch-process`, el scaffold tambien:
 
@@ -126,7 +125,13 @@ Para `batch-process`, el scaffold tambien:
 - deja el proceso preparado para usar la carpeta Bruno genérica `test-batch-process`,
 - y evita crear una carpeta Bruno específica por proceso.
 
+Desde ahora `batch-process` expone dos modos:
+
+- `mode=generic`: default compilable para adaptar otra tabla padre/hija.
+- `mode=bulk_jobs`: base funcional sobre `bulk_jobs` y `bulk_job_items` con la lógica operativa inicial tipo `punitorios`.
+
 Adicionalmente existe un comando de cleanup para revertir el scaffold de procesos siguiendo el mismo patrón.
+Ese cleanup también normaliza `internal/runtimebootstrap/bootstrap.go` para no dejar variables de S3 huérfanas al borrar el último export.
 
 ## Beneficios practicos
 

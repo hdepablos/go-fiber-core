@@ -25,10 +25,9 @@ Y que el developer del caso concreto solo implemente la lógica funcional del ar
 - `ParentLifecycle`
 - `OutputRegistrar`
 
-El caso concreto montado actualmente sobre este framework es:
+Un caso concreto montado actualmente sobre este framework es:
 
-- `internal/services/test/bulkexportV2`
-- `internal/services/generar_archivo_banco_galicia`
+- `internal/services/exports/bcra`
 
 ## Infraestructura compartida
 
@@ -126,7 +125,7 @@ Objetivo:
 Regla práctica:
 
 - exports nuevos sobre `exportmanager` deben usar el registry central de managers;
-- `bulkexportv1` es legacy y no entra en este contrato hasta que migre a `exportmanager.Manager`.
+- cualquier pipeline legacy fuera de `exportmanager.Manager` debe documentarse explícitamente como excepción hasta migrarlo.
 
 Checklist para crear un export batch nuevo:
 
@@ -203,6 +202,13 @@ Contrato:
 Responsabilidad:
 
 - transformar cada registro en una o varias líneas del archivo
+- mantener la lógica item-oriented del export en un único punto reutilizable
+
+Punto de extensión recomendado:
+
+- `BuildBodyLines(ctx, execCtx, item)` conserva el contrato del framework
+- `BodyBuilder.renderItem(...)` concentra la transformación real del registro
+- preview y run deben reutilizar esa misma ruta para evitar divergencias entre test y ejecución real
 
 Contrato:
 
@@ -331,30 +337,30 @@ El framework usa estas keys base por corrida:
 - `runtime_keys`
   - registro interno de variables runtime para poder limpiarlas al final de la corrida
 
-## Caso concreto `bulkexportV2`
+## Caso concreto de referencia
 
 Carpeta:
 
-- [bulkexportV2](file:///private/var/www/go-fiber-core/internal/services/test/bulkexportV2)
+- [bcra](file:///private/var/www/go-fiber-core/internal/services/exports/bcra)
 
 ### Qué implementa hoy
 
-- `BulkJobDataProvider`
+- `DataProvider`
   - lee `bulk_job_items`
   - calcula `total_records`
   - calcula `total_amount`
-- `HardcodedHeaderBuilder`
+- `HeaderBuilder`
   - genera el header fijo actual
-- `JSONBodyBuilder`
+- `BodyBuilder`
   - transforma cada item JSON en línea CSV
-- `EmptyFooterBuilder`
-  - por ahora no genera líneas, pero ya puede leer runtime
-- `BulkJobLifecycle`
+- `FooterBuilder`
+  - genera el cierre final del archivo
+- `ParentLifecycle`
   - valida `IMPORTED`
   - cambia a `PROCESSING`
   - cambia a `PROCESSED`
   - maneja `ERROR_PROCESS`
-- `BulkJobOutputRegistrar`
+- `OutputRegistrar`
   - inserta el resultado final en `bulk_job_outputs`
 
 ## Generador de scaffold
@@ -371,8 +377,10 @@ Target de `make`:
 
 Si no se envía `bulk_job_id`, el scaffold:
 
-- genera el módulo bajo `internal/services/<service-slug>`
+- genera el módulo bajo `internal/services/exports/<service-slug>`
 - deja `DataProvider`, `ParentLifecycle` y `OutputRegistrar` con `TODOs`
+- deja `BodyBuilder.renderItem(...)` como punto de extensión recomendado para el render por registro
+- mantiene preview y run apoyados sobre la misma implementación de `BodyBuilder`
 - deja footer por defecto con la línea `footer`
 - documenta cómo eliminar ese footer si no aplica
 
@@ -381,7 +389,7 @@ Si no se envía `bulk_job_id`, el scaffold:
 Si se envía:
 
 ```bash
-make create-export-manager process_name="generar archivo banco galicia" file="exports/bank/galicia/manager-galicia" bulk_job_id=2
+make create-export-manager process_name="generar archivo banco galicia" service_slug="generar_archivo_banco_galicia" file="exports/bank/galicia/manager-galicia" bulk_job_id=2
 ```
 
 el scaffold queda funcional sobre `bulk_jobs`.
@@ -404,6 +412,8 @@ Eso significa:
 - `bulk_job_id` opcional
 
 ### Derivaciones automáticas
+
+Si no se envía `service_slug`, se deriva automáticamente desde `process_name`.
 
 - `label = process_name`
 - `next_step = bulk/export/<service-slug>/finalize`

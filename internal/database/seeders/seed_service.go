@@ -49,11 +49,8 @@ func ListSeedersNames() []string {
 		"multi_queue_batch_one_table_recreate_records",
 		"bulk_process_generic",
 		"bulk_process_generic_fanout",
-		"export_manager_generar_archivo_banco_galicia",
-		"batch_process_punitorios",
-		"batch_process_punitorios_fanout",
-		"batch_process_imputations",
-		"batch_process_imputations_fanout",
+		"batch_process_punitive",
+		"batch_process_punitive_fanout",
 		"all_menus",
 	}
 }
@@ -242,7 +239,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 	service.AddSeeder("catalog_items", func() error {
 		return CatalogItemsSeeder(pool)
 	})
-
 	// ═══════════════════════════════════════════════════════════════
 	// PHASE 2: Users (requires DI container for services)
 	// ═══════════════════════════════════════════════════════════════
@@ -250,7 +246,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 	service.AddSeeder("create_test_user", func() error {
 		return CreateUserSeeder(configPath)
 	})
-
 	// Example: Create additional users with different roles
 	// service.AddSeeder("create_coord_user", func() error {
 	//     return CreateUserSeederWithCustomData(configPath, "Coordinador", "coord@test.com", "coord123")
@@ -263,7 +258,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 	// service.AddSeeder("create_operator_user", func() error {
 	//     return CreateUserSeederWithCustomData(configPath, "Operador", "operator@test.com", "op123")
 	// })
-
 	// ═══════════════════════════════════════════════════════════════
 	// PHASE 3: Relationship Tables (depend on users and other entities)
 	// ═══════════════════════════════════════════════════════════════
@@ -273,7 +267,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 	service.AddSeeder("role_user", func() error {
 		return RoleUserSeeder(pool)
 	})
-
 	// Assign menus to users based on their role templates
 	// User 1 has role "Admin", so will get all 15 menus
 	// The seeder automatically:
@@ -283,7 +276,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 	service.AddSeeder("menu_user", func() error {
 		return MenuUserSeeder(pool)
 	})
-
 	// ═══════════════════════════════════════════════════════════════
 	// PHASE 4: Process lifecycle (versioned workflows)
 	// ═══════════════════════════════════════════════════════════════
@@ -324,24 +316,12 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return BulkProcessGenericFanoutSeeder(pool)
 	})
 
-	service.AddSeeder("export_manager_generar_archivo_banco_galicia", func() error {
-		return ExportManagerGenerarArchivoBancoGaliciaSeeder(pool)
+	service.AddSeeder("batch_process_punitive", func() error {
+		return BatchProcessPunitiveSeeder(pool)
 	})
 
-	service.AddSeeder("batch_process_punitorios", func() error {
-		return BatchProcessPunitoriosSeeder(pool)
-	})
-
-	service.AddSeeder("batch_process_punitorios_fanout", func() error {
-		return BatchProcessPunitoriosFanoutSeeder(pool)
-	})
-
-	service.AddSeeder("batch_process_imputations", func() error {
-		return BatchProcessImputationsSeeder(pool)
-	})
-
-	service.AddSeeder("batch_process_imputations_fanout", func() error {
-		return BatchProcessImputationsFanoutSeeder(pool)
+	service.AddSeeder("batch_process_punitive_fanout", func() error {
+		return BatchProcessPunitiveFanoutSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {

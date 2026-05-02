@@ -96,8 +96,10 @@ Uso:
 Ejemplos:
 
 - `make create-step name=folder/service_name`
-- `make create-export-manager process_name="generar archivo x" file="exports/x/y"`
+- `make create-export-manager process_name="generar archivo x" service_slug="generar_archivo_x" file="exports/x/y"`
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x"`
+- `make create-batch-process process_name="procesar x" service_slug="procesar_x" mode=bulk_jobs`
+- `make create-batch-process process_name="procesar x" service_slug="procesar_x" type_process=batch-oriented`
 - `make create-command name=nuevoComando`
 - `make list-scaffolds`
 - `make list-tools`
@@ -120,13 +122,18 @@ Notas:
 
 - `create-batch-process` ya no genera carpeta Bruno específica por proceso.
 - `create-batch-process` genera dos seeders: base `sequential` y companion `_fanout`.
+- `create-batch-process` usa `mode=generic` por default y soporta `mode=bulk_jobs` para generar la base funcional tipo `punitorios`.
+- `create-batch-process` usa `type_process=item-oriented` por default y soporta `type_process=batch-oriented` para modelar la estrategia del processor.
 - `create-batch-process force=true` permite regenerar un scaffold existente sobrescribiendo los archivos generados.
 - `create-batch-process` soporta además la variante técnica `dispatch_pacing` con `pacing=true`.
 - `create-batch-process pacing=true` acepta `pacing_messages` y `pacing_interval` para generar el config del `process_batch`.
 - `clone-process-version` y `add-process-pacing` se presentan en `list-scaffolds` como operaciones hijas del dominio `batch-process`, no como familias independientes.
 - `clone-process-version` es el comando genérico para obtener variantes nuevas como `fanout + pacing` o `sequential + pacing`.
 - `add-process-pacing` funciona como wrapper conveniente de `clone-process-version` con `with_pacing=true`.
+- `create-export-manager` acepta `service_slug` opcional; si no se envía, se deriva desde `process_name`.
 - `create-export-manager force=true` permite regenerar archivos existentes porque el `Makefile` ya propaga ese flag al scaffold.
+- `create-export-manager` mantiene un flujo `item-oriented`: `BuildBodyLines(...)` delega en `BodyBuilder.renderItem(...)`.
+- preview y run del export reutilizan la misma ruta de render por item, lo que permite testear el archivo sin duplicar lógica.
 - `list-scaffolds` funciona como catálogo humano de scaffolds disponibles y debe mantenerse sincronizado cuando se agreguen comandos nuevos de ese tipo.
 - El Makefile debe pasar booleanos en formato `-flag=false` para que `go run` no corte el parseo de argumentos antes de flags posteriores como `-force`.
 - `create-external-api-config` agrega una entrada `apis.xxx` en `internal/appconfig/config.yml`.

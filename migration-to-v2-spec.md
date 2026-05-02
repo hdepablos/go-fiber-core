@@ -242,8 +242,7 @@ when_to_read:
   - cambios en generación de archivos por lote
 code_paths:
   - internal/services/exportmanager/
-  - internal/services/generar_archivo_banco_galicia/
-  - internal/services/test/bulkexportV2/
+  - internal/services/exports/bcra/
 related_info:
   - doc/info/exports/exportmanager-bulkexport-v2.md
   - doc/info/exports/exportmanager-generar-archivo-banco-galicia.md

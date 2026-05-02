@@ -22,6 +22,7 @@ type processConfig struct {
 	ServiceSlug          string
 	PascalName           string
 	ImportPath           string
+	LegacyImportPaths    []string
 	SeedName             string
 	FanoutSeedName       string
 	SeederFuncName       string
@@ -79,6 +80,8 @@ func buildConfig(opts options) (processConfig, error) {
 
 	switch kind {
 	case "batch-process":
+		cfg.ImportPath = "go-fiber-core/internal/services/batchprocess/" + slug
+		cfg.LegacyImportPaths = []string{"go-fiber-core/internal/services/" + slug}
 		cfg.SeedName = "batch_process_" + slug
 		cfg.FanoutSeedName = "batch_process_" + slug + "_fanout"
 		cfg.SeederFuncName = "BatchProcess" + cfg.PascalName + "Seeder"
@@ -86,35 +89,47 @@ func buildConfig(opts options) (processConfig, error) {
 		cfg.RuntimeFieldName = cfg.PascalName
 		cfg.NeedsRuntimeWiring = true
 		cfg.FilesToDelete = []string{
-			filepath.Join(repoRoot, "internal/services", slug, "provider.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "steps.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "data_provider.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "processor.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "lifecycle.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "provider.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "runtime", "provider_context.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "data", "provider.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "processor", "processor.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "lifecycle", "parent.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "lifecycle", "finalizer.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "start.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "dispatch_shards.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "process_batch.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "finalize.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "input.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "failure.go"),
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "helpers.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_seeder.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_fanout_seeder.go"),
 			filepath.Join(repoRoot, "bruno/legacy/process-lifecycle", "RunProc -> "+slug+".bru"),
 		}
 		cfg.DirsToDelete = []string{
+			filepath.Join(repoRoot, "internal/services/batchprocess", slug),
 			filepath.Join(repoRoot, "internal/services", slug),
 			filepath.Join(repoRoot, "bruno/legacy/process-lifecycle/test-batch-process", slug),
 		}
 	case "export":
+		cfg.ImportPath = "go-fiber-core/internal/services/exports/" + slug
+		cfg.LegacyImportPaths = []string{"go-fiber-core/internal/services/" + slug}
 		cfg.SeedName = "export_manager_" + slug
 		cfg.SeederFuncName = "ExportManager" + cfg.PascalName + "Seeder"
 		cfg.RuntimeFieldName = cfg.PascalName
 		cfg.NeedsRuntimeWiring = true
 		cfg.FilesToDelete = []string{
-			filepath.Join(repoRoot, "internal/services", slug, "provider.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "steps.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "data_provider.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "layout.go"),
-			filepath.Join(repoRoot, "internal/services", slug, "lifecycle.go"),
+			filepath.Join(repoRoot, "internal/services/exports", slug, "provider.go"),
+			filepath.Join(repoRoot, "internal/services/exports", slug, "steps.go"),
+			filepath.Join(repoRoot, "internal/services/exports", slug, "data_provider.go"),
+			filepath.Join(repoRoot, "internal/services/exports", slug, "layout.go"),
+			filepath.Join(repoRoot, "internal/services/exports", slug, "lifecycle.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_seeder.go"),
 			filepath.Join(repoRoot, "doc/info", "exportmanager_"+slug+".md"),
 			filepath.Join(repoRoot, "bruno/process-lifecycle", "RunProc -> "+slug+".bru"),
 		}
 		cfg.DirsToDelete = []string{
+			filepath.Join(repoRoot, "internal/services/exports", slug),
 			filepath.Join(repoRoot, "internal/services", slug),
 		}
 	default:
@@ -125,11 +140,14 @@ func buildConfig(opts options) (processConfig, error) {
 }
 
 func cleanupProcess(cfg processConfig, dryRun bool) error {
-	if err := patchMainImports(filepath.Join(repoRoot, "cmd/api/main.go"), cfg.ImportPath, dryRun); err != nil {
-		return err
-	}
-	if err := patchMainImports(filepath.Join(repoRoot, "cmd/sqs-consumer/main.go"), cfg.ImportPath, dryRun); err != nil {
-		return err
+	importPaths := append([]string{cfg.ImportPath}, cfg.LegacyImportPaths...)
+	for _, importPath := range importPaths {
+		if err := patchMainImports(filepath.Join(repoRoot, "cmd/api/main.go"), importPath, dryRun); err != nil {
+			return err
+		}
+		if err := patchMainImports(filepath.Join(repoRoot, "cmd/sqs-consumer/main.go"), importPath, dryRun); err != nil {
+			return err
+		}
 	}
 	if cfg.NeedsRuntimeWiring {
 		if err := patchRuntimeBootstrap(cfg, dryRun); err != nil {
@@ -161,90 +179,112 @@ func cleanupProcess(cfg processConfig, dryRun bool) error {
 }
 
 func patchMainImports(filePath, importPath string, dryRun bool) error {
-	line := "\n\t_ " + fmt.Sprintf("%q", importPath)
-	return removeLiteral(filePath, line, dryRun)
+	pattern := regexp.MustCompile(`(?m)^\t_ "` + regexp.QuoteMeta(importPath) + `"\)?\s*$\n?`)
+	return removePattern(filePath, pattern, dryRun, true)
 }
 
 func patchSeedService(cfg processConfig, dryRun bool) error {
 	filePath := filepath.Join(repoRoot, "internal/database/seeders/seed_service.go")
-	listEntry := fmt.Sprintf("\n\t\t%q,", cfg.SeedName)
-	if err := removeLiteral(filePath, listEntry, dryRun); err != nil {
-		return err
-	}
-	fanoutListEntry := fmt.Sprintf("\n\t\t%q,", cfg.FanoutSeedName)
-	if err := removeLiteral(filePath, fanoutListEntry, dryRun); err != nil {
-		return err
-	}
+	listPattern := regexp.MustCompile(`(?m)^\t\t"` + regexp.QuoteMeta(cfg.SeedName) + `",\s*$\n?`)
+	fanoutListPattern := regexp.MustCompile(`(?m)^\t\t"` + regexp.QuoteMeta(cfg.FanoutSeedName) + `",\s*$\n?`)
+	funcPattern := regexp.MustCompile(`(?ms)\n\tservice\.AddSeeder\("` + regexp.QuoteMeta(cfg.SeedName) + `", func\(\) error \{\n\t\treturn ` + regexp.QuoteMeta(cfg.SeederFuncName) + `\(pool\)\n\t\}\)\n*`)
+	fanoutFuncPattern := regexp.MustCompile(`(?ms)\n\tservice\.AddSeeder\("` + regexp.QuoteMeta(cfg.FanoutSeedName) + `", func\(\) error \{\n\t\treturn ` + regexp.QuoteMeta(cfg.FanoutSeederFuncName) + `\(pool\)\n\t\}\)\n*`)
 
-	funcBlock := fmt.Sprintf(`
-	service.AddSeeder(%q, func() error {
-		return %s(pool)
-	})
-`, cfg.SeedName, cfg.SeederFuncName)
-	if err := removeLiteral(filePath, funcBlock, dryRun); err != nil {
-		return err
-	}
-	fanoutFuncBlock := fmt.Sprintf(`
-	service.AddSeeder(%q, func() error {
-		return %s(pool)
-	})
-`, cfg.FanoutSeedName, cfg.FanoutSeederFuncName)
-	return removeLiteral(filePath, fanoutFuncBlock, dryRun)
+	patterns := []*regexp.Regexp{listPattern, fanoutListPattern, funcPattern, fanoutFuncPattern}
+	return removePatternsAndNormalize(filePath, patterns, dryRun, false)
 }
 
 func patchRuntimeBootstrap(cfg processConfig, dryRun bool) error {
 	filePath := filepath.Join(repoRoot, "internal/runtimebootstrap/bootstrap.go")
-	importLine := "\n\t" + fmt.Sprintf("%q", cfg.ImportPath)
-	if err := removeLiteral(filePath, importLine, dryRun); err != nil {
-		return err
+	allImportPaths := append([]string{cfg.ImportPath}, cfg.LegacyImportPaths...)
+	quotedImports := make([]string, 0, len(allImportPaths))
+	for _, importPath := range allImportPaths {
+		quotedImports = append(quotedImports, regexp.QuoteMeta(importPath))
 	}
+	importPattern := regexp.MustCompile(`(?m)^\t"(?:` + strings.Join(quotedImports, "|") + `)"\)?\s*$\n?`)
+	fieldPattern := regexp.MustCompile(`(?m)^\t` + regexp.QuoteMeta(cfg.RuntimeFieldName) + `\s+` + regexp.QuoteMeta(cfg.ServiceSlug) + `\.Provider\s*$\n?`)
+	legacyBuildPattern := regexp.MustCompile(`(?ms)\n\tif prov, err := ` + regexp.QuoteMeta(cfg.ServiceSlug) + `\.NewProviderWithConfig\([^)]*\); err == nil \{\n\t\tdeps\.` + regexp.QuoteMeta(cfg.RuntimeFieldName) + ` = prov\n\t\} else \{\n\t\terrs = append\(errs, fmt\.Sprintf\("` + regexp.QuoteMeta(cfg.ServiceSlug) + `: %v", err\)\)\n\t\}\n*`)
+	markedBuildPattern := regexp.MustCompile(`(?ms)\n\t// scaffold:export-runtime-start:` + regexp.QuoteMeta(cfg.ServiceSlug) + `\n.*?\n\t// scaffold:export-runtime-end:` + regexp.QuoteMeta(cfg.ServiceSlug) + `\n*`)
+	injectPattern := regexp.MustCompile(`(?ms)\n\tif d\.` + regexp.QuoteMeta(cfg.RuntimeFieldName) + ` != nil \{\n\t\tctx = ` + regexp.QuoteMeta(cfg.ServiceSlug) + `\.WithProvider\(ctx, d\.` + regexp.QuoteMeta(cfg.RuntimeFieldName) + `\)\n\t\}\n*`)
 
-	fieldLine := fmt.Sprintf("\n\t%s  %s.Provider", cfg.RuntimeFieldName, cfg.ServiceSlug)
-	if err := removeLiteral(filePath, fieldLine, dryRun); err != nil {
-		altFieldLine := fmt.Sprintf("\n\t%s %s.Provider", cfg.RuntimeFieldName, cfg.ServiceSlug)
-		if err2 := removeLiteral(filePath, altFieldLine, dryRun); err2 != nil {
-			return err2
-		}
-	}
-
-	buildCall := fmt.Sprintf("%s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis)", cfg.ServiceSlug)
-	if cfg.Kind == "export" {
-		buildCall = fmt.Sprintf("%s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client)", cfg.ServiceSlug)
-	}
-	buildBlock := fmt.Sprintf(`
-	if prov, err := %s; err == nil {
-		deps.%s = prov
-	} else {
-		errs = append(errs, fmt.Sprintf(%q, err))
-	}
-`, buildCall, cfg.RuntimeFieldName, cfg.ServiceSlug+": %v")
-	if err := removeLiteral(filePath, buildBlock, dryRun); err != nil {
-		return err
-	}
-
-	injectBlock := fmt.Sprintf(`
-	if d.%s != nil {
-		ctx = %s.WithProvider(ctx, d.%s)
-	}
-`, cfg.RuntimeFieldName, cfg.ServiceSlug, cfg.RuntimeFieldName)
-	return removeLiteral(filePath, injectBlock, dryRun)
+	patterns := []*regexp.Regexp{importPattern, fieldPattern, legacyBuildPattern, markedBuildPattern, injectPattern}
+	return removePatternsAndNormalize(filePath, patterns, dryRun, true)
 }
 
-func removeLiteral(filePath, literal string, dryRun bool) error {
+func removePattern(filePath string, pattern *regexp.Regexp, dryRun bool, normalizeImports bool) error {
+	return removePatternsAndNormalize(filePath, []*regexp.Regexp{pattern}, dryRun, normalizeImports)
+}
+
+func removePatternsAndNormalize(filePath string, patterns []*regexp.Regexp, dryRun bool, normalizeImports bool) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("leyendo %s: %w", filePath, err)
 	}
-	fileStr := string(content)
-	if !strings.Contains(fileStr, literal) {
-		return nil
+	updated := string(content)
+	for _, pattern := range patterns {
+		updated = pattern.ReplaceAllString(updated, "")
 	}
-	updated := strings.Replace(fileStr, literal, "", 1)
+	if normalizeImports {
+		updated = normalizeImportBlock(updated)
+	}
+	if strings.Contains(filePath, "internal/database/seeders/seed_service.go") {
+		updated = normalizeSeedService(updated)
+	}
+	if strings.Contains(filePath, "internal/runtimebootstrap/bootstrap.go") {
+		updated = normalizeRuntimeBootstrap(updated)
+	}
 	if dryRun {
 		fmt.Printf("[dry-run] patch %s\n", filePath)
 		return nil
 	}
 	return os.WriteFile(filePath, []byte(updated), 0o644)
+}
+
+func normalizeImportBlock(fileStr string) string {
+	lines := strings.Split(fileStr, "\n")
+	importStart := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "import (" {
+			importStart = i
+			break
+		}
+	}
+	if importStart == -1 {
+		return fileStr
+	}
+	for i := importStart + 1; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		switch {
+		case trimmed == ")":
+			return strings.Join(lines, "\n")
+		case strings.Contains(trimmed, "\"") && strings.HasSuffix(trimmed, ")"):
+			lines[i] = strings.TrimSuffix(lines[i], ")")
+			lines = append(lines[:i+1], append([]string{")"}, lines[i+1:]...)...)
+			return strings.Join(lines, "\n")
+		case strings.HasPrefix(trimmed, "var ") || trimmed == "var (" || strings.HasPrefix(trimmed, "func "):
+			lines = append(lines[:i], append([]string{")"}, lines[i:]...)...)
+			return strings.Join(lines, "\n")
+		}
+	}
+	lines = append(lines, ")")
+	return strings.Join(lines, "\n")
+}
+
+func normalizeRuntimeBootstrap(fileStr string) string {
+	fileStr = strings.ReplaceAll(fileStr, "\t}\tif", "\t}\n\tif")
+	fileStr = strings.ReplaceAll(fileStr, "\t}\treturn", "\t}\n\treturn")
+	if !strings.Contains(fileStr, "NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client)") {
+		fileStr = regexp.MustCompile(`(?ms)\n\tawsSvc, err := queue\.NewAWSService\(ctx\)\n\tif err != nil \{\n\t\treturn deps, fmt\.Errorf\("runtime bootstrap aws: %w", err\)\n\t\}\n\ts3Client := awsSvc\.NewS3Client\(\)\n*`).ReplaceAllString(fileStr, "\n")
+	}
+	fileStr = regexp.MustCompile(`\n{3,}`).ReplaceAllString(fileStr, "\n\n")
+	return fileStr
+}
+
+func normalizeSeedService(fileStr string) string {
+	fileStr = regexp.MustCompile(`\}\)\s*service\.AddSeeder\(`).ReplaceAllString(fileStr, "})\n\n\tservice.AddSeeder(")
+	fileStr = regexp.MustCompile(`\}\)\s*//`).ReplaceAllString(fileStr, "})\n\t//")
+	fileStr = regexp.MustCompile(`\n{3,}`).ReplaceAllString(fileStr, "\n\n")
+	return fileStr
 }
 
 func removePath(path string) error {

@@ -24,7 +24,6 @@ import (
 
 	// Import services to register them
 	_ "go-fiber-core/internal/services/test"
-	_ "go-fiber-core/internal/services/test/bulkexportV2"
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 	_ "go-fiber-core/internal/services/test/mqb1t"
@@ -37,10 +36,7 @@ import (
 	"go.uber.org/zap"
 
 	_ "go-fiber-core/internal/services/bulkprocess"
-	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
-
-	_ "go-fiber-core/internal/services/imputations"
-	_ "go-fiber-core/internal/services/punitorios"
+	_ "go-fiber-core/internal/services/batchprocess/punitive"
 )
 
 var (

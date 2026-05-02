@@ -11,8 +11,7 @@ when_to_read:
 code_paths:
   - internal/services/batchflow/
   - internal/services/bulkprocess/steps.go
-  - internal/services/punitorios/steps.go
-  - internal/services/imputations/steps.go
+  - internal/services/batchprocess/punitorios/steps/
   - cmd/sqs-consumer/main.go
 related_info:
   - doc/info/process-lifecycle/batch-fanout-guide.md
@@ -205,7 +204,7 @@ Debe seguir siendo compatible con:
 - `internal/services/batchflow/manager.go`
 - `internal/services/batchflow/state_store.go`
 - `internal/services/bulkprocess/steps.go`
-- `internal/services/punitorios/steps.go`
+- `internal/services/batchprocess/punitorios/steps/`
 - `cmd/sqs-consumer/main.go`
 - `doc/info/process-lifecycle/batch-fanout-guide.md`
 - `doc/info/process-lifecycle/batch-fanout-risks.md`

@@ -28,9 +28,7 @@ La intencion es sostener un enfoque de Spec-Driven Development: primero se acuer
 
 El paquete compartido centraliza helpers que antes estaban repetidos en servicios y layouts, especialmente en:
 
-- `internal/services/generar_archivo_banco_galicia`
-- `internal/services/test/bulkexportV2`
-- `internal/services/test/bulkexportv1`
+- `internal/services/exports/bcra`
 - `internal/services/test/mqb1t`
 
 ## Especificacion

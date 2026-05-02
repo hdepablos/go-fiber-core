@@ -63,6 +63,7 @@ Todo target nuevo debe pertenecer a uno de estos dominios, salvo justificación 
 - Los comandos de scaffold o generación reutilizable deben evaluarse también para aparecer en un catálogo específico como `make list-scaffolds`.
 - Las utilidades operativas de uso humano frecuente deben evaluarse para aparecer en un catálogo resumido como `make list-tools`.
 - Si un scaffold soporta opciones operativas importantes como `force=true`, el catálogo debe mostrarlas.
+- Si un scaffold soporta modos funcionales relevantes, por ejemplo `mode=generic` o `mode=bulk_jobs`, el catálogo debe mostrarlos.
 - Si un scaffold tiene variantes técnicas relevantes, por ejemplo `sequential`, `fanout` o `dispatch_pacing`, el catálogo debe mostrarlas o referenciarlas claramente.
 - Si un scaffold expone parámetros funcionales de una variante técnica, por ejemplo `pacing_messages` o `pacing_interval`, el catálogo debe mostrarlos cuando sean parte del uso recomendado.
 - Si existe una herramienta operativa para versionar o parchear procesos existentes, por ejemplo `add-process-pacing`, el catálogo debe mostrarla junto con su comando base y parámetros críticos.

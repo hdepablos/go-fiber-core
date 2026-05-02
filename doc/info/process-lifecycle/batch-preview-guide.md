@@ -255,7 +255,7 @@ Importante:
   - `internal/services/batchflow/preview_service.go`
   - `internal/services/batchflow/dispatch_pacing.go`
   - `internal/utils/shared_helpers.go`
-  - `internal/services/punitorios/processor.go`
+  - `internal/services/batchprocess/punitorios/processor/processor.go`
 - Bruno:
   - `bruno/legacy/process-lifecycle/test-batch-process/`
 - Spec relacionada:

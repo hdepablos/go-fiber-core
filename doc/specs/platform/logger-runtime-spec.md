@@ -53,7 +53,7 @@ Ejemplos válidos:
 - `logger.GetLogger("punitorios")`
 - `logger.GetLogger("process-lifecycle")`
 - `logger.GetLogger("external-http-client")`
-- `logger.GetLoggerToFile("imputations", "pkg/logs/imputations-debug.log")`
+- `logger.GetLoggerToFile("mi_proceso", "pkg/logs/mi_proceso-debug.log")`
 
 ## Reglas de archivos locales
 

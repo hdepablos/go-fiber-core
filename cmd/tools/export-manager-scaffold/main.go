@@ -76,12 +76,21 @@ func main() {
 	}
 
 	files := map[string]string{
-		paths.providerFile:     renderProvider(data),
-		paths.stepsFile:        renderSteps(data),
-		paths.dataProviderFile: renderDataProvider(data),
-		paths.layoutFile:       renderLayout(data),
-		paths.lifecycleFile:    renderLifecycle(data),
-		paths.seederFile:       renderSeeder(data),
+		paths.providerFile:                 renderProvider(data),
+		paths.runtimeProviderContextFile:   renderRuntimeProviderContext(data),
+		paths.dataProviderFile:             renderDataProvider(data),
+		paths.layoutHeaderFile:             renderLayoutHeader(data),
+		paths.layoutBodyFile:               renderLayoutBody(data),
+		paths.layoutFooterFile:             renderLayoutFooter(data),
+		paths.layoutHelpersFile:            renderLayoutHelpers(data),
+		paths.lifecycleParentFile:          renderLifecycleParent(data),
+		paths.lifecycleOutputRegistrarFile: renderLifecycleOutputRegistrar(data),
+		paths.stepsStartFile:               renderStepStart(data),
+		paths.stepsProcessBatchFile:        renderStepProcessBatch(data),
+		paths.stepsFinalizeFile:            renderStepFinalize(data),
+		paths.stepsInputFile:               renderStepInput(data),
+		paths.stepsFailureFile:             renderStepFailure(data),
+		paths.seederFile:                   renderSeeder(data),
 	}
 	if opts.WithDoc {
 		files[paths.docFile] = renderDoc(data)
@@ -90,16 +99,21 @@ func main() {
 		files[paths.brunoFile] = renderBruno(data)
 	}
 
+	for path := range files {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			fatal(err)
+		}
+	}
 	for path, content := range files {
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			fatal(fmt.Errorf("escribiendo %s: %w", path, err))
 		}
 	}
 
-	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/api/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/%s"`, data.ServiceSlug)); err != nil {
+	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/api/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
 		fatal(err)
 	}
-	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/sqs-consumer/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/%s"`, data.ServiceSlug)); err != nil {
+	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/sqs-consumer/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
 		fatal(err)
 	}
 	if err := patchSeedService(data); err != nil {
@@ -124,34 +138,54 @@ func main() {
 	fmt.Println("1. Implementar DataProvider")
 	fmt.Println("2. Ajustar ParentLifecycle, incluyendo Fail para auto-cancel")
 	fmt.Println("3. Implementar OutputRegistrar")
-	fmt.Println("4. Verificar execution keys y registro automatico del manager")
-	fmt.Printf("5. Ejecutar el seeder: make seed-one name=%s\n", data.SeedName)
+	fmt.Println("4. Ajustar el layout default de header/body/footer si el archivo requiere otro formato")
+	fmt.Println("5. Probar preview y run, sabiendo que ambos reutilizan BodyBuilder.renderItem(...)")
+	fmt.Println("6. Verificar execution keys y registro automatico del manager")
+	fmt.Printf("7. Ejecutar el seeder: make seed-one name=%s\n", data.SeedName)
 }
 
 type generatedPaths struct {
-	serviceDir       string
-	providerFile     string
-	stepsFile        string
-	dataProviderFile string
-	layoutFile       string
-	lifecycleFile    string
-	seederFile       string
-	docFile          string
-	brunoFile        string
+	serviceDir                   string
+	providerFile                 string
+	runtimeProviderContextFile   string
+	dataProviderFile             string
+	layoutHeaderFile             string
+	layoutBodyFile               string
+	layoutFooterFile             string
+	layoutHelpersFile            string
+	lifecycleParentFile          string
+	lifecycleOutputRegistrarFile string
+	stepsStartFile               string
+	stepsProcessBatchFile        string
+	stepsFinalizeFile            string
+	stepsInputFile               string
+	stepsFailureFile             string
+	seederFile                   string
+	docFile                      string
+	brunoFile                    string
 }
 
 func scaffoldPaths(data scaffoldData) generatedPaths {
-	serviceDir := filepath.Join("/private/var/www/go-fiber-core/internal/services", data.ServiceSlug)
+	serviceDir := filepath.Join("/private/var/www/go-fiber-core/internal/services/exports", data.ServiceSlug)
 	return generatedPaths{
-		serviceDir:       serviceDir,
-		providerFile:     filepath.Join(serviceDir, "provider.go"),
-		stepsFile:        filepath.Join(serviceDir, "steps.go"),
-		dataProviderFile: filepath.Join(serviceDir, "data_provider.go"),
-		layoutFile:       filepath.Join(serviceDir, "layout.go"),
-		lifecycleFile:    filepath.Join(serviceDir, "lifecycle.go"),
-		seederFile:       filepath.Join("/private/var/www/go-fiber-core/internal/database/seeders", data.ServiceSlug+"_seeder.go"),
-		docFile:          filepath.Join("/private/var/www/go-fiber-core/doc/info", data.DocFileName),
-		brunoFile:        filepath.Join("/private/var/www/go-fiber-core/bruno/process-lifecycle", data.BrunoFileName),
+		serviceDir:                   serviceDir,
+		providerFile:                 filepath.Join(serviceDir, "provider.go"),
+		runtimeProviderContextFile:   filepath.Join(serviceDir, "runtime", "provider_context.go"),
+		dataProviderFile:             filepath.Join(serviceDir, "data", "provider.go"),
+		layoutHeaderFile:             filepath.Join(serviceDir, "layout", "header_builder.go"),
+		layoutBodyFile:               filepath.Join(serviceDir, "layout", "body_builder.go"),
+		layoutFooterFile:             filepath.Join(serviceDir, "layout", "footer_builder.go"),
+		layoutHelpersFile:            filepath.Join(serviceDir, "layout", "layout_helpers.go"),
+		lifecycleParentFile:          filepath.Join(serviceDir, "lifecycle", "parent.go"),
+		lifecycleOutputRegistrarFile: filepath.Join(serviceDir, "lifecycle", "output_registrar.go"),
+		stepsStartFile:               filepath.Join(serviceDir, "steps", "start.go"),
+		stepsProcessBatchFile:        filepath.Join(serviceDir, "steps", "process_batch.go"),
+		stepsFinalizeFile:            filepath.Join(serviceDir, "steps", "finalize.go"),
+		stepsInputFile:               filepath.Join(serviceDir, "steps", "input.go"),
+		stepsFailureFile:             filepath.Join(serviceDir, "steps", "failure.go"),
+		seederFile:                   filepath.Join("/private/var/www/go-fiber-core/internal/database/seeders", data.ServiceSlug+"_seeder.go"),
+		docFile:                      filepath.Join("/private/var/www/go-fiber-core/doc/info", data.DocFileName),
+		brunoFile:                    filepath.Join("/private/var/www/go-fiber-core/bruno/process-lifecycle", data.BrunoFileName),
 	}
 }
 
@@ -244,10 +278,19 @@ func buildScaffoldData(opts options) scaffoldData {
 func ensurePaths(paths generatedPaths, force bool) error {
 	all := []string{
 		paths.providerFile,
-		paths.stepsFile,
+		paths.runtimeProviderContextFile,
 		paths.dataProviderFile,
-		paths.layoutFile,
-		paths.lifecycleFile,
+		paths.layoutHeaderFile,
+		paths.layoutBodyFile,
+		paths.layoutFooterFile,
+		paths.layoutHelpersFile,
+		paths.lifecycleParentFile,
+		paths.lifecycleOutputRegistrarFile,
+		paths.stepsStartFile,
+		paths.stepsProcessBatchFile,
+		paths.stepsFinalizeFile,
+		paths.stepsInputFile,
+		paths.stepsFailureFile,
 		paths.seederFile,
 	}
 	all = append(all, paths.docFile, paths.brunoFile)
@@ -275,17 +318,42 @@ func patchImportBlock(filePath, importLine string) error {
 		return nil
 	}
 
-	start := strings.Index(fileStr, "import (")
-	if start == -1 {
+	lines := strings.Split(fileStr, "\n")
+	importStart := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "import (" {
+			importStart = i
+			break
+		}
+	}
+	if importStart == -1 {
 		return fmt.Errorf("no se encontro bloque import en %s", filePath)
 	}
-	rest := fileStr[start:]
-	end := strings.Index(rest, "\n)")
-	if end == -1 {
+
+	insertAt := -1
+	for i := importStart + 1; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		switch {
+		case trimmed == ")":
+			insertAt = i
+			i = len(lines)
+		case strings.Contains(trimmed, "\"") && strings.HasSuffix(trimmed, ")"):
+			lines[i] = strings.TrimSuffix(lines[i], ")")
+			insertAt = i + 1
+			lines = append(lines[:insertAt], append([]string{")"}, lines[insertAt:]...)...)
+			i = len(lines)
+		case strings.HasPrefix(trimmed, "var ") || trimmed == "var (" || strings.HasPrefix(trimmed, "func "):
+			insertAt = i
+			lines = append(lines[:insertAt], append([]string{")"}, lines[insertAt:]...)...)
+			i = len(lines)
+		}
+	}
+	if insertAt == -1 {
 		return fmt.Errorf("no se encontro cierre de imports en %s", filePath)
 	}
-	insertPos := start + end + 1
-	newContent := fileStr[:insertPos] + "\n\t" + importLine + fileStr[insertPos:]
+
+	lines = append(lines[:insertAt], append([]string{"\t" + importLine}, lines[insertAt:]...)...)
+	newContent := strings.Join(lines, "\n")
 	return os.WriteFile(filePath, []byte(newContent), 0o644)
 }
 
@@ -324,7 +392,7 @@ func patchRuntimeBootstrap(data scaffoldData) error {
 	}
 	fileStr := string(content)
 
-	importLine := fmt.Sprintf("%q", "go-fiber-core/internal/services/"+data.ServiceSlug)
+	importLine := fmt.Sprintf("%q", "go-fiber-core/internal/services/exports/"+data.ServiceSlug)
 	if !strings.Contains(fileStr, importLine) {
 		if patchErr := patchImportBlock(filePath, importLine); patchErr != nil {
 			return patchErr
@@ -353,12 +421,19 @@ func patchRuntimeBootstrap(data scaffoldData) error {
 	}
 
 	buildBlock := fmt.Sprintf(`
-	if prov, err := %s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client); err == nil {
-		deps.%s = prov
-	} else {
+	// scaffold:export-runtime-start:%s
+	if awsSvc, err := queue.NewAWSService(ctx); err != nil {
 		errs = append(errs, fmt.Sprintf(%q, err))
+	} else {
+		s3Client := awsSvc.NewS3Client()
+		if prov, err := %s.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client); err == nil {
+			deps.%s = prov
+		} else {
+			errs = append(errs, fmt.Sprintf(%q, err))
+		}
 	}
-`, data.PackageName, data.PascalName, data.ServiceSlug+": %v")
+	// scaffold:export-runtime-end:%s
+`, data.ServiceSlug, data.ServiceSlug+" aws: %v", data.PackageName, data.PascalName, data.ServiceSlug+": %v", data.ServiceSlug)
 	if !strings.Contains(fileStr, fmt.Sprintf("deps.%s = prov", data.PascalName)) {
 		anchor := "\tif len(errs) > 0 {"
 		if !strings.Contains(fileStr, anchor) {
@@ -373,11 +448,12 @@ func patchRuntimeBootstrap(data scaffoldData) error {
 	}
 `, data.PascalName, data.PackageName, data.PascalName)
 	if !strings.Contains(fileStr, fmt.Sprintf("d.%s != nil", data.PascalName)) {
-		anchor := "\treturn ctx"
-		if !strings.Contains(fileStr, anchor) {
+		anchor := "\n\treturn ctx\n}"
+		insertPos := strings.LastIndex(fileStr, anchor)
+		if insertPos == -1 {
 			return fmt.Errorf("no se encontro anchor de inject en runtimebootstrap")
 		}
-		fileStr = strings.Replace(fileStr, anchor, injectBlock+"\n"+anchor, 1)
+		fileStr = fileStr[:insertPos] + injectBlock + fileStr[insertPos:]
 	}
 
 	return os.WriteFile(filePath, []byte(fileStr), 0o644)
@@ -389,40 +465,45 @@ func renderProvider(data scaffoldData) string {
 import (
 	"context"
 	"fmt"
+
 	"go-fiber-core/internal/dtos/config"
 	"go-fiber-core/internal/dtos/connect"
+	serviceData "go-fiber-core/internal/services/exports/%s/data"
+	serviceLayout "go-fiber-core/internal/services/exports/%s/layout"
+	serviceLifecycle "go-fiber-core/internal/services/exports/%s/lifecycle"
+	serviceRuntime "go-fiber-core/internal/services/exports/%s/runtime"
+	serviceSteps "go-fiber-core/internal/services/exports/%s/steps"
 	"go-fiber-core/internal/services/exportmanager"
-	"go-fiber-core/internal/services/runtimectx"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/redis/go-redis/v9"
 )
 
-type Provider interface {
-	Manager() exportmanager.Manager
-	Connect() *connect.ConnectDTO
-}
+type Provider = serviceRuntime.Provider
 
+// provider arma el entrypoint del export y expone manager, conexiones y preview.
 type provider struct {
 	manager    exportmanager.Manager
 	conn       *connect.ConnectDTO
 	components exportmanager.PreviewComponents
 }
 
-const providerContextKey = %q
-
+// Manager devuelve el coordinador principal del flujo de exportacion.
 func (p *provider) Manager() exportmanager.Manager {
 	return p.manager
 }
 
+// Connect expone las conexiones por si otro componente del proceso las necesita.
 func (p *provider) Connect() *connect.ConnectDTO {
 	return p.conn
 }
 
+// PreviewComponents registra las piezas necesarias para preview y debugging del export.
 func (p *provider) PreviewComponents() exportmanager.PreviewComponents {
 	return p.components
 }
 
+// NewProviderWithConfig construye todo el grafo del export: lifecycle, data source, layout y registro final.
 func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, redisClient *redis.Client, s3Client *s3.Client) (Provider, error) {
 	if conn == nil || conn.ConnectGormWrite == nil || conn.ConnectGormRead == nil {
 		return nil, fmt.Errorf("connect dto invalido")
@@ -436,12 +517,12 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 
 	cache := exportmanager.NewRedisCache(redisClient)
 	stateStore := exportmanager.NewRedisStateStore(cache)
-	lifecycle := NewParentLifecycle(conn.ConnectGormRead, conn.ConnectGormWrite)
-	dataProvider := NewDataProvider(conn.ConnectGormRead)
-	headerBuilder := NewHeaderBuilder()
-	bodyBuilder := NewBodyBuilder()
-	footerBuilder := NewFooterBuilder()
-	outputRegistrar := NewOutputRegistrar(conn.ConnectGormWrite)
+	lifecycle := serviceLifecycle.NewParentLifecycle(conn.ConnectGormRead, conn.ConnectGormWrite)
+	dataProvider := serviceData.NewDataProvider(conn.ConnectGormRead)
+	headerBuilder := serviceLayout.NewHeaderBuilder()
+	bodyBuilder := serviceLayout.NewBodyBuilder()
+	footerBuilder := serviceLayout.NewFooterBuilder()
+	outputRegistrar := serviceLifecycle.NewOutputRegistrar(conn.ConnectGormWrite)
 	store := exportmanager.NewS3Store(s3Client)
 
 	defaultBucket := ""
@@ -475,20 +556,21 @@ func NewProviderWithConfig(appCfg *config.AppConfig, conn *connect.ConnectDTO, r
 	}, nil
 }
 
+// WithProvider inyecta el provider en el contexto para que lo consuman los steps.
 func WithProvider(ctx context.Context, prov Provider) context.Context {
-	return runtimectx.WithNamedValue(ctx, providerContextKey, prov)
+	return serviceRuntime.WithProvider(ctx, prov)
 }
 
+// ProviderFromContext recupera el provider del export desde el contexto de ejecucion.
 func ProviderFromContext(ctx context.Context) (Provider, error) {
-	if prov, ok := runtimectx.NamedValue[Provider](ctx, providerContextKey); ok && prov != nil {
-		return prov, nil
-	}
-	return nil, fmt.Errorf("provider no disponible en contexto")
+	return serviceRuntime.ProviderFromContext(ctx)
 }
 
 const processTypeName = %q
 
+// init registra el export en el runtime para run, preview y ejecucion administrada.
 func init() {
+	serviceSteps.Register()
 	exportmanager.RegisterPreviewProvider(processTypeName, func(ctx context.Context) (exportmanager.PreviewProvider, error) {
 		prov, err := ProviderFromContext(ctx)
 		if err != nil {
@@ -516,7 +598,842 @@ func init() {
 		%q,
 	)
 }
-`, data.PackageName, data.PackageName+".provider", data.PartPrefix, data.ProcessName, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.StartKey, data.ProcessBatchKey, data.FinalizeKey)
+`, data.PackageName, data.ServiceSlug, data.ServiceSlug, data.ServiceSlug, data.ServiceSlug, data.ServiceSlug, data.PartPrefix, data.ProcessName, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.StartKey, data.ProcessBatchKey, data.FinalizeKey)
+}
+
+func renderRuntimeProviderContext(data scaffoldData) string {
+	return fmt.Sprintf(`package runtime
+
+import (
+	"context"
+	"fmt"
+
+	"go-fiber-core/internal/dtos/connect"
+	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/services/runtimectx"
+)
+
+type Provider interface {
+	Manager() exportmanager.Manager
+	Connect() *connect.ConnectDTO
+}
+
+const providerContextKey = %q
+
+// WithProvider adjunta el provider del export al contexto actual.
+func WithProvider(ctx context.Context, prov Provider) context.Context {
+	return runtimectx.WithNamedValue(ctx, providerContextKey, prov)
+}
+
+// ProviderFromContext recupera el provider previamente inyectado para este export.
+func ProviderFromContext(ctx context.Context) (Provider, error) {
+	if prov, ok := runtimectx.NamedValue[Provider](ctx, providerContextKey); ok && prov != nil {
+		return prov, nil
+	}
+	return nil, fmt.Errorf("provider no disponible en contexto")
+}
+`, data.PackageName+".provider")
+}
+
+func renderLayoutHeader(data scaffoldData) string {
+	_ = data
+	return `package layout
+
+import (
+	"context"
+
+	"go-fiber-core/internal/services/exportmanager"
+)
+
+type headerBuilder struct{}
+
+// NewHeaderBuilder crea la pieza que construye el encabezado del archivo final.
+func NewHeaderBuilder() exportmanager.HeaderBuilder {
+	return &headerBuilder{}
+}
+
+// BuildHeader arma las primeras lineas del archivo usando el contexto global del export.
+func (b *headerBuilder) BuildHeader(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+	_ = execCtx
+
+	line, err := buildHeaderLine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []string{line}, nil
+}
+`
+}
+
+func renderLayoutBody(data scaffoldData) string {
+	_ = data
+	return `package layout
+
+import (
+	"context"
+	"encoding/json"
+
+	"go-fiber-core/internal/services/exportmanager"
+)
+
+type bodyBuilder struct{}
+
+// NewBodyBuilder crea la pieza que transforma cada item en lineas del cuerpo del archivo.
+func NewBodyBuilder() exportmanager.BodyBuilder {
+	return &bodyBuilder{}
+}
+
+// BuildBodyLines conserva el contrato del framework y delega la logica real del item en renderItem.
+func (b *bodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+	return b.renderItem(ctx, execCtx, item)
+}
+
+// renderItem es el punto de extension estandar del export.
+// Aqui el developer transforma un registro del batch en una o varias lineas del archivo.
+func (b *bodyBuilder) renderItem(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+	_ = execCtx
+
+	line, err := buildBodyLine(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+	return []string{line}, nil
+}
+`
+}
+
+func renderLayoutFooter(data scaffoldData) string {
+	_ = data
+	return `package layout
+
+import (
+	"context"
+
+	"go-fiber-core/internal/services/exportmanager"
+)
+
+type footerBuilder struct{}
+
+// NewFooterBuilder crea la pieza que construye el cierre del archivo.
+func NewFooterBuilder() exportmanager.FooterBuilder {
+	return &footerBuilder{}
+}
+
+// BuildFooter arma las lineas finales del archivo usando el Summary y el runtime del export.
+func (b *footerBuilder) BuildFooter(ctx context.Context, execCtx exportmanager.ExecutionContext) ([]string, error) {
+	_ = execCtx
+
+	line, err := buildFooterLine(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []string{line}, nil
+}
+`
+}
+
+func renderLayoutHelpers(data scaffoldData) string {
+	_ = data
+	bt := "`"
+	return fmt.Sprintf(`package layout
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"time"
+
+	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/utils"
+)
+
+var exportColumns = [5]string{
+	"amount",
+	"descount1",
+	"descount2",
+	"sweep_days",
+	"collection_file_id",
+}
+
+var csvHeader = append(
+	[]string{
+		"id",
+		"bulk_job_id",
+		"row_number",
+		"reference_key",
+		"status_code",
+		"last_detail_message",
+		"created_at",
+		"updated_at",
+	},
+	append(exportColumns[:], "new_importe")...,
+)
+
+type exportData struct {
+	fields     [5]string
+	newImporte string
+}
+
+type bulkItemPayload struct {
+	ID                int64                %sjson:"ID"%s
+	BulkJobID         int64                %sjson:"BulkJobID"%s
+	RowNumber         int                  %sjson:"RowNumber"%s
+	ReferenceKey      string               %sjson:"ReferenceKey"%s
+	StatusCode        models.BulkJobStatus %sjson:"StatusCode"%s
+	LastDetailMessage *string              %sjson:"LastDetailMessage"%s
+	CreatedAt         time.Time            %sjson:"CreatedAt"%s
+	UpdatedAt         time.Time            %sjson:"UpdatedAt"%s
+	Data              json.RawMessage      %sjson:"Data"%s
+}
+
+func buildHeaderLine(_ context.Context) (string, error) {
+	return utils.BuildCSVLine(csvHeader, ';')
+}
+
+func buildBodyLine(_ context.Context, item json.RawMessage) (string, error) {
+	var payload bulkItemPayload
+	if err := json.Unmarshal(item, &payload); err != nil {
+		return "", fmt.Errorf("unmarshal bulk item: %%w", err)
+	}
+
+	data, err := extractExportData(payload.Data)
+	if err != nil {
+		return "", fmt.Errorf("extract export data: %%w", err)
+	}
+
+	row, err := payload.toRow(data)
+	if err != nil {
+		return "", fmt.Errorf("build row: %%w", err)
+	}
+
+	line, err := utils.BuildCSVLine(row, ';')
+	if err != nil {
+		return "", fmt.Errorf("build body line: %%w", err)
+	}
+	return line, nil
+}
+
+func buildFooterLine(_ context.Context) (string, error) {
+	return utils.BuildCSVLine([]string{"footer"}, ';')
+}
+
+func (p *bulkItemPayload) lastDetail() string {
+	if p.LastDetailMessage != nil {
+		return *p.LastDetailMessage
+	}
+	return ""
+}
+
+func (p *bulkItemPayload) toRow(data exportData) ([]string, error) {
+	createdAt, err := utils.FormatDate(p.CreatedAt.Format(time.RFC3339), "YYYY-MM-DD HH:mm:ss")
+	if err != nil {
+		return nil, fmt.Errorf("format createdAt: %%w", err)
+	}
+
+	updatedAt, err := utils.FormatDate(p.UpdatedAt.Format(time.RFC3339), "DDMMYYYY")
+	if err != nil {
+		return nil, fmt.Errorf("format updatedAt: %%w", err)
+	}
+
+	return []string{
+		fmt.Sprintf("%%d", p.ID),
+		fmt.Sprintf("%%d", p.BulkJobID),
+		fmt.Sprintf("%%d", p.RowNumber),
+		p.ReferenceKey,
+		string(p.StatusCode),
+		p.lastDetail(),
+		createdAt,
+		updatedAt,
+		data.fields[0],
+		data.fields[1],
+		data.fields[2],
+		data.fields[3],
+		data.fields[4],
+		data.newImporte,
+	}, nil
+}
+
+func extractExportData(raw json.RawMessage) (exportData, error) {
+	fields, err := extractDataFields(raw)
+	if err != nil {
+		return exportData{}, err
+	}
+
+	newImporte, err := calcNewImporte(fields[0], fields[1], fields[2])
+	if err != nil {
+		return exportData{}, fmt.Errorf("calcular new_importe: %%w", err)
+	}
+
+	return exportData{
+		fields:     fields,
+		newImporte: newImporte,
+	}, nil
+}
+
+func calcNewImporte(amount, descount1, descount2 string) (string, error) {
+	amt, err := utils.ParseDecimal(amount)
+	if err != nil {
+		return "", fmt.Errorf("parsear amount %%q: %%w", amount, err)
+	}
+
+	result := amt - (utils.ParseDecimalOrZero(descount1) + utils.ParseDecimalOrZero(descount2))
+	return strconv.FormatFloat(result, 'f', -1, 64), nil
+}
+
+func extractDataFields(raw json.RawMessage) ([5]string, error) {
+	var fields [5]string
+
+	if len(raw) == 0 || string(raw) == "null" {
+		return fields, nil
+	}
+
+	if raw[0] == '"' {
+		var encoded string
+		if err := json.Unmarshal(raw, &encoded); err != nil {
+			return fields, fmt.Errorf("unmarshal string data: %%w", err)
+		}
+		if encoded == "" {
+			return fields, nil
+		}
+		if decoded, err := base64.StdEncoding.DecodeString(encoded); err == nil && len(decoded) > 0 {
+			return extractDataFields(json.RawMessage(decoded))
+		}
+		return extractDataFields(json.RawMessage(encoded))
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+
+	var data map[string]any
+	if err := dec.Decode(&data); err != nil {
+		return fields, fmt.Errorf("decode data object: %%w", err)
+	}
+
+	for i, key := range exportColumns {
+		fields[i] = utils.StringifyValue(data[key])
+	}
+	return fields, nil
+}
+`, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt, bt)
+}
+
+func renderLifecycleParent(data scaffoldData) string {
+	if data.UseBulkJobMode {
+		return `package lifecycle
+
+import (
+	"context"
+	"fmt"
+
+	"go-fiber-core/internal/domain"
+	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/services/exportmanager"
+
+	"gorm.io/gorm"
+)
+
+type parentLifecycle struct {
+	readDB  *gorm.DB
+	writeDB *gorm.DB
+}
+
+// NewParentLifecycle concentra los cambios de status del padre durante todo el export.
+func NewParentLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &parentLifecycle{readDB: readDB, writeDB: writeDB}
+}
+
+// Start valida el padre y lo mueve a PROCESSING antes de iniciar el export.
+func (l *parentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+	input := execCtx.Input
+	var job models.BulkJob
+	if err := l.readDB.WithContext(ctx).
+		Select("id", "status_code").
+		Where("id = ?", input.ParentID).
+		First(&job).Error; err != nil {
+		return err
+	}
+	if job.StatusCode != models.BulkJobStatusImported {
+		return fmt.Errorf("%w: Verifique el proceso con el id %d ya fue procesado actualmente con el status %s de la tabla bulk_jobs", domain.ErrBusinessRuleViolation, input.ParentID, job.StatusCode)
+	}
+	return l.writeDB.WithContext(ctx).
+		Model(&models.BulkJob{}).
+		Where("id = ?", input.ParentID).
+		Update("status_code", models.BulkJobStatusProcessing).Error
+}
+
+// End persiste el status final exitoso del padre cuando el archivo ya fue generado.
+func (l *parentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, _ exportmanager.OutputResult) error {
+	return l.writeDB.WithContext(ctx).
+		Model(&models.BulkJob{}).
+		Where("id = ?", execCtx.Input.ParentID).
+		Update("status_code", models.BulkJobStatusProcessed).Error
+}
+
+// Fail marca error de proceso en el padre cuando el export no puede completarse.
+func (l *parentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, _ error) error {
+	return l.writeDB.WithContext(ctx).
+		Model(&models.BulkJob{}).
+		Where("id = ?", execCtx.Input.ParentID).
+		Update("status_code", models.BulkJobStatusErrorProcess).Error
+}
+`
+	}
+	return `package lifecycle
+
+import (
+	"context"
+
+	"go-fiber-core/internal/services/exportmanager"
+
+	"gorm.io/gorm"
+)
+
+type parentLifecycle struct {
+	readDB  *gorm.DB
+	writeDB *gorm.DB
+}
+
+// NewParentLifecycle concentra los cambios de status del padre durante todo el export.
+func NewParentLifecycle(readDB, writeDB *gorm.DB) exportmanager.ParentLifecycle {
+	return &parentLifecycle{readDB: readDB, writeDB: writeDB}
+}
+
+// Start es el punto para validar la entidad padre y cambiar su status al iniciar.
+func (l *parentLifecycle) Start(ctx context.Context, execCtx exportmanager.ExecutionContext) error {
+	_ = ctx
+	_ = execCtx
+	_ = l.readDB
+	_ = l.writeDB
+
+	// TODO: cambiar el status del padre a PROCESSING.
+	return nil
+}
+
+// End persiste el status final exitoso del padre al cerrar el export.
+func (l *parentLifecycle) End(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+	_ = ctx
+	_ = execCtx
+	_ = output
+
+	// TODO: cambiar el status del padre a PROCESSED.
+	return nil
+}
+
+// Fail persiste el status de error del padre cuando el export no puede continuar.
+func (l *parentLifecycle) Fail(ctx context.Context, execCtx exportmanager.ExecutionContext, cause error) error {
+	_ = ctx
+	_ = execCtx
+	_ = cause
+
+	// TODO: cambiar el status del padre a ERROR_PROCESS.
+	return nil
+}
+`
+}
+
+func renderLifecycleOutputRegistrar(data scaffoldData) string {
+	if data.UseBulkJobMode {
+		return `package lifecycle
+
+import (
+	"context"
+	"encoding/json"
+
+	"go-fiber-core/internal/models"
+	"go-fiber-core/internal/services/exportmanager"
+
+	"gorm.io/gorm"
+)
+
+type outputRegistrar struct {
+	writeDB *gorm.DB
+}
+
+// NewOutputRegistrar crea la pieza que persiste el archivo final generado por el export.
+func NewOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &outputRegistrar{writeDB: writeDB}
+}
+
+// Register guarda la referencia final del archivo y su metadata operativa en la tabla destino.
+func (r *outputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+	metadata, err := json.Marshal(map[string]any{
+		"bucket":        output.Bucket,
+		"key":           output.Key,
+		"content_type":  output.ContentType,
+		"parts":         output.Parts,
+		"total_records": execCtx.Summary.TotalRecords,
+		"total_amount":  execCtx.Summary.TotalAmount,
+		"redis_key":     execCtx.Input.RedisKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	fileSize := output.FileSize
+	record := &models.BulkJobOutput{
+		BulkJobID: execCtx.Input.ParentID,
+		Type:      "csv",
+		FilePath:  output.Path,
+		FileSize:  &fileSize,
+		Status:    models.BulkJobOutputStatusGenerated,
+		Metadata:  metadata,
+	}
+	return r.writeDB.WithContext(ctx).Create(record).Error
+}
+`
+	}
+	return `package lifecycle
+
+import (
+	"context"
+
+	"go-fiber-core/internal/services/exportmanager"
+
+	"gorm.io/gorm"
+)
+
+type outputRegistrar struct {
+	writeDB *gorm.DB
+}
+
+// NewOutputRegistrar crea la pieza que persiste el archivo final generado por el export.
+func NewOutputRegistrar(writeDB *gorm.DB) exportmanager.OutputRegistrar {
+	return &outputRegistrar{writeDB: writeDB}
+}
+
+// Register es el punto donde se debe persistir el archivo final en la tabla o repositorio elegido.
+func (r *outputRegistrar) Register(ctx context.Context, execCtx exportmanager.ExecutionContext, output exportmanager.OutputResult) error {
+	_ = ctx
+	_ = execCtx
+	_ = output
+	_ = r.writeDB
+
+	// TODO: persistir el output final en la tabla o repositorio que corresponda.
+	return nil
+}
+`
+}
+
+func renderStepStart(data scaffoldData) string {
+	return fmt.Sprintf(`package steps
+
+import (
+	"fmt"
+	"time"
+
+	serviceRuntime "go-fiber-core/internal/services/exports/%s/runtime"
+	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/services/serviceconfig"
+	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
+)
+
+type StartStep struct {
+	ctx         *contracts.ServiceContext
+	servicePath string
+	batchSize   int
+	ttlHours    int
+	partPrefix  string
+}
+
+// Register publica los steps del export en el runtime de serviceconfig.
+func Register() {
+	serviceconfig.Register(%q, NewStartStep)
+	serviceconfig.Register(%q, NewProcessBatchStep)
+	serviceconfig.Register(%q, NewFinalizeStep)
+}
+
+// NewStartStep crea el step que prepara la corrida y reserva el estado temporal del export.
+func NewStartStep() contracts.Service {
+	return &StartStep{
+		batchSize: %d,
+		ttlHours:  %d,
+	}
+}
+
+// Init absorbe la configuracion del step definida en el seeder o version del proceso.
+func (s *StartStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+	s.ctx = ctx
+	s.servicePath = servicePath
+	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
+		if v, ok := s.ctx.CurrentStepConfig["batch_size"]; ok {
+			s.batchSize = utils.ToInt(v)
+		}
+		if v, ok := s.ctx.CurrentStepConfig["redis_ttl_hours"]; ok {
+			s.ttlHours = utils.ToInt(v)
+		}
+		if v, ok := s.ctx.CurrentStepConfig["part_prefix"]; ok {
+			if str, ok := v.(string); ok {
+				s.partPrefix = str
+			}
+		}
+	}
+}
+
+// Execute inicia el export, genera las claves runtime y deja listo el primer batch para procesar.
+func (s *StartStep) Execute() error {
+	prov, err := serviceRuntime.ProviderFromContext(s.ctx.Ctx)
+	if err != nil {
+		return err
+	}
+
+	input, err := buildStartInput(s.ctx)
+	if err != nil {
+		return err
+	}
+
+	res, err := prov.Manager().Start(s.ctx.Ctx, exportmanager.StartRequest{
+		Input:      input,
+		BatchSize:  s.batchSize,
+		RedisTTL:   time.Duration(s.ttlHours) * time.Hour,
+		S3Bucket:   fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
+		PartPrefix: s.partPrefix,
+	})
+	if err != nil {
+		markFailure(prov, s.ctx.Ctx, input, err)
+		return err
+	}
+
+	s.ctx.SetInputValue("id", input.ParentID)
+	s.ctx.SetInputValue("key_redis", res.RedisKey)
+	s.ctx.SetInputValue("batches_list_key", res.BatchesListKey)
+	s.ctx.SetInputValue("parts_list_key", res.PartsListKey)
+	s.ctx.SetInputValue("total_batches", res.TotalBatches)
+	s.ctx.SetInputValue("batch_index", 0)
+	s.ctx.SetInputValue("is_last_batch", false)
+	s.ctx.SetInputValue("s3_bucket", res.S3Bucket)
+	s.ctx.SetInputValue("part_prefix", res.PartPrefix)
+
+	s.ctx.SetResult(s.servicePath, contracts.StepResult{
+		Status:  "completed",
+		Message: "export manager start completado",
+		Data: map[string]any{
+			"key_redis":     res.RedisKey,
+			"id":            input.ParentID,
+			"total_batches": res.TotalBatches,
+		},
+	})
+	return nil
+}
+`, data.ServiceSlug, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.BatchSize, data.RedisTTLHours)
+}
+
+func renderStepProcessBatch(data scaffoldData) string {
+	return fmt.Sprintf(`package steps
+
+import (
+	"fmt"
+
+	serviceRuntime "go-fiber-core/internal/services/exports/%s/runtime"
+	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
+)
+
+type ProcessBatchStep struct {
+	ctx         *contracts.ServiceContext
+	servicePath string
+}
+
+// NewProcessBatchStep crea el step que procesa y sube cada parte temporal del archivo.
+func NewProcessBatchStep() contracts.Service {
+	return &ProcessBatchStep{}
+}
+
+// Init conserva el contexto necesario para resolver input y publicar el resultado del batch.
+func (s *ProcessBatchStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+	s.ctx = ctx
+	s.servicePath = servicePath
+}
+
+// Execute entrega el batch actual al manager para construir y almacenar una parte temporal del archivo.
+func (s *ProcessBatchStep) Execute() error {
+	prov, err := serviceRuntime.ProviderFromContext(s.ctx.Ctx)
+	if err != nil {
+		return err
+	}
+	input, err := buildInput(s.ctx)
+	if err != nil {
+		return err
+	}
+
+	res, err := prov.Manager().ProcessBatch(s.ctx.Ctx, exportmanager.ProcessBatchRequest{
+		Input:          input,
+		BatchesListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "batches_list_key")),
+		PartsListKey:   fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:       fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
+		PartPrefix:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "part_prefix", "")),
+		BatchIndex:     utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "batch_index", 0)),
+		TotalBatches:   utils.ToInt(utils.MustGetInputValue(s.ctx, "total_batches")),
+	})
+	if err != nil {
+		markFailure(prov, s.ctx.Ctx, input, err)
+		return err
+	}
+
+	s.ctx.SetResult(s.servicePath, contracts.StepResult{
+		Status:  "completed",
+		Message: "batch procesado",
+		Data: map[string]any{
+			"batch_index":     res.NextBatchIndex,
+			"is_last_batch":   res.IsLastBatch,
+			"processed_count": res.ProcessedCount,
+			"s3_part_key":     res.S3PartKey,
+		},
+	})
+	return nil
+}
+`, data.ServiceSlug)
+}
+
+func renderStepFinalize(data scaffoldData) string {
+	return fmt.Sprintf(`package steps
+
+import (
+	"fmt"
+
+	serviceRuntime "go-fiber-core/internal/services/exports/%s/runtime"
+	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
+)
+
+type FinalizeStep struct {
+	ctx         *contracts.ServiceContext
+	servicePath string
+	fileBase    string
+}
+
+// NewFinalizeStep crea el step encargado de unir partes y publicar el archivo final.
+func NewFinalizeStep() contracts.Service {
+	return &FinalizeStep{}
+}
+
+// Init absorbe la configuracion final del nombre base del archivo a generar.
+func (s *FinalizeStep) Init(ctx *contracts.ServiceContext, servicePath string) {
+	s.ctx = ctx
+	s.servicePath = servicePath
+	if s.ctx != nil && s.ctx.CurrentStepConfig != nil {
+		if v, ok := s.ctx.CurrentStepConfig["file"]; ok {
+			if str, ok := v.(string); ok {
+				s.fileBase = str
+			}
+		}
+	}
+}
+
+// Execute llama al manager.Finalize para ensamblar el archivo final y registrar su salida.
+func (s *FinalizeStep) Execute() error {
+	prov, err := serviceRuntime.ProviderFromContext(s.ctx.Ctx)
+	if err != nil {
+		return err
+	}
+	input, err := buildInput(s.ctx)
+	if err != nil {
+		return err
+	}
+
+	output, err := prov.Manager().Finalize(s.ctx.Ctx, exportmanager.FinalizeRequest{
+		Input:        input,
+		PartsListKey: fmt.Sprint(utils.MustGetInputValue(s.ctx, "parts_list_key")),
+		S3Bucket:     fmt.Sprint(utils.GetInputValueOrDefault(s.ctx, "s3_bucket", "")),
+		FileBase:     s.fileBase,
+		TotalParts:   utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_batches", 0)),
+	})
+	if err != nil {
+		markFailure(prov, s.ctx.Ctx, input, err)
+		return err
+	}
+
+	s.ctx.SetResult(s.servicePath, contracts.StepResult{
+		Status:  "completed",
+		Message: "archivo final generado",
+		Data: map[string]any{
+			"s3_final_key": output.Key,
+			"s3_file_path": output.Path,
+			"file_size":    output.FileSize,
+			"parts":        output.Parts,
+		},
+	})
+	return nil
+}
+`, data.ServiceSlug)
+}
+
+func renderStepInput(data scaffoldData) string {
+	_ = data
+	return `package steps
+
+import (
+	"fmt"
+
+	"go-fiber-core/internal/services/exportmanager"
+	"go-fiber-core/internal/services/serviceconfig/contracts"
+	"go-fiber-core/internal/utils"
+)
+
+// buildInput reconstruye el input comun que usan process_batch y finalize desde el contexto runtime.
+func buildInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
+	input := exportmanager.Input{
+		RedisKey: fmt.Sprint(utils.MustGetInputValue(ctx, "key_redis")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
+	}
+	if input.ParentID <= 0 {
+		return exportmanager.Input{}, fmt.Errorf("id invalido")
+	}
+	if input.RedisKey == "" {
+		return exportmanager.Input{}, fmt.Errorf("key_redis invalida")
+	}
+	if rawFilters, ok := ctx.GetInputValue("filters"); ok {
+		if filters, ok := rawFilters.(map[string]any); ok {
+			input.Filters = filters
+		}
+	}
+	return input, nil
+}
+
+// buildStartInput arma el input inicial del run antes de que exista key_redis obligatoria.
+func buildStartInput(ctx *contracts.ServiceContext) (exportmanager.Input, error) {
+	input := exportmanager.Input{
+		RedisKey: fmt.Sprint(utils.GetInputValueOrDefault(ctx, "key_redis", "")),
+		ParentID: utils.ToInt64(utils.MustGetInputValue(ctx, "id")),
+	}
+	if input.ParentID <= 0 {
+		return exportmanager.Input{}, fmt.Errorf("id invalido")
+	}
+	if rawFilters, ok := ctx.GetInputValue("filters"); ok {
+		if filters, ok := rawFilters.(map[string]any); ok {
+			input.Filters = filters
+		}
+	}
+	return input, nil
+}
+`
+}
+
+func renderStepFailure(data scaffoldData) string {
+	return fmt.Sprintf(`package steps
+
+import (
+	"context"
+	"errors"
+
+	"go-fiber-core/internal/domain"
+	serviceRuntime "go-fiber-core/internal/services/exports/%s/runtime"
+	"go-fiber-core/internal/services/exportmanager"
+)
+
+// markFailure centraliza el fallback de error para que todos los steps cambien el status del padre igual.
+func markFailure(prov serviceRuntime.Provider, ctx context.Context, input exportmanager.Input, err error) {
+	if errors.Is(err, domain.ErrBusinessRuleViolation) || errors.Is(err, domain.ErrInvalidArgument) {
+		return
+	}
+	_ = prov.Manager().Fail(ctx, input, err)
+}
+`, data.ServiceSlug)
 }
 
 func renderSteps(data scaffoldData) string {
@@ -773,7 +1690,7 @@ func init() {
 
 func renderDataProvider(data scaffoldData) string {
 	if data.UseBulkJobMode {
-		return fmt.Sprintf(`package %s
+		return `package data
 
 import (
 	"context"
@@ -791,10 +1708,12 @@ type dataProvider struct {
 	readDB *gorm.DB
 }
 
+// NewDataProvider crea el origen de datos que alimenta al manager con batches del export.
 func NewDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
 	return &dataProvider{readDB: readDB}
 }
 
+// LoadBatches define la fuente de datos, corta los lotes y prepara el Summary global del archivo.
 func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	input := execCtx.Input
 	if input.ParentID <= 0 {
@@ -804,6 +1723,7 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 		batchSize = 5000
 	}
 
+	// La consulta base define la fuente de datos del export.
 	query := p.readDB.WithContext(ctx).
 		Model(&models.BulkJobItem{}).
 		Select("id", "row_number", "reference_key", "data", "created_at", "updated_at").
@@ -823,6 +1743,7 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 		query = query.Where("status_code = ?", models.BulkJobStatusImported)
 	}
 
+	// Se carga el universo completo y luego se parte en batches en memoria.
 	var items []models.BulkJobItem
 	if err := query.Find(&items).Error; err != nil {
 		return exportmanager.LoadBatchesResult{}, err
@@ -834,6 +1755,7 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 
 	totalAmount := 0.0
 	for _, item := range items {
+		// Cada item se serializa para que el body builder lo consuma sin acoplarse a GORM.
 		payload, err := json.Marshal(map[string]any{
 			"id":            item.ID,
 			"row_number":    item.RowNumber,
@@ -855,6 +1777,7 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 		batches = append(batches, current)
 	}
 
+	// Runtime y Summary dejan los totales disponibles para header, footer y registro final.
 	if execCtx.Runtime != nil {
 		_ = execCtx.Runtime.Set(ctx, "total_records", len(items))
 		_ = execCtx.Runtime.Set(ctx, "total_amount", totalAmount)
@@ -876,9 +1799,9 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 		},
 	}, nil
 }
-`, data.PackageName)
+`
 	}
-	return fmt.Sprintf(`package %s
+	return fmt.Sprintf(`package data
 
 import (
 	"context"
@@ -893,10 +1816,12 @@ type dataProvider struct {
 	readDB *gorm.DB
 }
 
+// NewDataProvider crea el origen de datos que alimenta al manager con batches del export.
 func NewDataProvider(readDB *gorm.DB) exportmanager.DataProvider {
 	return &dataProvider{readDB: readDB}
 }
 
+// LoadBatches es el punto para consultar la fuente real del export y devolver batches + summary.
 func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.ExecutionContext, batchSize int) (exportmanager.LoadBatchesResult, error) {
 	_ = ctx
 	_ = execCtx
@@ -915,7 +1840,7 @@ func (p *dataProvider) LoadBatches(ctx context.Context, execCtx exportmanager.Ex
 	// Retorna batches + summary.
 	return exportmanager.LoadBatchesResult{}, fmt.Errorf("TODO: implement LoadBatches for process %%q", %q)
 }
-`, data.PackageName, data.ProcessName)
+`, data.ProcessName)
 }
 
 func renderLayout(data scaffoldData) string {
@@ -955,10 +1880,17 @@ func NewBodyBuilder() exportmanager.BodyBuilder {
 }
 
 func (b *bodyBuilder) BuildBodyLines(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
+	return b.renderItem(ctx, execCtx, item)
+}
+
+// renderItem es el punto de extension estandar del export.
+// Aqui el developer transforma un registro del batch en una o varias lineas del archivo.
+func (b *bodyBuilder) renderItem(ctx context.Context, execCtx exportmanager.ExecutionContext, item json.RawMessage) ([]string, error) {
 	_ = ctx
 	_ = execCtx
 
-	// TODO: transformar cada item en una o varias lineas del archivo.
+	// TODO: reemplazar esta implementacion por la transformacion real del item.
+	// El preview reutiliza este mismo BodyBuilder, por eso conviene mantener aqui toda la logica de render por registro.
 	line, err := utils.BuildCSVLine([]string{string(item)}, 0)
 	if err != nil {
 		return nil, err
@@ -1281,12 +2213,12 @@ func %s(pool *pgxpool.Pool) error {
 
 func renderDoc(data scaffoldData) string {
 	mode := "generico"
-	nextSteps := "1. Implementar `DataProvider`\n2. Implementar `ParentLifecycle`\n3. Implementar `OutputRegistrar`\n4. Personalizar `HeaderBuilder`, `BodyBuilder` y `FooterBuilder`\n"
+	nextSteps := "1. Implementar `DataProvider`\n2. Implementar `ParentLifecycle`\n3. Implementar `OutputRegistrar`\n4. Ajustar `layout/header_builder.go`, `layout/body_builder.go`, `layout/footer_builder.go` y `layout/layout_helpers.go` si el formato final difiere del default\n"
 	if data.UseBulkJobMode {
 		mode = fmt.Sprintf("bulk_jobs funcional (bulk_job_id=%d)", data.BulkJobID)
-		nextSteps = "1. Ajustar DataProvider si necesitas filtros adicionales\n2. Personalizar `HeaderBuilder`, `BodyBuilder` y `FooterBuilder`\n3. Ejecutar el seeder y probar con Bruno\n"
+		nextSteps = "1. Ajustar DataProvider si necesitas filtros adicionales\n2. Ajustar `layout/header_builder.go`, `layout/body_builder.go`, `layout/footer_builder.go` y `layout/layout_helpers.go` si el formato final difiere del default\n3. Ejecutar el seeder y probar con Bruno\n"
 	}
-	return fmt.Sprintf("# %s\n\n## Objetivo\n\nScaffold base generado automaticamente para montar un flujo sobre `exportmanager`.\n\n## Modo\n\n- `%s`\n\n## Execution Keys\n\n- `%s`\n- `%s`\n- `%s`\n\n## Config base\n\n- batch_size: %d\n- part_prefix: `%s`\n- redis_ttl_hours: %d\n- file: `%s`\n\n## Variables que recibe el developer\n\nTodos los servicios funcionales reciben:\n\n- `id`: id del padre de negocio\n- `key_redis`: key unica de la corrida\n\n## Runtime en Redis\n\nEl runtime permite compartir datos entre data/header/body/footer/end.\n\nEjemplo:\n\n- guardar `total_amount` en header\n- leer `total_amount` en footer\n\n## Siguientes pasos\n\n%s", data.ProcessName, mode, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.BatchSize, data.PartPrefix, data.RedisTTLHours, data.FileBase, nextSteps)
+	return fmt.Sprintf("# %s\n\n## Objetivo\n\nScaffold base generado automaticamente para montar un flujo sobre `exportmanager`.\n\n## Modo\n\n- `%s`\n- `item-oriented` por contrato: cada registro del batch se transforma desde `BodyBuilder.renderItem(...)`\n\n## Execution Keys\n\n- `%s`\n- `%s`\n- `%s`\n\n## Config base\n\n- batch_size: %d\n- part_prefix: `%s`\n- redis_ttl_hours: %d\n- file: `%s`\n\n## Variables que recibe el developer\n\nTodos los servicios funcionales reciben:\n\n- `id`: id del padre de negocio\n- `key_redis`: key unica de la corrida\n\n## Runtime en Redis\n\nEl runtime permite compartir datos entre data/header/body/footer/end.\n\nEjemplo:\n\n- guardar `total_amount` en header\n- leer `total_amount` en footer\n\n## Layout por defecto\n\n- `header`, `body` y `footer` salen funcionales desde el scaffold\n- usa CSV con separador `;`\n- incluye columnas históricas y cálculo de `new_importe`\n- concentra helpers compartidos en `layout/layout_helpers.go`\n\n## BodyBuilder\n\n- `BuildBodyLines(...)` mantiene el contrato del framework\n- `renderItem(...)` es el punto de extension recomendado para el developer\n- el preview reutiliza este mismo camino de render por item\n\n## Siguientes pasos\n\n%s", data.ProcessName, mode, data.StartKey, data.ProcessBatchKey, data.FinalizeKey, data.BatchSize, data.PartPrefix, data.RedisTTLHours, data.FileBase, nextSteps)
 }
 
 func renderBruno(data scaffoldData) string {
@@ -1373,10 +2305,19 @@ func toPascal(s string) string {
 func sortedFileList(paths generatedPaths, withDoc, withBruno bool) []string {
 	out := []string{
 		paths.providerFile,
-		paths.stepsFile,
+		paths.runtimeProviderContextFile,
 		paths.dataProviderFile,
-		paths.layoutFile,
-		paths.lifecycleFile,
+		paths.layoutHeaderFile,
+		paths.layoutBodyFile,
+		paths.layoutFooterFile,
+		paths.layoutHelpersFile,
+		paths.lifecycleParentFile,
+		paths.lifecycleOutputRegistrarFile,
+		paths.stepsStartFile,
+		paths.stepsProcessBatchFile,
+		paths.stepsFinalizeFile,
+		paths.stepsInputFile,
+		paths.stepsFailureFile,
 		paths.seederFile,
 	}
 	if withDoc {

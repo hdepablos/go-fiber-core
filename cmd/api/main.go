@@ -41,16 +41,11 @@ import (
 	_ "go-fiber-core/internal/services/test"
 
 	// Servicios de demo para escenarios seed de Process Lifecycle
-	_ "go-fiber-core/internal/services/test/bulkexportV2"
-	_ "go-fiber-core/internal/services/test/bulkexportv1"
 	_ "go-fiber-core/internal/services/test/common"
 	_ "go-fiber-core/internal/services/test/heavy"
 
 	_ "go-fiber-core/internal/services/bulkprocess"
-	_ "go-fiber-core/internal/services/generar_archivo_banco_galicia"
-
-	_ "go-fiber-core/internal/services/imputations"
-	_ "go-fiber-core/internal/services/punitorios"
+	_ "go-fiber-core/internal/services/batchprocess/punitive"
 )
 
 var fiberLambda *fiberadapter.FiberLambda

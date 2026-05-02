@@ -139,8 +139,8 @@ Crear carpetas por proceso vuelve a fragmentar el modelo y reintroduce mantenimi
 
 Evitar crear cosas como:
 
-- `imputations_sequential`
-- `imputations_fanout`
+- `mi_proceso_sequential`
+- `mi_proceso_fanout`
 
 como procesos de negocio distintos, si la lógica funcional es la misma.
 
