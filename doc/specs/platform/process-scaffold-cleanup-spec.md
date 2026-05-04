@@ -66,6 +66,7 @@ Opcionales típicos:
 - `service_slug`
 - `mode`
 - `type_process`
+- `source_mode`
 - `batch_size`
 - `concurrent_batches`
 - `parallel_shards`
@@ -153,6 +154,7 @@ El scaffold de batch debe generar:
 - `steps/helpers.go`,
 - archivo de seeder base secuencial,
 - archivo de seeder fanout,
+- archivo de seeder cursor,
 - wiring de imports requerido,
 - wiring en `runtimebootstrap`,
 - `ParentLifecycle.Fail(...)` en el template base,
@@ -171,6 +173,24 @@ Cuando el scaffold base contemple semántica `bulk_jobs`, `make list-scaffolds` 
 - `type_process=item-oriented` debe ser el comportamiento por defecto del processor.
 - `type_process=item-oriented` debe exponer `processItemOriented(...)` como punto de extension.
 - `type_process=batch-oriented` debe exponer `processBatchOriented(...)` como punto de extension para trabajar el lote completo.
+- `source_mode=materialized` debe ser el comportamiento por defecto del runtime batch.
+- `source_mode=materialized` debe mantener la preparación clásica que materializa batches en Redis durante `start`.
+- `source_mode=cursor` debe exponer el contrato incremental del manager compartido y generar la versión técnica companion `_cursor`.
+- `source_mode=cursor` debe dejar `parallel_shards=1` en su versión generada hasta que exista un contrato distribuido específico para cursores.
+- El scaffold batch debe dejar explícita, en documentación humana y normativa, la diferencia entre:
+  - `source_mode`, como estrategia de carga;
+  - `execution_mode`, como estrategia de reparto;
+  - `auto_invoke`, como estrategia de continuidad.
+- El scaffold batch debe reflejar como perfiles técnicos vigentes, al menos:
+  - `materialized sequential`
+  - `materialized fanout`
+  - `cursor sequential`
+- El scaffold batch no debe presentar `cursor + fanout` como capacidad ya soportada.
+- Si se documenta una fase futura de `cursor + fanout`, debe quedar explicitado que requiere una estrategia distribuida nueva, por ejemplo:
+  - shard por rangos de IDs;
+  - shard por ventanas fijas;
+  - lease de páginas desde Redis/DB;
+  - cursor independiente por shard.
 
 - `input.id = bulk_job_id`
 - `DataProvider` consulta `bulk_job_items`
@@ -213,6 +233,7 @@ El cleanup debe remover, cuando existan:
 - carpeta legacy `internal/services/<service_slug>/`
 - archivo de seeder
 - archivo de seeder fanout
+- archivo de seeder cursor
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
 - wiring en `internal/runtimebootstrap/bootstrap.go`
@@ -240,7 +261,9 @@ El cleanup debe remover, cuando existan:
 - El cleanup no debe borrar documentación o wiring de otros procesos.
 - El scaffold batch no debe generar nuevas carpetas Bruno específicas por proceso.
 - El scaffold batch debe producir un seeder base `sequential` y un seeder adicional `_fanout`.
+- El scaffold batch debe producir además un seeder `_cursor` para la variante incremental.
 - Los seeders base y fanout deben apuntar al mismo `process_type`.
+- El seeder `_cursor` debe apuntar al mismo `process_type` y crear otra `process_version`, no otro `process_type`.
 - `force=true` debe permitir sobrescribir el scaffold existente.
 - El scaffold batch debe poder generar `dispatch_pacing` cuando se solicite explícitamente con parámetros del comando.
 - Si el scaffold batch genera `dispatch_pacing`, debe reflejarlo en el `config` del step `process_batch` sin requerir edición manual mínima para el caso base.

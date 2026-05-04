@@ -1,7 +1,6 @@
 make seed-one name=process_lifecycle_manager \
 && make seed-one name=test_process_scenarios \
 && make seed-one name=process_lifecycle_auto_invoke \
-&& make seed-one name=bulk_export_generate_file_v2 \
 && make seed-one name=multi_queue_batch_one_table_process_lifecycle \
 && make seed-one name=multi_queue_batch_one_table_recreate_records \
 && make seed-one name=bulk_process_generic \

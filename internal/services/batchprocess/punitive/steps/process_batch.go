@@ -59,6 +59,7 @@ func (s *processBatchStep) Execute() error {
 		ShardIndex:        utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "shard_index", 0)),
 		TotalShards:       utils.ToInt(utils.GetInputValueOrDefault(s.ctx, "total_shards", 1)),
 		DispatchPacing:    s.dispatchPacing,
+		SourceMode:        resolveSourceMode(s.ctx),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)

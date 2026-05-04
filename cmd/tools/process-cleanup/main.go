@@ -25,8 +25,10 @@ type processConfig struct {
 	LegacyImportPaths    []string
 	SeedName             string
 	FanoutSeedName       string
+	CursorSeedName       string
 	SeederFuncName       string
 	FanoutSeederFuncName string
+	CursorSeederFuncName string
 	RuntimeFieldName     string
 	FilesToDelete        []string
 	DirsToDelete         []string
@@ -84,8 +86,10 @@ func buildConfig(opts options) (processConfig, error) {
 		cfg.LegacyImportPaths = []string{"go-fiber-core/internal/services/" + slug}
 		cfg.SeedName = "batch_process_" + slug
 		cfg.FanoutSeedName = "batch_process_" + slug + "_fanout"
+		cfg.CursorSeedName = "batch_process_" + slug + "_cursor"
 		cfg.SeederFuncName = "BatchProcess" + cfg.PascalName + "Seeder"
 		cfg.FanoutSeederFuncName = "BatchProcess" + cfg.PascalName + "FanoutSeeder"
+		cfg.CursorSeederFuncName = "BatchProcess" + cfg.PascalName + "CursorSeeder"
 		cfg.RuntimeFieldName = cfg.PascalName
 		cfg.NeedsRuntimeWiring = true
 		cfg.FilesToDelete = []string{
@@ -104,6 +108,7 @@ func buildConfig(opts options) (processConfig, error) {
 			filepath.Join(repoRoot, "internal/services/batchprocess", slug, "steps", "helpers.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_seeder.go"),
 			filepath.Join(repoRoot, "internal/database/seeders", slug+"_fanout_seeder.go"),
+			filepath.Join(repoRoot, "internal/database/seeders", slug+"_cursor_seeder.go"),
 			filepath.Join(repoRoot, "bruno/legacy/process-lifecycle", "RunProc -> "+slug+".bru"),
 		}
 		cfg.DirsToDelete = []string{
@@ -187,10 +192,12 @@ func patchSeedService(cfg processConfig, dryRun bool) error {
 	filePath := filepath.Join(repoRoot, "internal/database/seeders/seed_service.go")
 	listPattern := regexp.MustCompile(`(?m)^\t\t"` + regexp.QuoteMeta(cfg.SeedName) + `",\s*$\n?`)
 	fanoutListPattern := regexp.MustCompile(`(?m)^\t\t"` + regexp.QuoteMeta(cfg.FanoutSeedName) + `",\s*$\n?`)
+	cursorListPattern := regexp.MustCompile(`(?m)^\t\t"` + regexp.QuoteMeta(cfg.CursorSeedName) + `",\s*$\n?`)
 	funcPattern := regexp.MustCompile(`(?ms)\n\tservice\.AddSeeder\("` + regexp.QuoteMeta(cfg.SeedName) + `", func\(\) error \{\n\t\treturn ` + regexp.QuoteMeta(cfg.SeederFuncName) + `\(pool\)\n\t\}\)\n*`)
 	fanoutFuncPattern := regexp.MustCompile(`(?ms)\n\tservice\.AddSeeder\("` + regexp.QuoteMeta(cfg.FanoutSeedName) + `", func\(\) error \{\n\t\treturn ` + regexp.QuoteMeta(cfg.FanoutSeederFuncName) + `\(pool\)\n\t\}\)\n*`)
+	cursorFuncPattern := regexp.MustCompile(`(?ms)\n\tservice\.AddSeeder\("` + regexp.QuoteMeta(cfg.CursorSeedName) + `", func\(\) error \{\n\t\treturn ` + regexp.QuoteMeta(cfg.CursorSeederFuncName) + `\(pool\)\n\t\}\)\n*`)
 
-	patterns := []*regexp.Regexp{listPattern, fanoutListPattern, funcPattern, fanoutFuncPattern}
+	patterns := []*regexp.Regexp{listPattern, fanoutListPattern, cursorListPattern, funcPattern, fanoutFuncPattern, cursorFuncPattern}
 	return removePatternsAndNormalize(filePath, patterns, dryRun, false)
 }
 

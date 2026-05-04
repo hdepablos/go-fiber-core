@@ -65,6 +65,26 @@ Sintetiza el dominio descrito en:
 - El motor debe soportar escenarios secuenciales y asincronos dentro del mismo modelo mental.
 - La validacion de precondiciones debe ser declarativa siempre que sea posible.
 - Los errores deben poder clasificarse entre regla de negocio, configuracion y fallo tecnico.
+- Para procesos batch montados sobre `batchflow`, el runtime debe soportar al menos `source_mode=materialized` y `source_mode=cursor`.
+- `source_mode=materialized` puede materializar todos los batches en Redis durante `start`.
+- `source_mode=cursor` debe permitir preparar la corrida sin materializar todo el universo y avanzar el cursor desde `runtime values`.
+- `source_mode=cursor` debe seguir siendo compatible con cancelacion operativa, auto-cancel y `dispatch_pacing`.
+- Mientras no exista un contrato distribuido especifico para cursores, `source_mode=cursor` no debe depender de `parallel_shards > 1`.
+- El runtime debe distinguir explícitamente entre:
+  - `source_mode`, como estrategia de carga de datos;
+  - `execution_mode`, como estrategia de reparto;
+  - `auto_invoke`, como estrategia de continuidad entre invocaciones.
+- El runtime debe soportar hoy, como mínimo, estas combinaciones:
+  - `materialized + sequential + auto_invoke`
+  - `materialized + fanout + auto_invoke`
+  - `cursor + sequential + auto_invoke`
+- La combinación `cursor + fanout` no debe considerarse soportada mientras no exista una estrategia distribuida específica para cursores.
+- La documentación humana y normativa debe explicitar que `cursor + fanout` es una fase posterior del motor y no una capacidad vigente.
+- Si en el futuro se habilita `cursor + fanout`, la implementación debe definir explícitamente una estrategia de partición o leasing distribuido, por ejemplo:
+  - shard por rangos de IDs;
+  - shard por ventanas fijas;
+  - lease de páginas desde Redis/DB;
+  - cursor independiente por shard.
 - Para procesos batch montados sobre `batchflow`, el runtime puede exponer un hook opcional de progreso por lote que reciba el mismo `Batch` efectivamente procesado por el `BatchProcessor`.
 - Ese hook opcional debe ser idempotente y seguro ante concurrencia entre shards; no debe depender de columnas derivadas persistidas en `bulk_jobs` para calcular avance si la fuente de verdad vive en `bulk_job_items`.
 - Si un proceso implementa ese hook, la definicion de "procesado" debe vivir en el lifecycle o estrategia del propio proceso y no hardcodearse en el manager compartido.
@@ -100,3 +120,5 @@ Sintetiza el dominio descrito en:
 - El runtime puede auto-cancelar una corrida por exceso de errores repetidos del mismo fingerprint.
 - Un proceso batch puede refrescar progreso agregado del padre por lote sin obligar a que todos los lifecycles implementen esa capacidad.
 - Si un proceso define una semantica custom de registros procesados o pendientes, `Finalize` y el refresco de progreso por lote deben reutilizar la misma regla.
+- Un proceso batch puede ejecutar corridas `materialized` o `cursor` sin perder compatibilidad con cancelacion, auto-cancel o `dispatch_pacing`.
+- El equipo puede identificar documentalmente qué combinaciones batch están soportadas hoy y cuál combinación queda explícitamente fuera del contrato actual: `cursor + fanout`.

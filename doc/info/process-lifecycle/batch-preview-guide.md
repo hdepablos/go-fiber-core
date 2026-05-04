@@ -20,6 +20,11 @@ Documento complementario:
 El motor `batchflow` expone un preview reutilizable para procesos como `procesar lote generico` y `punitorios`.
 El preview trabaja sobre el mismo `DataProvider` y el mismo `Processor` del flujo real.
 
+Nota de alcance:
+
+- el runtime de ejecución ya soporta `source_mode=materialized` y `source_mode=cursor`;
+- el preview sigue usando la ruta actual de preparación/selección del provider y hoy no expone un toggle específico de `source_mode`.
+
 En local ahora existen dos comportamientos:
 
 - preview puro: simula el resultado y no escribe en base.

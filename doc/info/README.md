@@ -51,6 +51,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 - [usage-guide.md](process-lifecycle/usage-guide.md): como usar el modulo.
 - [scenarios.md](process-lifecycle/scenarios.md): escenarios de ejecucion.
 - [testing-guide.md](process-lifecycle/testing-guide.md): pruebas funcionales y requests.
+- [example-cases.md](process-lifecycle/example-cases.md): catálogo reproducible de casos demo, comandos `create/delete/recreate` y `process_type` asociados.
 - [batch-preview-guide.md](process-lifecycle/batch-preview-guide.md): uso de batch preview, apply_changes local y run filtrado.
 - [batch-fanout-guide.md](process-lifecycle/batch-fanout-guide.md): fan-out batch para Lambda/EKS y configuración de steps.
 - [dispatch-pacing-guide.md](process-lifecycle/dispatch-pacing-guide.md): dosificación por tandas usando `process_batch` + `auto_invoke` con delay.
@@ -61,8 +62,7 @@ La estructura se clasifica por dominio para evitar duplicacion y para que cada a
 
 ## Exports
 
-- [bulk-export-generate-file-v1-async.md](exports/bulk-export-generate-file-v1-async.md): pipeline v1 asincrono.
-- [exportmanager-bulkexport-v2.md](exports/exportmanager-bulkexport-v2.md): framework y caso v2.
+- [exportmanager-guide.md](exports/exportmanager-guide.md): framework reusable de exportmanager y contratos operativos comunes.
 - [exportmanager-generar-archivo-banco-galicia.md](exports/exportmanager-generar-archivo-banco-galicia.md): implementacion Banco Galicia.
 
 ## Data

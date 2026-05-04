@@ -200,7 +200,7 @@ Matriz completa de revisión por tipo de cambio. Complementa el resumen en `AGEN
 
 **Specs obligatorias**:
 - `doc/specs/exports/export-pipelines-spec.md`
-- `doc/info/exports/exportmanager-bulkexport-v2.md`
+- `doc/info/exports/exportmanager-guide.md`
 
 **Criterio**: nuevo export batch, modificación de `exportmanager`, cambio en generación de archivos, integración de auto-cancel en exports.
 

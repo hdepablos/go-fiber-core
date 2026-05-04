@@ -13,6 +13,7 @@ code_paths:
 related_info:
   - doc/info/platform/makefile-guide.md
   - doc/info/development/process-scaffold-and-cleanup.md
+  - doc/info/process-lifecycle/example-cases.md
 related_specs:
   - doc/specs/architecture/service-runtime-bootstrap-spec.md
   - doc/specs/platform/process-scaffold-cleanup-spec.md
@@ -64,6 +65,7 @@ Todo target nuevo debe pertenecer a uno de estos dominios, salvo justificación 
 - Las utilidades operativas de uso humano frecuente deben evaluarse para aparecer en un catálogo resumido como `make list-tools`.
 - Si un scaffold soporta opciones operativas importantes como `force=true`, el catálogo debe mostrarlas.
 - Si un scaffold soporta modos funcionales relevantes, por ejemplo `mode=generic` o `mode=bulk_jobs`, el catálogo debe mostrarlos.
+- Si un scaffold soporta modos técnicos de carga relevantes, por ejemplo `source_mode=materialized` o `source_mode=cursor`, el catálogo debe mostrarlos.
 - Si un scaffold tiene variantes técnicas relevantes, por ejemplo `sequential`, `fanout` o `dispatch_pacing`, el catálogo debe mostrarlas o referenciarlas claramente.
 - Si un scaffold expone parámetros funcionales de una variante técnica, por ejemplo `pacing_messages` o `pacing_interval`, el catálogo debe mostrarlos cuando sean parte del uso recomendado.
 - Si existe una herramienta operativa para versionar o parchear procesos existentes, por ejemplo `add-process-pacing`, el catálogo debe mostrarla junto con su comando base y parámetros críticos.
@@ -95,6 +97,7 @@ Los targets destructivos o riesgosos deben dejar claro si:
 - Los comandos vinculados a otros dominios deben enlazarse con la documentación humana correspondiente cuando aplique.
 - Si se agrega un comando tipo scaffold o generador reusable, debe revisarse `make list-scaffolds` y la documentación humana de scaffolds.
 - Si se agrega una utilidad operativa de uso frecuente, debe evaluarse `make list-tools` y la documentación humana del Makefile.
+- Si se agrega una familia de comandos para recrear ejemplos reproducibles, el catálogo humano debe listar al menos `list`, `create`, `seed`, `recreate` y `delete`.
 
 ### 6. Scaffold y cleanup de procesos
 

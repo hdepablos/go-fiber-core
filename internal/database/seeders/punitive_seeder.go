@@ -75,7 +75,7 @@ func BatchProcessPunitiveSeeder(pool *pgxpool.Pool) error {
 				Order:        1,
 				Name:         "Step 1: Preparar lotes",
 				ExecutionKey: "bulk/process/punitive/start",
-				Config:       `{"batch_size":500,"redis_ttl_hours":24}`,
+				Config:       `{"batch_size":500,"redis_ttl_hours":24,"source_mode":"materialized"}`,
 			},
 			{
 				Order:        2,

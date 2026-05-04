@@ -22,12 +22,6 @@ import (
 	"go-fiber-core/internal/services/serviceconfig"
 	"go-fiber-core/internal/services/serviceconfig/contracts"
 
-	// Import services to register them
-	_ "go-fiber-core/internal/services/test"
-	_ "go-fiber-core/internal/services/test/common"
-	_ "go-fiber-core/internal/services/test/heavy"
-	_ "go-fiber-core/internal/services/test/mqb1t"
-
 	"github.com/google/uuid"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -37,6 +31,8 @@ import (
 
 	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/batchprocess/punitive"
+	_ "go-fiber-core/internal/services/batchprocess/punitivecursor"
+	_ "go-fiber-core/internal/services/examplesregistry"
 )
 
 var (

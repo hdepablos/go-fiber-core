@@ -92,6 +92,7 @@ status: active
 - [batch-fanout-spec.md](process-lifecycle/batch-fanout-spec.md)
 - [batch-observability-spec.md](process-lifecycle/batch-observability-spec.md)
 - [batch-preview-spec.md](process-lifecycle/batch-preview-spec.md)
+- [example-cases-spec.md](process-lifecycle/example-cases-spec.md)
 - [process-lifecycle-runtime-spec.md](process-lifecycle/process-lifecycle-runtime-spec.md)
 
 ### Exports

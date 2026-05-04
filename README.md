@@ -40,6 +40,7 @@ La documentacion se divide en dos capas complementarias:
 
 - [Overview del motor](doc/info/process-lifecycle/motor-overview.md)
 - [Runtime](doc/info/process-lifecycle/runtime.md)
+- [Example Cases](doc/info/process-lifecycle/example-cases.md)
 - [Uso](doc/info/process-lifecycle/usage-guide.md)
 - [Escenarios](doc/info/process-lifecycle/scenarios.md)
 - [Testing](doc/info/process-lifecycle/testing-guide.md)
@@ -51,8 +52,7 @@ La documentacion se divide en dos capas complementarias:
 
 ### Exports
 
-- [Bulk export v1 async](doc/info/exports/bulk-export-generate-file-v1-async.md)
-- [ExportManager v2](doc/info/exports/exportmanager-bulkexport-v2.md)
+- [ExportManager Guide](doc/info/exports/exportmanager-guide.md)
 - [Generar archivo Banco Galicia](doc/info/exports/exportmanager-generar-archivo-banco-galicia.md)
 
 ### Datos

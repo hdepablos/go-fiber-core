@@ -37,6 +37,9 @@ Aplica a procesos montados sobre `batchflow` que exponen:
 - `BatchProcessor`,
 - `StateStore`.
 
+La capacidad de preview descrita aquí es independiente del `source_mode` usado por la corrida real.
+Si un proceso soporta `source_mode=cursor`, el preview actual puede seguir resolviendo selección mediante la ruta existente del provider mientras no exista un contrato específico de preview incremental.
+
 Complementa la guia humana:
 
 - `doc/info/process-lifecycle/batch-preview-guide.md`

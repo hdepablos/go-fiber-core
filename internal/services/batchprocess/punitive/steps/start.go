@@ -23,6 +23,7 @@ type startStep struct {
 	servicePath string
 	batchSize   int
 	ttlHours    int
+	sourceMode  string
 }
 
 // Register publica los steps del proceso en el runtime de serviceconfig.
@@ -38,6 +39,7 @@ func NewStartStep() contracts.Service {
 	return &startStep{
 		batchSize: 500,
 		ttlHours:  24,
+		sourceMode: batchflow.SourceModeMaterialized,
 	}
 }
 
@@ -52,6 +54,7 @@ func (s *startStep) Init(ctx *contracts.ServiceContext, servicePath string) {
 		if v, ok := s.ctx.CurrentStepConfig["redis_ttl_hours"]; ok {
 			s.ttlHours = utils.ToInt(v)
 		}
+		s.sourceMode = resolveSourceMode(s.ctx)
 	}
 }
 
@@ -71,9 +74,10 @@ func (s *startStep) Execute() error {
 	}
 
 	res, err := prov.Manager().Start(s.ctx.Ctx, batchflow.StartRequest{
-		Input:     input,
-		BatchSize: s.batchSize,
-		RedisTTL:  time.Duration(s.ttlHours) * time.Hour,
+		Input:      input,
+		BatchSize:  s.batchSize,
+		RedisTTL:   time.Duration(s.ttlHours) * time.Hour,
+		SourceMode: s.sourceMode,
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)
@@ -86,6 +90,7 @@ func (s *startStep) Execute() error {
 	s.ctx.SetInputValue("total_batches", res.TotalBatches)
 	s.ctx.SetInputValue("batch_index", 0)
 	s.ctx.SetInputValue("is_last_batch", false)
+	s.ctx.SetInputValue("source_mode", s.sourceMode)
 
 	s.ctx.SetResult(s.servicePath, contracts.StepResult{
 		Status:  "completed",
@@ -94,6 +99,7 @@ func (s *startStep) Execute() error {
 			"key_redis":     res.RedisKey,
 			"id":            input.ParentID,
 			"total_batches": res.TotalBatches,
+			"source_mode":   s.sourceMode,
 		},
 	})
 	return nil

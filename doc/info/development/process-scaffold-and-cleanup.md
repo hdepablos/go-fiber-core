@@ -103,6 +103,12 @@ Estrategia `batch-oriented`:
 make create-batch-process process_name="procesar x" service_slug="procesar_x" type_process=batch-oriented
 ```
 
+Modo incremental `cursor`:
+
+```bash
+make create-batch-process process_name="procesar x" service_slug="procesar_x" source_mode=cursor
+```
+
 Si el scaffold ya existe y se quiere regenerar sobrescribiendo archivos generados:
 
 ```bash
@@ -115,6 +121,7 @@ Uso típico:
 - registra imports necesarios,
 - genera el seeder base secuencial,
 - genera el seeder adicional `_fanout`,
+- genera el seeder adicional `_cursor`,
 - cablea `runtimebootstrap`,
 - deja `ParentLifecycle.Fail(...)` en el template base,
 - registra el manager por `execution_key`,
@@ -124,6 +131,73 @@ Modos del scaffold:
 
 - `generic`: modo por defecto; deja `DataProvider`, `Processor`, `ParentLifecycle` y `Finalizer` comentados para adaptar otra tabla padre/hija.
 - `bulk_jobs`: genera el scaffold funcional base sobre `bulk_jobs` y `bulk_job_items` con la misma lógica operativa inicial usada en `punitorios`.
+
+Modos de carga:
+
+- `source_mode=materialized`: default; `start` materializa todos los batches y los persiste en Redis.
+- `source_mode=cursor`: agrega la variante `_cursor`; `start` deja preparado el cursor inicial y `process_batch` va cargando la siguiente página en cada vuelta.
+- En el contrato actual, `source_mode=cursor` corre de forma secuencial y fuerza `parallel_shards=1`.
+
+## Perfiles técnicos disponibles en batchflow
+
+Al generar un `batch-process`, el scaffold deja preparados tres perfiles técnicos del mismo negocio, cada uno como `process_version` distinta del mismo `process_type`.
+
+| Versión | Perfil técnico | `source_mode` | `execution_mode` | Uso recomendado |
+|---|---|---|---|---|
+| 1 | `materialized sequential` | `materialized` | `sequential` | Base operativa simple para datasets todavía materializables |
+| 2 | `materialized fanout` | `materialized` | `fanout` | Mayor throughput cuando el costo de materializar sigue siendo aceptable |
+| 3 | `cursor sequential` | `cursor` | `sequential` | Datasets grandes donde no conviene cargar todo el universo en Redis al inicio |
+
+### Qué aporta cada dimensión
+
+- `source_mode`:
+  - `materialized` prepara todos los lotes durante `start`;
+  - `cursor` prepara el estado inicial y resuelve la siguiente página durante `process_batch`.
+- `execution_mode`:
+  - `sequential` avanza una sola línea de procesamiento;
+  - `fanout` reparte shards concurrentes sobre batches ya materializados.
+- `auto_invoke`:
+  - no cambia la fuente de datos ni la estrategia de reparto;
+  - solo decide cómo se reinvoca el siguiente `process_batch` hasta cumplir la condición de cierre.
+
+### Diferencias prácticas entre los perfiles actuales
+
+- `materialized sequential`:
+  - guarda los batches completos en Redis;
+  - facilita debugging y trazabilidad;
+  - no reparte shards.
+- `materialized fanout`:
+  - también guarda los batches completos en Redis;
+  - usa `parallel_shards` y `execution_mode.type=fanout`;
+  - corta por `is_shard_complete`.
+- `cursor sequential`:
+  - no guarda el universo completo en Redis;
+  - usa cursor o estado incremental en runtime values;
+  - corta por `is_last_batch`.
+
+### Combinación pendiente: `cursor + fanout`
+
+Esa combinación todavía no es una capacidad vigente del motor.
+
+Hoy no alcanza con mezclar:
+
+- `source_mode=cursor`
+- `execution_mode.type=fanout`
+
+porque el modelo actual de cursor no define una estrategia distribuida para que múltiples shards reserven páginas sin solaparse.
+
+Fase 2 posible:
+
+- shard por rangos de IDs;
+- shard por ventanas fijas;
+- lease de páginas desde Redis/DB;
+- cursor independiente por shard.
+
+Hasta que esa fase 2 exista:
+
+- `cursor + fanout` debe considerarse pendiente;
+- `source_mode=cursor` sigue siendo secuencial;
+- el perfil para paralelismo sigue siendo `materialized fanout`.
 
 Estrategias del processor:
 
@@ -260,6 +334,7 @@ El scaffold de batch crea normalmente:
 - `steps/helpers.go`
 - seeder base del proceso: `batch_process_<service_slug>`
 - seeder fanout del proceso: `batch_process_<service_slug>_fanout`
+- seeder cursor del proceso: `batch_process_<service_slug>_cursor`
 - registro del manager por `execution_key`
 
 No crea una carpeta Bruno nueva por proceso.
@@ -270,6 +345,7 @@ Variantes operativas relevantes:
 - `bulk_jobs`: modo funcional tipo `punitorios` sobre `bulk_jobs/bulk_job_items`.
 - `sequential`: base generada automáticamente.
 - `fanout`: companion `_fanout` generado automáticamente.
+- `cursor`: companion `_cursor` generado automáticamente.
 - `dispatch_pacing`: variante técnica opcional generable desde el scaffold con `pacing=true`.
 - `clone-process-version`: operación hija de `batch-process` para clonar una `process_version` existente y opcionalmente agregar `dispatch_pacing`.
 - `add-process-pacing`: operación hija de `batch-process`, atajo de `clone-process-version` con pacing activado.
@@ -339,6 +415,7 @@ El cleanup elimina, cuando existen:
 - carpeta legacy `internal/services/<service_slug>/`
 - archivo de seeder del proceso
 - archivo de seeder fanout del proceso
+- archivo de seeder cursor del proceso
 - import en `cmd/api/main.go`
 - import en `cmd/sqs-consumer/main.go`
 - wiring en `internal/runtimebootstrap/bootstrap.go`
@@ -368,10 +445,12 @@ El cleanup elimina, cuando existen:
    Ejemplos:
    - `make create-batch-process process_name="mi proceso" service_slug="mi_proceso"`
    - `make create-batch-process process_name="mi proceso" service_slug="mi_proceso" mode=bulk_jobs`
+   - `make create-batch-process process_name="mi proceso" service_slug="mi_proceso" source_mode=cursor`
    - `make create-batch-process process_name="mi proceso" service_slug="mi_proceso" pacing=true pacing_messages=100 pacing_interval=2`
 2. si hace falta confirmar parámetros o cleanup, correr `make list-scaffolds`
 2. ejecutar el seeder base secuencial
 3. ejecutar el seeder fanout si se quiere comparar rendimiento
+3. ejecutar el seeder cursor si el proceso necesita corrida incremental
 3. abrir `test-batch-process`
 4. ajustar `process_type_id`, `process_version_id`, `sede_id`, `bulk_job_id`
 5. probar `prepare`
@@ -398,6 +477,7 @@ El cleanup elimina, cuando existen:
 
 - `delete-process` limpia código y archivos del repositorio, no borra datos ya seedados en la base.
 - Los requests de `test-batch-process` son genéricos; dependen de que el developer actualice las variables correctas.
+- El runtime batch soporta `source_mode=cursor`, pero el preview sigue apoyándose en la ruta actual del provider y no se configura hoy con un flag separado de `source_mode`.
 - Si un proceso tiene wiring manual fuera del patrón scaffold, el cleanup puede no capturarlo y requerir revisión manual.
 - `list-scaffolds` es un catálogo operativo, no una fuente dinámica; debe mantenerse sincronizado cuando aparezcan scaffolds nuevos.
 - `list-scaffolds` también debe mantenerse sincronizado cuando cambien opciones críticas como `force=true` o aparezcan variantes técnicas relevantes como `dispatch_pacing`, `pacing_messages` o `pacing_interval`.

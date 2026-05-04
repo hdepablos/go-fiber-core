@@ -38,6 +38,9 @@ Aplica a procesos batch que:
 - ejecutan `process_batch` asíncrono con `auto_invoke`,
 - finalizan una sola vez al terminar todos los shards.
 
+Este contrato describe el fan-out distribuido del modo materializado.
+Si un proceso usa `source_mode=cursor`, el runtime actual debe degradar `parallel_shards` a `1` hasta que exista una estrategia distribuida específica para cursores.
+
 Complementa:
 
 - `doc/info/process-lifecycle/batch-fanout-guide.md`

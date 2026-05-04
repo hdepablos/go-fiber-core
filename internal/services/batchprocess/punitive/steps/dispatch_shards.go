@@ -48,6 +48,7 @@ func (s *dispatchShardsStep) Execute() error {
 		Input:          input,
 		TotalBatches:   totalBatches,
 		ParallelShards: s.parallelShards,
+		SourceMode:     resolveSourceMode(s.ctx),
 	})
 	if err != nil {
 		markFailure(prov, s.ctx.Ctx, input, err)

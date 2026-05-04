@@ -244,9 +244,8 @@ code_paths:
   - internal/services/exportmanager/
   - internal/services/exports/bcra/
 related_info:
-  - doc/info/exports/exportmanager-bulkexport-v2.md
+  - doc/info/exports/exportmanager-guide.md
   - doc/info/exports/exportmanager-generar-archivo-banco-galicia.md
-  - doc/info/exports/bulk-export-generate-file-v1-async.md
 related_specs:
   - doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md
 status: active

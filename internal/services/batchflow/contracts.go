@@ -102,9 +102,10 @@ type StateStore interface {
 }
 
 type StartRequest struct {
-	Input     Input
-	BatchSize int
-	RedisTTL  time.Duration
+	Input      Input
+	BatchSize  int
+	RedisTTL   time.Duration
+	SourceMode string
 }
 
 type StartResult struct {
@@ -124,6 +125,7 @@ type ProcessRequest struct {
 	ShardIndex        int
 	TotalShards       int
 	DispatchPacing    DispatchPacingConfig
+	SourceMode        string
 }
 
 type ProcessBatchResult struct {
@@ -148,6 +150,7 @@ type DispatchRequest struct {
 	Input          Input
 	TotalBatches   int
 	ParallelShards int
+	SourceMode     string
 }
 
 type DispatchResult struct {

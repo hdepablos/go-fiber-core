@@ -12,12 +12,14 @@ import (
 	"go-fiber-core/internal/services/queue"
 	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/batchprocess/punitive"
+	"go-fiber-core/internal/services/batchprocess/punitivecursor"
 )
 
 type Dependencies struct {
 	Dispatcher  dispatcher.Dispatcher
 	BulkProcess bulkprocess.Provider
 	Punitive punitive.Provider
+	Punitivecursor punitivecursor.Provider
 }
 
 func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectDTO, queueService queue.MessageQueue) (*Dependencies, error) {
@@ -46,6 +48,13 @@ func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectD
 		errs = append(errs, fmt.Sprintf("punitive: %v", err))
 	}
 
+
+	if prov, err := punitivecursor.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis); err == nil {
+		deps.Punitivecursor = prov
+	} else {
+		errs = append(errs, fmt.Sprintf("punitivecursor: %v", err))
+	}
+
 	if len(errs) > 0 {
 		return deps, fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
@@ -62,6 +71,10 @@ func (d *Dependencies) Inject(ctx context.Context) context.Context {
 	if d.BulkProcess != nil {
 		ctx = bulkprocess.WithProvider(ctx, d.BulkProcess)
 	}
+	if d.Punitivecursor != nil {
+		ctx = punitivecursor.WithProvider(ctx, d.Punitivecursor)
+	}
+
 	if d.Punitive != nil {
 		ctx = punitive.WithProvider(ctx, d.Punitive)
 	}

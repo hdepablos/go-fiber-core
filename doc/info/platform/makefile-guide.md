@@ -100,7 +100,10 @@ Ejemplos:
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x"`
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x" mode=bulk_jobs`
 - `make create-batch-process process_name="procesar x" service_slug="procesar_x" type_process=batch-oriented`
+- `make create-batch-process process_name="procesar x" service_slug="procesar_x" source_mode=cursor`
 - `make create-command name=nuevoComando`
+- `make list-example-cases`
+- `make recreate-example-case case=process_lifecycle_manager`
 - `make list-scaffolds`
 - `make list-tools`
 - `make delete-process kind=batch-process service_slug=punitorios`
@@ -115,18 +118,21 @@ Uso:
 - scaffolding de procesos batch,
 - descubrimiento centralizado de scaffolds y generadores relacionados,
 - descubrimiento de utilidades operativas agrupadas por dominio,
+- recreación y cleanup de casos ejemplo reproducibles,
 - limpieza de procesos scaffold,
 - generación de código de inyección.
 
 Notas:
 
 - `create-batch-process` ya no genera carpeta Bruno específica por proceso.
-- `create-batch-process` genera dos seeders: base `sequential` y companion `_fanout`.
+- `create-batch-process` genera tres seeders: base `sequential`, companion `_fanout` y companion `_cursor`.
 - `create-batch-process` usa `mode=generic` por default y soporta `mode=bulk_jobs` para generar la base funcional tipo `punitorios`.
 - `create-batch-process` usa `type_process=item-oriented` por default y soporta `type_process=batch-oriented` para modelar la estrategia del processor.
+- `create-batch-process` usa `source_mode=materialized` por default y soporta `source_mode=cursor` para dejar la variante incremental.
 - `create-batch-process force=true` permite regenerar un scaffold existente sobrescribiendo los archivos generados.
 - `create-batch-process` soporta además la variante técnica `dispatch_pacing` con `pacing=true`.
 - `create-batch-process pacing=true` acepta `pacing_messages` y `pacing_interval` para generar el config del `process_batch`.
+- En el runtime actual, `source_mode=cursor` conserva `dispatch_pacing`, cancelación y auto-cancel, pero fuerza ejecución secuencial con `parallel_shards=1`.
 - `clone-process-version` y `add-process-pacing` se presentan en `list-scaffolds` como operaciones hijas del dominio `batch-process`, no como familias independientes.
 - `clone-process-version` es el comando genérico para obtener variantes nuevas como `fanout + pacing` o `sequential + pacing`.
 - `add-process-pacing` funciona como wrapper conveniente de `clone-process-version` con `with_pacing=true`.
@@ -140,6 +146,7 @@ Notas:
 - `create-external-adapter` genera un adapter HTTP reutilizable basado en `apis.xxx` de `config.yml`.
 - `create-external-integration` ejecuta ambos pasos en una sola corrida.
 - Para pruebas batch se usa la carpeta genérica `bruno/legacy/process-lifecycle/test-batch-process/`.
+- Los casos ejemplo reproducibles de process lifecycle se recrean con `create-example-case`, se siembran con `seed-example-case` y generan Bruno bajo `bruno/legacy/process-lifecycle/example-cases/<case>/`.
 - `delete-process` soporta `dry_run=true` para revisar el alcance antes de borrar archivos.
 
 ## `list-scaffolds`
@@ -171,7 +178,7 @@ Cobertura actual:
 Regla de mantenimiento:
 
 - si se agrega un comando nuevo orientado a scaffold o generación reutilizable, debe evaluarse su inclusión en `list-scaffolds`.
-- si un scaffold agrega una capacidad importante como `force=true` o una variante técnica relevante como `dispatch_pacing`, `list-scaffolds` y esta guía deben reflejarlo.
+- si un scaffold agrega una capacidad importante como `force=true`, un modo técnico como `source_mode=cursor` o una variante relevante como `dispatch_pacing`, `list-scaffolds` y esta guía deben reflejarlo.
 
 ## `list-tools`
 
@@ -201,6 +208,7 @@ Regla de mantenimiento:
 
 - si se agrega una utilidad operativa de uso humano frecuente, debe evaluarse su inclusión en `list-tools`.
 - `list-tools` no reemplaza `make help`; funciona como catálogo resumido y curado.
+- Las utilidades `list-example-cases`, `create-example-case`, `seed-example-case`, `recreate-example-case` y `delete-example-case` pertenecen al dominio operativo de ejemplos reproducibles.
 
 ## `create-external-api-config`
 

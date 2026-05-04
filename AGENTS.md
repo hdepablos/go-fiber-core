@@ -115,6 +115,7 @@ status: active | draft | deprecated
 | Spec | Cuándo leerla |
 |------|---------------|
 | [`doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`](doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md) | Manager, runtime del motor, resolución de versiones, execution keys, cancelación |
+| [`doc/specs/process-lifecycle/example-cases-spec.md`](doc/specs/process-lifecycle/example-cases-spec.md) | Casos ejemplo reproducibles, comandos create/delete/recreate, Bruno demo |
 | [`doc/specs/process-lifecycle/batch-preview-spec.md`](doc/specs/process-lifecycle/batch-preview-spec.md) | Preview batch, `apply_changes`, selección por `item_ids` o `row_numbers` |
 | [`doc/specs/process-lifecycle/batch-fanout-spec.md`](doc/specs/process-lifecycle/batch-fanout-spec.md) | Fanout, shards, capacidad, Redis batch, `auto_invoke` |
 | [`doc/specs/process-lifecycle/batch-observability-spec.md`](doc/specs/process-lifecycle/batch-observability-spec.md) | Observabilidad estructurada, rate limit, cancelación distribuida |
@@ -142,6 +143,7 @@ status: active | draft | deprecated
 | Tipo de cambio | Specs obligatorias |
 |----------------|-------------------|
 | Documentación o mapa documental | `documentation-governance-spec` · `documentation-defaults-spec` |
+| Casos ejemplo reproducibles, Bruno demo y cleanup de servicios `internal/services/test` | `example-cases-spec` · `makefile-automation-spec` |
 | Servicios, casos de uso, interfaces, refactors estructurales | `service-design-spec` · `core-architecture-spec` |
 | Wiring, bootstrap, runtime, registro de dependencias | `service-runtime-bootstrap-spec` · `platform-runtime-spec` |
 | Infraestructura, Terraform, Helm/K8s, Docker Compose, LocalStack, env vars | `service-runtime-bootstrap-spec` · `platform-runtime-spec` · `makefile-automation-spec`* |
@@ -155,7 +157,7 @@ status: active | draft | deprecated
 | Batch preview, `apply_changes`, `item_ids`, `row_numbers` | `batch-preview-spec` |
 | Fanout, shards, Redis batch, `auto_invoke`, throttling/pacing | `batch-fanout-spec` · `batch-observability-spec` · `process-lifecycle-runtime-spec` |
 | Cancelación operativa, kill switch, auto-cancel, guards de polling | `process-lifecycle-runtime-spec` · `batch-fanout-spec` · `batch-observability-spec` · `http-endpoints-spec`* |
-| Export batch, `exportmanager`, archivos por lote, auto-cancel de exports | `export-pipelines-spec` + `doc/info/exports/exportmanager-bulkexport-v2.md` |
+| Export batch, `exportmanager`, archivos por lote, auto-cancel de exports | `export-pipelines-spec` + `doc/info/exports/exportmanager-guide.md` |
 | Base de datos, modelos GORM, migraciones, queries, integridad | `database-schema-query-spec` |
 | Helpers o utilidades compartidas | `shared-utils-spec` |
 | Logger o ajuste de logging | `logger-runtime-spec` |
@@ -274,11 +276,12 @@ Antes de cerrar cualquier tarea, verificar explícitamente:
 | [`doc/info/development/process-scaffold-and-cleanup.md`](doc/info/development/process-scaffold-and-cleanup.md) | Scaffold y cleanup |
 | [`doc/info/platform/makefile-guide.md`](doc/info/platform/makefile-guide.md) | Makefile |
 | [`doc/info/process-lifecycle/runtime.md`](doc/info/process-lifecycle/runtime.md) | Process lifecycle |
+| [`doc/info/process-lifecycle/example-cases.md`](doc/info/process-lifecycle/example-cases.md) | Process lifecycle |
 | [`doc/info/process-lifecycle/batch-preview-guide.md`](doc/info/process-lifecycle/batch-preview-guide.md) | Batch preview |
 | [`doc/info/process-lifecycle/batch-fanout-guide.md`](doc/info/process-lifecycle/batch-fanout-guide.md) | Batch fanout |
 | [`doc/info/process-lifecycle/batch-capacity-and-stress-guide.md`](doc/info/process-lifecycle/batch-capacity-and-stress-guide.md) | Capacidad y stress |
 | [`doc/info/api/http-endpoints-guide.md`](doc/info/api/http-endpoints-guide.md) | API endpoints |
-| [`doc/info/exports/exportmanager-bulkexport-v2.md`](doc/info/exports/exportmanager-bulkexport-v2.md) | Exportmanager |
+| [`doc/info/exports/exportmanager-guide.md`](doc/info/exports/exportmanager-guide.md) | Exportmanager |
 
 ### Specs normativas (`doc/specs/`)
 
@@ -298,6 +301,7 @@ Antes de cerrar cualquier tarea, verificar explícitamente:
 | [`doc/specs/platform/makefile-automation-spec.md`](doc/specs/platform/makefile-automation-spec.md) | Platform |
 | [`doc/specs/platform/process-scaffold-cleanup-spec.md`](doc/specs/platform/process-scaffold-cleanup-spec.md) | Platform |
 | [`doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md`](doc/specs/process-lifecycle/process-lifecycle-runtime-spec.md) | Process Lifecycle |
+| [`doc/specs/process-lifecycle/example-cases-spec.md`](doc/specs/process-lifecycle/example-cases-spec.md) | Process Lifecycle |
 | [`doc/specs/process-lifecycle/batch-preview-spec.md`](doc/specs/process-lifecycle/batch-preview-spec.md) | Process Lifecycle |
 | [`doc/specs/process-lifecycle/batch-fanout-spec.md`](doc/specs/process-lifecycle/batch-fanout-spec.md) | Process Lifecycle |
 | [`doc/specs/process-lifecycle/batch-observability-spec.md`](doc/specs/process-lifecycle/batch-observability-spec.md) | Process Lifecycle |

@@ -150,7 +150,7 @@ Este cambio complementa:
 - `doc/info/development/service-design-conventions.md`
 - `doc/specs/architecture/service-design-spec.md`
 - `doc/info/process-lifecycle/runtime.md`
-- `doc/info/exports/exportmanager-bulkexport-v2.md`
+- `doc/info/exports/exportmanager-guide.md`
 - `doc/info/exports/exportmanager-generar-archivo-banco-galicia.md`
 
 Si en el futuro se agrega otro runtime especial o un nuevo scaffold, debe seguir la misma idea: dependencias explicitas, sin globals de negocio.

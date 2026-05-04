@@ -33,13 +33,13 @@ En Go, la convención es usar nombres de paquetes (carpetas) cortos, concisos y 
 El comando soporta cualquier nivel de profundidad y convierte nombres con guiones bajos a CamelCase automáticamente.
 
 ```bash
-make create-step name=test/imputation/capital_interest
+make create-step name=credit/imputation/capital_interest
 ```
-*   Archivo: `internal/services/test/imputation/capital_interest.go`
+*   Archivo: `internal/services/credit/imputation/capital_interest.go`
 *   Paquete: `package imputation`
 *   Struct Generado: `type CapitalInterest struct { ... }`
 *   Constructor: `NewCapitalInterestService()`
-*   Registro: `serviceconfig.Register("test/imputation/capital_interest", NewCapitalInterestService)`
+*   Registro: `serviceconfig.Register("credit/imputation/capital_interest", NewCapitalInterestService)`
 
 ---
 

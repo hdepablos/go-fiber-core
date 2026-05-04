@@ -49,6 +49,99 @@ Reglas recomendadas:
 - evitar incrementos ciegos por registro cuando hay fanout, shards o retries;
 - reutilizar la misma regla tanto en el refresco por lote como en `Finalize`, para no divergir entre progreso en caliente y cierre final.
 
+## Source Modes de `batchflow`
+
+El runtime batch soporta hoy dos estrategias de carga para el mismo modelo mental `start -> dispatch_shards -> process_batch -> finalize`.
+
+- `source_mode=materialized`:
+  - `start` carga el universo completo,
+  - corta batches,
+  - y persiste la lista en Redis.
+- `source_mode=cursor`:
+  - `start` no materializa todos los batches,
+  - calcula el `summary` e inicializa el cursor,
+  - y cada `process_batch` carga la siguiente página desde el provider.
+
+Garantías del modo `cursor`:
+
+- mantiene compatibilidad con cancelación manual;
+- mantiene compatibilidad con auto-cancel por errores repetidos;
+- mantiene compatibilidad con `dispatch_pacing`;
+- mantiene el mismo `ParentLifecycle`, `BatchProcessor` y `Finalizer`;
+- y usa `runtime values` como fuente de verdad del cursor actual y del batch pendiente cuando hay pacing.
+
+Límite actual:
+
+- `source_mode=cursor` corre secuencialmente y no participa todavía del fan-out distribuido;
+- si una versión batch define `parallel_shards > 1` pero corre con `source_mode=cursor`, el runtime efectivo degrada a `1`.
+
+## Modos disponibles de `batchflow`
+
+Para leer correctamente una versión batch conviene separar tres ejes:
+
+- `source_mode`: cómo se obtiene la data;
+- `execution_mode`: cómo se reparte el trabajo;
+- `auto_invoke`: cómo continúa el flujo entre invocaciones.
+
+### Diferencia entre `source_mode` y `auto_invoke`
+
+- `source_mode=materialized` decide que `start` cargue todo el universo y lo persista en Redis como batches.
+- `source_mode=cursor` decide que `start` solo prepare el cursor inicial y que cada `process_batch` cargue la siguiente página.
+- `auto_invoke` no define cómo se carga la data; define cómo se re-invoca el siguiente `process_batch` o cuándo se salta a `finalize`.
+
+Regla práctica:
+
+- `source_mode` responde "cómo leo";
+- `execution_mode` responde "cómo reparto";
+- `auto_invoke` responde "cómo continúo".
+
+### Combinaciones disponibles hoy
+
+| Perfil técnico | `source_mode` | `execution_mode` | `auto_invoke` | Qué hace |
+|---|---|---|---|---|
+| `materialized sequential` | `materialized` | `sequential` | Sí | Materializa todos los lotes en Redis y avanza batch por batch |
+| `materialized fanout` | `materialized` | `fanout` | Sí | Materializa todos los lotes, reparte shards y cada shard avanza en paralelo |
+| `cursor sequential` | `cursor` | `sequential` | Sí | No materializa todo; carga y procesa la siguiente página en cada vuelta |
+
+### Objetivo de cada perfil
+
+- `materialized sequential`:
+  - es la base más simple de operar;
+  - facilita debugging porque el universo batch queda precalculado;
+  - sirve cuando el volumen todavía permite materializar en Redis.
+- `materialized fanout`:
+  - busca throughput paralelo;
+  - sirve cuando el costo de materializar es aceptable;
+  - depende de shards y de batches ya persistidos.
+- `cursor sequential`:
+  - busca escalar sin cargar el universo completo al inicio;
+  - sirve cuando el cuello está en memoria, tiempo de preparación o tamaño del dataset;
+  - conserva cancelación, auto-cancel y `dispatch_pacing`.
+
+### Combinación pendiente: `cursor + fanout`
+
+Hoy esa combinación no forma parte del contrato operativo del motor.
+
+No basta con poner:
+
+- `source_mode=cursor`
+- `execution_mode.type=fanout`
+
+porque el cursor actual representa un avance secuencial compartido y el runtime no tiene todavía una estrategia distribuida para repartir páginas sin solapamiento.
+
+Fase 2 posible del motor:
+
+- shard por rangos de IDs;
+- shard por ventanas fijas;
+- lease de páginas desde Redis/DB;
+- cursor independiente por shard.
+
+Mientras esa fase 2 no exista:
+
+- `cursor + fanout` debe considerarse no soportado;
+- `source_mode=cursor` debe seguir corriendo con `parallel_shards=1`;
+- el camino correcto para paralelismo hoy sigue siendo `materialized + fanout`.
+
 ---
 
 ## 1. ServiceContext: bolsa de datos de negocio

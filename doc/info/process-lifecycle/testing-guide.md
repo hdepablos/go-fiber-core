@@ -1,5 +1,19 @@
 # Guía de Pruebas de Process Lifecycle
 
+## Flujo recomendado para ejemplos reproducibles
+
+Antes de ejecutar los casos de ejemplo, usa el sistema nuevo de `example cases`:
+
+```bash
+make recreate-example-case case=process_lifecycle_manager
+```
+
+Más catálogo y comandos:
+
+- `doc/info/process-lifecycle/example-cases.md`
+
+Los `seeders` siguen siendo la fuente de verdad en DB, pero ahora los servicios demo y los requests Bruno se recrean bajo demanda.
+
 A continuación se detallan los pasos para probar cada uno de los escenarios implementados.
 
 **Nota Importante:** Los IDs mostrados a continuación asumen una base de datos limpia. Si has corrido el seeder múltiples veces, los IDs pueden variar.

@@ -43,14 +43,16 @@ func ListSeedersNames() []string {
 		"process_lifecycle_manager",
 		"test_process_scenarios",
 		"process_lifecycle_auto_invoke",
-		"bulk_export_generate_file_v1",
-		"bulk_export_generate_file_v2",
 		"multi_queue_batch_one_table_process_lifecycle",
 		"multi_queue_batch_one_table_recreate_records",
 		"bulk_process_generic",
 		"bulk_process_generic_fanout",
 		"batch_process_punitive",
 		"batch_process_punitive_fanout",
+		"batch_process_punitive_cursor",
+		"batch_process_punitivecursor",
+		"batch_process_punitivecursor_fanout",
+		"batch_process_punitivecursor_cursor",
 		"all_menus",
 	}
 }
@@ -292,14 +294,6 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 		return ProcessLifecycleAutoInvokeSeeder(pool)
 	})
 
-	service.AddSeeder("bulk_export_generate_file_v1", func() error {
-		return BulkExportGenerateFileV1Seeder(pool)
-	})
-
-	service.AddSeeder("bulk_export_generate_file_v2", func() error {
-		return BulkExportGenerateFileV2Seeder(pool)
-	})
-
 	service.AddSeeder("multi_queue_batch_one_table_process_lifecycle", func() error {
 		return MultiQueueBatchOneTableProcessLifecycleSeeder(pool)
 	})
@@ -322,6 +316,22 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 
 	service.AddSeeder("batch_process_punitive_fanout", func() error {
 		return BatchProcessPunitiveFanoutSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_punitive_cursor", func() error {
+		return BatchProcessPunitiveCursorSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_punitivecursor", func() error {
+		return BatchProcessPunitivecursorSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_punitivecursor_fanout", func() error {
+		return BatchProcessPunitivecursorFanoutSeeder(pool)
+	})
+
+	service.AddSeeder("batch_process_punitivecursor_cursor", func() error {
+		return BatchProcessPunitivecursorCursorSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {

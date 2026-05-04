@@ -50,6 +50,7 @@ func (m *manager) Start(ctx context.Context, req StartRequest) (StartResult, err
 	if err := validateStartInput(req.Input); err != nil {
 		return StartResult{}, err
 	}
+	req.SourceMode = NormalizeSourceMode(req.SourceMode)
 	if strings.TrimSpace(req.Input.RedisKey) == "" {
 		req.Input.RedisKey = fmt.Sprintf("run-%s", uuid.NewString())
 	}
@@ -67,14 +68,26 @@ func (m *manager) Start(ctx context.Context, req StartRequest) (StartResult, err
 		}
 	}
 
-	load, err := m.dataProvider.LoadBatches(ctx, execCtx, req.BatchSize)
-	if err != nil {
-		return StartResult{}, err
-	}
-
-	batchesListKey, err := m.stateStore.Initialize(ctx, req.Input, load.Batches, load.Summary, load.Metadata, req.RedisTTL)
-	if err != nil {
-		return StartResult{}, err
+	var (
+		load           LoadBatchesResult
+		batchesListKey string
+	)
+	if req.SourceMode == SourceModeCursor {
+		var err error
+		load, batchesListKey, err = m.startCursorRun(ctx, execCtx, req)
+		if err != nil {
+			return StartResult{}, err
+		}
+	} else {
+		var err error
+		load, err = m.dataProvider.LoadBatches(ctx, execCtx, req.BatchSize)
+		if err != nil {
+			return StartResult{}, err
+		}
+		batchesListKey, err = m.stateStore.Initialize(ctx, req.Input, load.Batches, load.Summary, load.Metadata, req.RedisTTL)
+		if err != nil {
+			return StartResult{}, err
+		}
 	}
 	if m.runControl != nil {
 		if err := m.runControl.RegisterRun(ctx, req.Input, req.RedisTTL); err != nil {
@@ -105,10 +118,14 @@ func (m *manager) DispatchShards(ctx context.Context, req DispatchRequest) (Disp
 	if err := validateInput(req.Input); err != nil {
 		return DispatchResult{}, err
 	}
+	req.SourceMode = NormalizeSourceMode(req.SourceMode)
 	if req.TotalBatches <= 0 {
 		return DispatchResult{}, fmt.Errorf("total_batches inválido")
 	}
 	if req.ParallelShards <= 0 {
+		req.ParallelShards = 1
+	}
+	if req.SourceMode == SourceModeCursor {
 		req.ParallelShards = 1
 	}
 	if req.ParallelShards > req.TotalBatches {
@@ -133,6 +150,7 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 	if err := validateInput(req.Input); err != nil {
 		return ProcessResult{}, err
 	}
+	req.SourceMode = NormalizeSourceMode(req.SourceMode)
 	if cancelled, status, err := m.runCancellationStatus(ctx, req.Input); err != nil {
 		return ProcessResult{}, err
 	} else if cancelled {
@@ -146,6 +164,9 @@ func (m *manager) ProcessBatch(ctx context.Context, req ProcessRequest) (Process
 	}
 	if req.ShardIndex < 0 || req.ShardIndex >= req.TotalShards {
 		return ProcessResult{}, fmt.Errorf("shard_index fuera de rango: %d (total_shards=%d)", req.ShardIndex, req.TotalShards)
+	}
+	if req.SourceMode == SourceModeCursor {
+		return m.processCursorBatch(ctx, req)
 	}
 	if req.BatchIndex < 0 || req.BatchIndex >= req.TotalBatches {
 		return ProcessResult{}, fmt.Errorf("batch_index fuera de rango: %d (total=%d)", req.BatchIndex, req.TotalBatches)

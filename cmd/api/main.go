@@ -13,39 +13,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	fiberadapter "github.com/awslabs/aws-lambda-go-api-proxy/fiber"
 
-	// Registro de servicios (Process Lifecycle)
-	//
-	// El Process Lifecycle executor resuelve cada step por su `execution_key` (string) y busca una
-	// factory registrada en `serviceconfig` con esa misma key.
-	//
-	// En Go, si un paquete no se importa, su `init()` no corre y por lo tanto no se registra el servicio.
-	// Por eso estos imports en blanco (`_`) son obligatorios para que el registry tenga las keys.
-	//
-	// Si en base de datos hay un step con `execution_key = "validate_input"` pero NO existe un
-	// `serviceconfig.Register("validate_input", ...)` incluido por alguno de estos paquetes,
-	// el runtime fallará con:
-	//   "servicio no encontrado en el registro: validate_input"
-	//
-	// Paquetes de servicios incluidos para pruebas/demo de Process Lifecycle:
-	// - internal/services/test/common: common/validate, common/calculate, common/notify, batch/processor, batch/consolidate
-	// - internal/services/test/heavy: heavy/process
-	// - internal/services/test/loanrisk: loanrisk/age, loanrisk/salary, loanrisk/validation, loanrisk/is_renovation, loanrisk/risk_level
-	// - internal/services/test: test/auto_invoke (y otros helpers de prueba)
-	_ "go-fiber-core/internal/services/test/loanrisk"
-	_ "go-fiber-core/internal/services/test/mqb1t"
-
-	// Servicios de prueba concurrente (no pertenecen al seed principal de Process Lifecycle)
-	_ "go-fiber-core/internal/services/test/steps_concurrent"
-
-	// Servicios de prueba de auto-invoke (loop/batch)
-	_ "go-fiber-core/internal/services/test"
-
-	// Servicios de demo para escenarios seed de Process Lifecycle
-	_ "go-fiber-core/internal/services/test/common"
-	_ "go-fiber-core/internal/services/test/heavy"
-
 	_ "go-fiber-core/internal/services/bulkprocess"
 	_ "go-fiber-core/internal/services/batchprocess/punitive"
+	_ "go-fiber-core/internal/services/batchprocess/punitivecursor"
+	_ "go-fiber-core/internal/services/examplesregistry"
 )
 
 var fiberLambda *fiberadapter.FiberLambda

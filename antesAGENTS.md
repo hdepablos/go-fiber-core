@@ -207,7 +207,7 @@ No asumir que alcanza con `AGENTS.md` si el cambio toca un dominio con spec dedi
   - `doc/specs/api/http-endpoints-spec.md` si también se expone endpoint operativo
 - Export batch, `exportmanager`, generación de archivos por lotes, auto-cancel de exports o registro de managers por `execution_key`:
   - `doc/specs/exports/export-pipelines-spec.md`
-  - `doc/info/exports/exportmanager-bulkexport-v2.md`
+  - `doc/info/exports/exportmanager-guide.md`
 - Exports, exportmanager, layouts, pipelines o generación de archivos:
   - `doc/specs/exports/export-pipelines-spec.md`
 - Base de datos, modelos GORM, migraciones, relaciones, queries e integridad:

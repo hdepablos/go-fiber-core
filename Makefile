@@ -212,7 +212,7 @@ create-export-manager: ## 🧩 Genera un scaffold de exportmanager. Uso: make cr
 	@echo "$(SUCCESS)✨ Scaffold exportmanager generado correctamente.$(RESET)"
 
 .PHONY: create-batch-process
-create-batch-process: ## 🧩 Genera un scaffold de batchflow. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x] [mode=generic|bulk_jobs] [type_process=item-oriented|batch-oriented] [pacing=true pacing_messages=100 pacing_interval=2]
+create-batch-process: ## 🧩 Genera un scaffold de batchflow. Uso: make create-batch-process process_name="procesar x" [service_slug=procesar_x] [mode=generic|bulk_jobs] [type_process=item-oriented|batch-oriented] [source_mode=materialized|cursor] [pacing=true pacing_messages=100 pacing_interval=2]
 	@if [ -z "$(process_name)" ]; then \
 		echo "$(ERROR)❌ Debes especificar process_name: make create-batch-process process_name=\"procesar x\" [service_slug=procesar_x]$(RESET)"; \
 		exit 1; \
@@ -223,6 +223,7 @@ create-batch-process: ## 🧩 Genera un scaffold de batchflow. Uso: make create-
 		-service-slug "$(service_slug)" \
 		-mode "$(or $(mode),generic)" \
 		-type-process "$(or $(type_process),item-oriented)" \
+		-source-mode "$(or $(source_mode),materialized)" \
 		-batch-size "$(or $(batch_size),500)" \
 		-concurrent-batches "$(or $(concurrent_batches),1)" \
 		-parallel-shards "$(or $(parallel_shards),4)" \
@@ -233,6 +234,38 @@ create-batch-process: ## 🧩 Genera un scaffold de batchflow. Uso: make create-
 		-with-bruno=false \
 		$(if $(filter true,$(force)),-force,)
 	@echo "$(SUCCESS)✨ Scaffold batchflow generado correctamente.$(RESET)"
+
+.PHONY: list-example-cases
+list-example-cases: ## 🧪 Lista los casos ejemplo reproducibles de process lifecycle. Uso: make list-example-cases
+	@go run ./cmd/tools/example-case-manager -action list -case all -repo-root . -verbose
+
+.PHONY: create-example-case
+create-example-case: ## 🧪 Recrea servicios y Bruno de un caso ejemplo. Uso: make create-example-case case=process_lifecycle_manager|all
+	@echo "$(INFO)🧪 Creando caso ejemplo $(or $(case),all)...$(RESET)"
+	@go run ./cmd/tools/example-case-manager -action create -case "$(or $(case),all)" -repo-root .
+	@echo "$(SUCCESS)✨ Caso ejemplo creado correctamente.$(RESET)"
+
+.PHONY: delete-example-case
+delete-example-case: ## 🧹 Elimina servicios y Bruno de un caso ejemplo. Uso: make delete-example-case case=process_lifecycle_manager|all
+	@echo "$(INFO)🧹 Eliminando caso ejemplo $(or $(case),all)...$(RESET)"
+	@go run ./cmd/tools/example-case-manager -action delete -case "$(or $(case),all)" -repo-root .
+	@echo "$(SUCCESS)✨ Caso ejemplo eliminado correctamente.$(RESET)"
+
+.PHONY: seed-example-case
+seed-example-case: ## 🌱 Ejecuta el seeder asociado a un caso ejemplo. Uso: make seed-example-case case=process_lifecycle_manager|all
+	@if [ -z "$(case)" ] || [ "$(case)" = "all" ]; then \
+		for c in process_lifecycle_manager test_process_scenarios process_lifecycle_auto_invoke multi_queue_batch_one_table_process_lifecycle multi_queue_batch_one_table_recreate_records; do \
+			$(MAKE) seed-one name=$$c; \
+		done; \
+	else \
+		$(MAKE) seed-one name=$(case); \
+	fi
+
+.PHONY: recreate-example-case
+recreate-example-case: ## 🔁 Elimina, recrea y siembra un caso ejemplo. Uso: make recreate-example-case case=process_lifecycle_manager|all
+	@$(MAKE) delete-example-case case="$(or $(case),all)"
+	@$(MAKE) create-example-case case="$(or $(case),all)"
+	@$(MAKE) seed-example-case case="$(or $(case),all)"
 
 .PHONY: add-process-pacing
 add-process-pacing: ## ⏱️ Clona una process_version existente y agrega dispatch_pacing al step process_batch. Uso: make add-process-pacing source_version_id=2 operator_id=1 pacing_messages=100 pacing_interval=2
@@ -283,15 +316,21 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" force=true"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" mode=bulk_jobs"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" type_process=batch-oriented"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" source_mode=cursor"
+	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" mode=bulk_jobs source_mode=cursor"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" mode=bulk_jobs type_process=item-oriented"
 	@echo "   make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" pacing=true pacing_messages=100 pacing_interval=2"
 	@echo ""
 	@echo "   Variantes:"
 	@echo "   - generic: modo por defecto; deja provider/processor/lifecycle comentados para adaptar otra tabla padre/hija"
+	@echo "   - source_mode=materialized: modo default; materializa todos los batches en Redis durante start"
+	@echo "   - source_mode=cursor: agrega la variante companion _cursor y deja stubs/implementacion incremental por pagina"
 	@echo "   - type_process=item-oriented: default; el developer implementa processItemOriented(...)"
 	@echo "   - type_process=batch-oriented: el developer implementa processBatchOriented(...)"
 	@echo "   - sequential: version base generada automaticamente"
 	@echo "   - fanout: version companion _fanout generada automaticamente"
+	@echo "   - cursor: version companion _cursor generada automaticamente para corrida incremental secuencial"
+	@echo "   - ejemplo cursor: make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" source_mode=cursor"
 	@echo "   - dispatch_pacing: variante opcional generable via pacing=true"
 	@echo "   - bulk_jobs: genera el scaffold funcional tipo punitorios sobre bulk_jobs/bulk_job_items"
 	@echo "     Implementacion esperada del modo bulk_jobs:"
@@ -318,10 +357,12 @@ list-scaffolds: ## 📚 Lista los comandos tipo scaffold y generadores relaciona
 	@echo "   - steps/helpers.go"
 	@echo "   - seeder base sequential"
 	@echo "   - seeder companion _fanout"
+	@echo "   - seeder companion _cursor"
 	@echo ""
 	@echo "   Opciones importantes:"
 	@echo "   - mode=generic|bulk_jobs: generic es el default; bulk_jobs genera la base funcional tipo punitorios"
 	@echo "   - type_process=item-oriented|batch-oriented: define la estrategia del processor; item-oriented es el default"
+	@echo "   - source_mode=materialized|cursor: materialized es el default; cursor deja habilitada la ruta incremental"
 	@echo "   - force=true: regenera y sobrescribe archivos scaffold existentes"
 	@echo "   - pacing=true: agrega dispatch_pacing al step process_batch"
 	@echo "   - pacing_messages=<n>: items por invocacion cuando pacing=true"
@@ -453,19 +494,27 @@ list-tools: ## 🧰 Lista utilidades operativas agrupadas por dominio. Uso: make
 	@echo "   - make list-scaffolds"
 	@echo "   - make create-step name=carpeta/servicio"
 	@echo "   - make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\""
+	@echo "   - make create-batch-process process_name=\"procesar x\" service_slug=\"procesar_x\" source_mode=cursor"
 	@echo "   - make clone-process-version source_version_id=19 operator_id=1 with_pacing=true pacing_messages=100 pacing_interval=2"
 	@echo "   - make add-process-pacing source_version_id=2 operator_id=1 pacing_messages=100 pacing_interval=2"
 	@echo "   - make create-export-manager process_name=\"generar archivo x\" service_slug=\"generar_archivo_x\" file=\"exports/x/y\""
 	@echo "   - make create-external-integration api_key=customer_api"
 	@echo "   - make create-command name=nuevoComando"
 	@echo ""
-	@echo "2. Procesos, seeds y cleanup"
+	@echo "2. Casos ejemplo"
+	@echo "   - make list-example-cases"
+	@echo "   - make create-example-case case=process_lifecycle_manager"
+	@echo "   - make seed-example-case case=process_lifecycle_manager"
+	@echo "   - make recreate-example-case case=process_lifecycle_manager"
+	@echo "   - make delete-example-case case=process_lifecycle_manager"
+	@echo ""
+	@echo "3. Procesos, seeds y cleanup"
 	@echo "   - make seed-list"
 	@echo "   - make seed-one name=..."
 	@echo "   - make delete-process kind=batch-process service_slug=..."
 	@echo "   - make delete-process kind=export service_slug=... dry_run=true"
 	@echo ""
-	@echo "3. Redis y estado"
+	@echo "4. Redis y estado"
 	@echo "   - make redis-list-project-keys"
 	@echo "   - make redis-get-key k=\"go-fiber-core:lifecycle-2\""
 	@echo "   - make redis-del key=\"catalogs*\""
