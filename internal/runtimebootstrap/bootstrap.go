@@ -13,6 +13,7 @@ import (
 	"go-fiber-core/internal/services/runtimectx"
 	"go-fiber-core/internal/services/batchprocess/punitive"
 	"go-fiber-core/internal/services/batchprocess/punitivecursor"
+	"go-fiber-core/internal/services/exports/bcra"
 )
 
 type Dependencies struct {
@@ -20,6 +21,7 @@ type Dependencies struct {
 	BulkProcess bulkprocess.Provider
 	Punitive punitive.Provider
 	Punitivecursor punitivecursor.Provider
+	Bcra bcra.Provider
 }
 
 func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectDTO, queueService queue.MessageQueue) (*Dependencies, error) {
@@ -55,6 +57,20 @@ func Build(ctx context.Context, appCfg *config.AppConfig, conn *connect.ConnectD
 		errs = append(errs, fmt.Sprintf("punitivecursor: %v", err))
 	}
 
+
+	// scaffold:export-runtime-start:bcra
+	if awsSvc, err := queue.NewAWSService(ctx); err != nil {
+		errs = append(errs, fmt.Sprintf("bcra aws: %v", err))
+	} else {
+		s3Client := awsSvc.NewS3Client()
+		if prov, err := bcra.NewProviderWithConfig(appCfg, conn, conn.ConnectRedis, s3Client); err == nil {
+			deps.Bcra = prov
+		} else {
+			errs = append(errs, fmt.Sprintf("bcra: %v", err))
+		}
+	}
+	// scaffold:export-runtime-end:bcra
+
 	if len(errs) > 0 {
 		return deps, fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
@@ -77,6 +93,10 @@ func (d *Dependencies) Inject(ctx context.Context) context.Context {
 
 	if d.Punitive != nil {
 		ctx = punitive.WithProvider(ctx, d.Punitive)
+	}
+
+	if d.Bcra != nil {
+		ctx = bcra.WithProvider(ctx, d.Bcra)
 	}
 
 	return ctx

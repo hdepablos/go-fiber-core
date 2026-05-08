@@ -7,5 +7,7 @@ pipx install terraform-local
 tflocal --version
 
 tflocal init
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
 
-
+brew install redis

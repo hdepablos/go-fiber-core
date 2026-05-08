@@ -1,9 +1,8 @@
-
 services:
   # Infraestructura LocalStack
   localstack:
     container_name: localstack
-    image: localstack/localstack:latest
+    image: localstack/localstack:4.14.0
     ports:
       - "4566:4566"
       - "4567:4567"

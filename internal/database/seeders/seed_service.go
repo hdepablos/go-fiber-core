@@ -53,6 +53,7 @@ func ListSeedersNames() []string {
 		"batch_process_punitivecursor",
 		"batch_process_punitivecursor_fanout",
 		"batch_process_punitivecursor_cursor",
+		"export_manager_bcra",
 		"all_menus",
 	}
 }
@@ -332,6 +333,10 @@ func registerSeeders(service *SeederService, dbPool interface{}, configPath stri
 
 	service.AddSeeder("batch_process_punitivecursor_cursor", func() error {
 		return BatchProcessPunitivecursorCursorSeeder(pool)
+	})
+
+	service.AddSeeder("export_manager_bcra", func() error {
+		return ExportManagerBcraSeeder(pool)
 	})
 
 	service.AddSeeder("all_menus", func() error {

@@ -51,8 +51,9 @@ func main() {
 		fatal(err)
 	}
 
+	repoRoot := resolveRepoRoot()
 	data := buildScaffoldData(opts)
-	paths := scaffoldPaths(data)
+	paths := scaffoldPaths(repoRoot, data)
 
 	if err := ensurePaths(paths, opts.Force); err != nil {
 		fatal(err)
@@ -110,16 +111,16 @@ func main() {
 		}
 	}
 
-	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/api/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
+	if err := patchImportBlock(filepath.Join(repoRoot, "cmd/api/main.go"), fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
 		fatal(err)
 	}
-	if err := patchImportBlock("/private/var/www/go-fiber-core/cmd/sqs-consumer/main.go", fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
+	if err := patchImportBlock(filepath.Join(repoRoot, "cmd/sqs-consumer/main.go"), fmt.Sprintf(`_ "go-fiber-core/internal/services/exports/%s"`, data.ServiceSlug)); err != nil {
 		fatal(err)
 	}
-	if err := patchSeedService(data); err != nil {
+	if err := patchSeedService(repoRoot, data); err != nil {
 		fatal(err)
 	}
-	if err := patchRuntimeBootstrap(data); err != nil {
+	if err := patchRuntimeBootstrap(repoRoot, data); err != nil {
 		fatal(err)
 	}
 
@@ -165,8 +166,8 @@ type generatedPaths struct {
 	brunoFile                    string
 }
 
-func scaffoldPaths(data scaffoldData) generatedPaths {
-	serviceDir := filepath.Join("/private/var/www/go-fiber-core/internal/services/exports", data.ServiceSlug)
+func scaffoldPaths(repoRoot string, data scaffoldData) generatedPaths {
+	serviceDir := filepath.Join(repoRoot, "internal/services/exports", data.ServiceSlug)
 	return generatedPaths{
 		serviceDir:                   serviceDir,
 		providerFile:                 filepath.Join(serviceDir, "provider.go"),
@@ -183,9 +184,9 @@ func scaffoldPaths(data scaffoldData) generatedPaths {
 		stepsFinalizeFile:            filepath.Join(serviceDir, "steps", "finalize.go"),
 		stepsInputFile:               filepath.Join(serviceDir, "steps", "input.go"),
 		stepsFailureFile:             filepath.Join(serviceDir, "steps", "failure.go"),
-		seederFile:                   filepath.Join("/private/var/www/go-fiber-core/internal/database/seeders", data.ServiceSlug+"_seeder.go"),
-		docFile:                      filepath.Join("/private/var/www/go-fiber-core/doc/info", data.DocFileName),
-		brunoFile:                    filepath.Join("/private/var/www/go-fiber-core/bruno/process-lifecycle", data.BrunoFileName),
+		seederFile:                   filepath.Join(repoRoot, "internal/database/seeders", data.ServiceSlug+"_seeder.go"),
+		docFile:                      filepath.Join(repoRoot, "doc/info", data.DocFileName),
+		brunoFile:                    filepath.Join(repoRoot, "bruno/process-lifecycle", data.BrunoFileName),
 	}
 }
 
@@ -357,8 +358,8 @@ func patchImportBlock(filePath, importLine string) error {
 	return os.WriteFile(filePath, []byte(newContent), 0o644)
 }
 
-func patchSeedService(data scaffoldData) error {
-	filePath := "/private/var/www/go-fiber-core/internal/database/seeders/seed_service.go"
+func patchSeedService(repoRoot string, data scaffoldData) error {
+	filePath := filepath.Join(repoRoot, "internal/database/seeders/seed_service.go")
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -384,8 +385,8 @@ func patchSeedService(data scaffoldData) error {
 	return os.WriteFile(filePath, []byte(fileStr), 0o644)
 }
 
-func patchRuntimeBootstrap(data scaffoldData) error {
-	filePath := "/private/var/www/go-fiber-core/internal/runtimebootstrap/bootstrap.go"
+func patchRuntimeBootstrap(repoRoot string, data scaffoldData) error {
+	filePath := filepath.Join(repoRoot, "internal/runtimebootstrap/bootstrap.go")
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -457,6 +458,37 @@ func patchRuntimeBootstrap(data scaffoldData) error {
 	}
 
 	return os.WriteFile(filePath, []byte(fileStr), 0o644)
+}
+
+func resolveRepoRoot() string {
+	if root := strings.TrimSpace(os.Getenv("GO_FIBER_CORE_ROOT")); root != "" {
+		if abs, err := filepath.Abs(root); err == nil {
+			return abs
+		}
+		return root
+	}
+
+	wd, err := os.Getwd()
+	if err != nil || wd == "" {
+		return "/private/var/www/go-fiber-core"
+	}
+
+	dir := wd
+	for {
+		modPath := filepath.Join(dir, "go.mod")
+		if _, statErr := os.Stat(modPath); statErr == nil {
+			if b, readErr := os.ReadFile(modPath); readErr == nil && strings.Contains(string(b), "module go-fiber-core") {
+				return dir
+			}
+			return dir
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return wd
+		}
+		dir = parent
+	}
 }
 
 func renderProvider(data scaffoldData) string {

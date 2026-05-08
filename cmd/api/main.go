@@ -17,6 +17,7 @@ import (
 	_ "go-fiber-core/internal/services/batchprocess/punitive"
 	_ "go-fiber-core/internal/services/batchprocess/punitivecursor"
 	_ "go-fiber-core/internal/services/examplesregistry"
+	_ "go-fiber-core/internal/services/exports/bcra"
 )
 
 var fiberLambda *fiberadapter.FiberLambda
